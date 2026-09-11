@@ -8,9 +8,9 @@ import {
   SiDiscord,
   SiFacebook,
   SiReddit,
-  SiLinkedin,
   SiTwitch,
 } from "react-icons/si";
+import { FaLinkedin } from "react-icons/fa";
 import type { IconType } from "react-icons";
 
 export type Platform =
@@ -36,7 +36,7 @@ const MAP: Record<Platform, { Icon: IconType; color: string; label: string }> = 
   discord: { Icon: SiDiscord, color: "#5865F2", label: "Discord" },
   facebook: { Icon: SiFacebook, color: "#1877F2", label: "Facebook" },
   reddit: { Icon: SiReddit, color: "#FF4500", label: "Reddit" },
-  linkedin: { Icon: SiLinkedin, color: "#0A66C2", label: "LinkedIn" },
+  linkedin: { Icon: FaLinkedin, color: "#0A66C2", label: "LinkedIn" },
   twitch: { Icon: SiTwitch, color: "#9146FF", label: "Twitch" },
 };
 
