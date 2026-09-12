@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { listPendingWithdrawals, reviewWithdrawal } from "@/lib/taskora.functions";
+import { listPendingWithdrawals, reviewWithdrawal } from "@/lib/taskora-extra.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/withdrawals")({
   loader: async () => {

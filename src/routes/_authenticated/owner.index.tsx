@@ -42,6 +42,9 @@ function OwnerHub() {
         <Link to="/owner/reviews" className="card-surface block p-4 text-sm font-semibold">
           Task review queue
         </Link>
+        <Link to="/owner/withdrawals" className="card-surface block p-4 text-sm font-semibold">
+          Withdrawal queue
+        </Link>
         <Link to="/advertise" className="card-surface block p-4 text-sm font-semibold">
           Create / publish task
         </Link>
