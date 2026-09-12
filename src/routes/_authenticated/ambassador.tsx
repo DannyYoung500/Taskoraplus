@@ -3,7 +3,7 @@ import { Copy, Share2, Users, Crown } from "lucide-react";
 import { Screen, ScreenTitle } from "@/components/Screen";
 import { USER } from "@/lib/taskora-data";
 
-export const Route = createFileRoute("/ambassador")({
+export const Route = createFileRoute("/_authenticated/ambassador")({
   head: () => ({
     meta: [
       { title: "Channel Ambassador — TASKORA" },

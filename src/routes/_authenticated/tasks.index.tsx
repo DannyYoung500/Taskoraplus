@@ -5,7 +5,7 @@ import { TaskCard } from "@/components/TaskCard";
 import { CATEGORIES, TASKS } from "@/lib/taskora-data";
 import type { Platform } from "@/components/PlatformIcon";
 
-export const Route = createFileRoute("/tasks/")({
+export const Route = createFileRoute("/_authenticated/tasks/")({
   head: () => ({
     meta: [
       { title: "Tasks — TASKORA" },

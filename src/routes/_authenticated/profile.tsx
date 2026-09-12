@@ -4,7 +4,7 @@ import { Screen, ScreenTitle } from "@/components/Screen";
 import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
 import { USER } from "@/lib/taskora-data";
 
-export const Route = createFileRoute("/profile")({
+export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
       { title: "Profile — TASKORA" },

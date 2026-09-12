@@ -3,7 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, Bitcoin } from "lucide-react";
 import { Screen, ScreenTitle } from "@/components/Screen";
 import { LEDGER, USER } from "@/lib/taskora-data";
 
-export const Route = createFileRoute("/wallet")({
+export const Route = createFileRoute("/_authenticated/wallet")({
   head: () => ({
     meta: [
       { title: "Wallet — TASKORA" },
