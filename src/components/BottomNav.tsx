@@ -1,11 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, ListChecks, Wallet, Users, User } from "lucide-react";
+import { Home, ListChecks, PlayCircle, Wallet, User } from "lucide-react";
 
+/** Spec nav: HOME · TASKS · WATCH & EARN · WALLET · PROFILE */
 const ITEMS = [
   { to: "/home", label: "Home", Icon: Home },
   { to: "/tasks", label: "Tasks", Icon: ListChecks },
+  { to: "/watch-earn", label: "Watch", Icon: PlayCircle },
   { to: "/wallet", label: "Wallet", Icon: Wallet },
-  { to: "/ambassador", label: "Invite", Icon: Users },
   { to: "/profile", label: "Profile", Icon: User },
 ] as const;
 

@@ -1,73 +1,76 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 
+/**
+ * Telegram-native entry only.
+ * Google / email / password registration is forbidden by the master product spec.
+ * Full initData HMAC validation must complete on the server before any session is trusted.
+ */
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — TASKORA" },
+      { title: "Open TASKORA" },
       {
         name: "description",
-        content: "Sign in to TASKORA to complete verified social tasks and earn real crypto rewards.",
+        content: "Open TASKORA inside Telegram. Verified tasks. Real rewards.",
       },
-      { property: "og:title", content: "Sign in — TASKORA" },
-      { property: "og:description", content: "Sign in and start earning verified task rewards." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AuthScreen,
 });
 
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        initData?: string;
+        initDataUnsafe?: { user?: { id?: number; first_name?: string; username?: string } };
+        ready?: () => void;
+        expand?: () => void;
+        colorScheme?: string;
+      };
+    };
+  }
+}
+
 function AuthScreen() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<"checking" | "need-telegram" | "ready" | "error">("checking");
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
     try {
-      if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/home` },
-        });
-        if (error) throw error;
-        if (!data.session) {
-          setMessage("Check your email to confirm your account, then sign in.");
-          return;
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      }
-      navigate({ to: "/home", replace: true });
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
+      tg?.ready?.();
+      tg?.expand?.();
+    } catch {
+      /* ignore */
     }
-  }
 
-  async function handleGoogle() {
-    setMessage(null);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      setMessage("Google sign-in failed. Try again.");
+    const initData = tg?.initData ?? "";
+    if (!initData) {
+      setStatus("need-telegram");
+      setMessage("Open TASKORA from your Telegram bot. Browser email/Google login is not supported.");
       return;
     }
-    if (result.redirected) return;
-    navigate({ to: "/home", replace: true });
+
+    setStatus("ready");
+  }, []);
+
+  async function continueWithTelegram() {
+    setMessage(null);
+    const initData = window.Telegram?.WebApp?.initData ?? "";
+    if (!initData) {
+      setStatus("need-telegram");
+      setMessage("Telegram initData missing. Launch from the bot Mini App button.");
+      return;
+    }
+
+    // Session must be created only after server-side initData validation.
+    // Wire to a server function that validates HMAC with the bot token, then issues a session.
+    setMessage("Telegram session bridge is not fully wired yet. Server must validate initData before entry.");
+    setStatus("error");
   }
 
   return (
@@ -76,53 +79,36 @@ function AuthScreen() {
         <span className="bg-green-grad mx-auto inline-flex size-14 items-center justify-center rounded-2xl text-primary-foreground shadow-glow">
           <ShieldCheck className="size-7" />
         </span>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">
-          {mode === "signin" ? "Welcome back" : "Create your account"}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Verified tasks. Real rewards.</p>
+        <h1 className="mt-4 text-2xl font-bold tracking-tight">TASKORA</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Verified Tasks. Real Rewards.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card-surface space-y-3 p-4">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email address"
-          className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-        />
-        <input
-          type="password"
-          required
-          minLength={6}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="bg-green-grad w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-60"
-        >
-          {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
-        </button>
+      <div className="card-surface space-y-4 p-5">
+        <p className="text-sm text-muted-foreground">
+          Sign-in is Telegram-only. There is no Google login, email login, or password registration.
+        </p>
+
+        {status === "checking" ? (
+          <p className="text-center text-xs text-muted-foreground">Checking Telegram environment…</p>
+        ) : null}
+
+        {status === "need-telegram" ? (
+          <p className="text-center text-xs text-warning">{message}</p>
+        ) : null}
+
         <button
           type="button"
-          onClick={handleGoogle}
-          className="w-full rounded-2xl border border-input px-4 py-3.5 text-sm font-semibold"
+          onClick={continueWithTelegram}
+          disabled={status === "need-telegram" || status === "checking"}
+          className="bg-green-grad w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-50"
         >
-          Continue with Google
+          Continue with Telegram
         </button>
-        {message ? <p className="text-center text-xs text-warning">{message}</p> : null}
-      </form>
 
-      <button
-        onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-        className="mt-4 text-center text-xs font-semibold text-primary"
-      >
-        {mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}
-      </button>
+        {message && status === "error" ? (
+          <p className="text-center text-xs text-warning">{message}</p>
+        ) : null}
+      </div>
     </main>
   );
 }
