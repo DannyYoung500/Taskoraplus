@@ -1,8 +1,8 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, ListChecks, Wallet, Users, User } from "lucide-react";
 
 const ITEMS = [
-  { to: "/", label: "Home", Icon: Home },
+  { to: "/home", label: "Home", Icon: Home },
   { to: "/tasks", label: "Tasks", Icon: ListChecks },
   { to: "/wallet", label: "Wallet", Icon: Wallet },
   { to: "/ambassador", label: "Invite", Icon: Users },
@@ -10,6 +10,9 @@ const ITEMS = [
 ] as const;
 
 export function BottomNav() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname === "/" || pathname.startsWith("/auth")) return null;
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur-xl">
       <ul className="mx-auto flex max-w-md items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)] pt-1.5">
@@ -17,7 +20,6 @@ export function BottomNav() {
           <li key={to} className="flex-1">
             <Link
               to={to}
-              activeOptions={{ exact: to === "/" }}
               className="group flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-muted-foreground transition-colors"
               activeProps={{ className: "text-primary" }}
             >
