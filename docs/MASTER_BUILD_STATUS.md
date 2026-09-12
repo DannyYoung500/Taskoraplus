@@ -1,33 +1,46 @@
 # TASKORA — Master Build Status
 
-## Done in recent commits
+## Recently completed
 
-- Telegram-only auth UI (no Google/email/password forms)
-- Server `validateTelegramInitData` + `validateTelegramSession` (HMAC)
-- Bottom nav: Home · Tasks · Watch · Wallet · Profile
-- `/home` + `/watch-earn` routes
-- Tasks list/detail load from Supabase (not hardcoded TASKS array)
-- `submitTask` never auto-credits — always `pending`
-- Owner `reviewSubmission` (idempotent reward) + `listPendingSubmissions`
-- Schema migration draft: telegram_id, campaigns, connected_accounts, watch_*, audit_logs, owner_settings
+- Telegram initData HMAC validation
+- **Telegram session bridge** (`loginWithTelegram`) → Supabase session tokens
+- Auth UI sets session and opens `/home`
+- Tasks load from DB; submit always pending
+- Owner review API + `/owner/reviews` UI
+- Advertise scaffold (platform → type → configure → owner publish)
+- Schema expansion migration file
+- Watch & Earn stub screen
 
-## Remaining (priority order)
+## Required env (server)
 
-1. **Session bridge** — after valid initData, create/link user by `telegram_id` and issue real app session (replace Supabase email gate)
-2. **Apply migration** on Supabase (`20260912103000_master_schema_expand.sql`)
-3. **Set `TELEGRAM_BOT_TOKEN`** (server only)
-4. **Owner UI** — review queue consuming `listPendingSubmissions` / `reviewSubmission`
-5. **Advertise flow** — platform → type → configure → fund → publish → campaign rows
-6. **Connected accounts** — real verification per platform (Telegram membership needs bot admin)
-7. **Watch & Earn provider** — signed callbacks, limits, cooldown, unique provider_tx_id
-8. **Full Owner Control Center** modules (overview, users, fraud, settings, branding, legal…)
-9. **Bot flow** — Start → language → welcome → Open Mini App + webhook
-10. **Deposits** + provider webhooks; withdrawal owner review states
-11. **XP / leaderboards / notifications / support tickets**
-12. **Remove leftover demo seed reliance**; regenerate `routeTree.gen.ts` on build
-13. **E2E inside Telegram** acceptance tests from master prompt §37
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_AUTH_SECRET` (optional; falls back to bot token)
+- `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
+
+## Owner setup
+
+Grant admin role in Supabase:
+
+```sql
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('<your-auth-user-uuid>', 'admin')
+ON CONFLICT DO NOTHING;
+```
+
+## Remaining
+
+1. Apply schema migration on Supabase if not applied
+2. Regenerate TanStack `routeTree.gen.ts` via `npm run dev` / build
+3. Bot Start → language → welcome → Open Mini App + webhook
+4. Full advertiser funding / campaign budget ledger
+5. Connected accounts + real platform verification
+6. Watch & Earn provider callbacks + fraud controls
+7. Full Owner Control Center (users, fraud, settings, branding, legal, support…)
+8. Deposits webhooks; withdrawal owner workflow UI
+9. XP / leaderboards / notifications
+10. listUsers pagination for Telegram bridge (scale beyond 200 users)
+11. E2E tests inside Telegram
 
 ## Non-claims
 
-- Do not claim Watch & Earn, Advertise funding, or Telegram membership verification work until providers/bot admin are configured and tested.
-- Do not claim balances/rewards without ledger rows.
+Provider payouts, social API verification, and full owner suite are not complete until configured and tested.

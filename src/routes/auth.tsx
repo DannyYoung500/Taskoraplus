@@ -1,12 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { validateTelegramSession } from "@/lib/taskora.functions";
+import { loginWithTelegram } from "@/lib/taskora.functions";
+import { supabase } from "@/integrations/supabase/client";
 
-/**
- * Telegram-native entry only.
- * Google / email / password registration is forbidden.
- */
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
@@ -25,7 +22,6 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData?: string;
-        initDataUnsafe?: { user?: { id?: number; first_name?: string; username?: string } };
         ready?: () => void;
         expand?: () => void;
       };
@@ -34,11 +30,11 @@ declare global {
 }
 
 function AuthScreen() {
-  const [status, setStatus] = useState<"checking" | "need-telegram" | "ready" | "valid" | "error">(
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<"checking" | "need-telegram" | "ready" | "busy" | "error">(
     "checking",
   );
   const [message, setMessage] = useState<string | null>(null);
-  const [identity, setIdentity] = useState<string | null>(null);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -48,11 +44,9 @@ function AuthScreen() {
     } catch {
       /* ignore */
     }
-
-    const initData = tg?.initData ?? "";
-    if (!initData) {
+    if (!(tg?.initData ?? "")) {
       setStatus("need-telegram");
-      setMessage("Open TASKORA from your Telegram bot Mini App button. Browser login is not supported.");
+      setMessage("Open TASKORA from your Telegram bot Mini App button.");
       return;
     }
     setStatus("ready");
@@ -67,22 +61,18 @@ function AuthScreen() {
       return;
     }
 
+    setStatus("busy");
     try {
-      const result = await validateTelegramSession({ data: { initData } });
-      setIdentity(
-        [result.firstName, result.username ? `@${result.username}` : null, `id:${result.telegramId}`]
-          .filter(Boolean)
-          .join(" · "),
-      );
-      setStatus("valid");
-      setMessage(
-        result.sessionReady
-          ? "Session ready."
-          : "initData signature verified. Full app session bridge (link telegram_id → login) is the next deploy step — set TELEGRAM_BOT_TOKEN on the server.",
-      );
+      const result = await loginWithTelegram({ data: { initData } });
+      const { error } = await supabase.auth.setSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      });
+      if (error) throw error;
+      navigate({ to: "/home", replace: true });
     } catch (e) {
       setStatus("error");
-      setMessage(e instanceof Error ? e.message : "Validation failed");
+      setMessage(e instanceof Error ? e.message : "Telegram login failed");
     }
   }
 
@@ -98,12 +88,8 @@ function AuthScreen() {
 
       <div className="card-surface space-y-4 p-5">
         <p className="text-sm text-muted-foreground">
-          Sign-in is Telegram-only. No Google login, email, or password.
+          Telegram-only access. Your identity is verified with Telegram initData on the server.
         </p>
-
-        {status === "checking" ? (
-          <p className="text-center text-xs text-muted-foreground">Checking Telegram environment…</p>
-        ) : null}
 
         {status === "need-telegram" ? (
           <p className="text-center text-xs text-warning">{message}</p>
@@ -112,14 +98,13 @@ function AuthScreen() {
         <button
           type="button"
           onClick={continueWithTelegram}
-          disabled={status === "need-telegram" || status === "checking"}
+          disabled={status === "need-telegram" || status === "checking" || status === "busy"}
           className="bg-green-grad w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-50"
         >
-          Continue with Telegram
+          {status === "busy" ? "Verifying…" : "Continue with Telegram"}
         </button>
 
-        {identity ? <p className="text-center text-xs text-muted-foreground">{identity}</p> : null}
-        {message && status !== "need-telegram" ? (
+        {message && status === "error" ? (
           <p className="text-center text-xs text-warning">{message}</p>
         ) : null}
       </div>

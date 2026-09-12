@@ -3,6 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { validateTelegramInitData } from "@/lib/telegram-initdata";
+import {
+  telegramDerivedPassword,
+  telegramSyntheticEmail,
+} from "@/lib/telegram-auth-bridge";
 
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 
@@ -23,24 +27,110 @@ function publicClient() {
   });
 }
 
-/** Validate Telegram Mini App initData (HMAC). Does not invent balances or rewards. */
-export const validateTelegramSession = createServerFn({ method: "POST" })
+/**
+ * Validate Telegram initData, ensure Auth user + profile, return session tokens.
+ * Client must call supabase.auth.setSession with the returned tokens.
+ */
+export const loginWithTelegram = createServerFn({ method: "POST" })
   .inputValidator((d: { initData: string }) => d)
   .handler(async ({ data }) => {
     const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
     const validated = await validateTelegramInitData(data.initData, botToken);
+    const telegramId = validated.user.id;
+    const email = telegramSyntheticEmail(telegramId);
+    const password = await telegramDerivedPassword(telegramId);
+    const displayName =
+      [validated.user.first_name, validated.user.last_name].filter(Boolean).join(" ") ||
+      validated.user.username ||
+      `User ${telegramId}`;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Find existing by synthetic email
+    const { data: listed } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    let userId = listed?.users?.find((u) => u.email === email)?.id;
+
+    if (!userId) {
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          telegram_id: telegramId,
+          username: validated.user.username ?? null,
+          display_name: displayName,
+          photo_url: validated.user.photo_url ?? null,
+          auth_provider: "telegram",
+        },
+      });
+      if (createErr || !created.user) {
+        // Race: user may already exist
+        const { data: again } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        userId = again?.users?.find((u) => u.email === email)?.id;
+        if (!userId) throw new Error(createErr?.message ?? "Could not create Telegram user.");
+      } else {
+        userId = created.user.id;
+      }
+    } else {
+      // Keep password in sync for deterministic sign-in
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password,
+        user_metadata: {
+          telegram_id: telegramId,
+          username: validated.user.username ?? null,
+          display_name: displayName,
+          photo_url: validated.user.photo_url ?? null,
+          auth_provider: "telegram",
+        },
+      });
+    }
+
+    // Profile row (trigger may already create it)
+    const referralCode = `TASKORA-${String(telegramId).slice(-6).toUpperCase()}`;
+    await supabaseAdmin.from("profiles").upsert(
+      {
+        id: userId,
+        display_name: displayName,
+        username: validated.user.username ?? null,
+        referral_code: referralCode,
+        // telegram_id column exists after master schema migration
+        ...({
+          telegram_id: telegramId,
+          photo_url: validated.user.photo_url ?? null,
+        } as Record<string, unknown>),
+      } as never,
+      { onConflict: "id" },
+    );
+
+    // Issue session via password grant (server-side)
+    const url = process.env["SUPABASE_URL"]!;
+    const anon = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
+    const authClient = createClient(url, anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: sessionData, error: signErr } = await authClient.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signErr || !sessionData.session) {
+      throw new Error(signErr?.message ?? "Could not issue Telegram session.");
+    }
+
     return {
-      telegramId: validated.user.id,
+      sessionReady: true as const,
+      telegramId,
+      userId,
+      access_token: sessionData.session.access_token,
+      refresh_token: sessionData.session.refresh_token,
+      expires_at: sessionData.session.expires_at ?? null,
       username: validated.user.username ?? null,
       firstName: validated.user.first_name ?? null,
-      photoUrl: validated.user.photo_url ?? null,
-      languageCode: validated.user.language_code ?? null,
       startParam: validated.startParam ?? null,
-      // Session bridge to Supabase Auth / custom JWT must be wired next with a trusted path.
-      sessionReady: false,
-      note: "initData signature valid. Issue app session only after user row is linked to telegram_id.",
     };
   });
+
+/** @deprecated use loginWithTelegram */
+export const validateTelegramSession = loginWithTelegram;
 
 export const listTasks = createServerFn({ method: "GET" }).handler(async () => {
   const { data, error } = await publicClient()
@@ -106,10 +196,6 @@ export const getDashboard = createServerFn({ method: "GET" })
     };
   });
 
-/**
- * Submit proof. NEVER auto-credits reward.
- * All rewards require owner/admin verification (or a future real automated adapter).
- */
 export const submitTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { taskId: string; proofText?: string; proofUrl?: string }) => d)
@@ -151,7 +237,6 @@ export const submitTask = createServerFn({ method: "POST" })
     return { status: "pending" as const };
   });
 
-/** Owner/admin: approve or reject a submission. Reward credit is idempotent. */
 export const reviewSubmission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { submissionId: string; decision: "verified" | "rejected"; reason?: string }) => d)
@@ -185,7 +270,6 @@ export const reviewSubmission = createServerFn({ method: "POST" })
       return { status: "rejected" as const };
     }
 
-    // Idempotent credit: only transition pending → verified once, then insert one ledger row.
     const { data: updated, error: updErr } = await supabaseAdmin
       .from("submissions")
       .update({ status: "verified" })
@@ -335,4 +419,50 @@ export const applyReferral = createServerFn({ method: "POST" })
       { user_id: userId, label: "Welcome invite bonus", amount: 0.15, kind: "bonus" },
     ]);
     return { ok: true };
+  });
+
+/** Owner creates a publishable task (simple path until full Advertise flow ships). */
+export const ownerCreateTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      platform: string;
+      title: string;
+      advertiser: string;
+      reward: number;
+      slots: number;
+      steps: string[];
+      proof: "auto" | "screenshot" | "username";
+      link?: string;
+    }) => d,
+  )
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Owner/admin authorization required.");
+    if (!(data.reward > 0) || !(data.slots > 0) || !data.title.trim()) {
+      throw new Error("Invalid task configuration.");
+    }
+
+    const { data: task, error } = await supabaseAdmin
+      .from("tasks")
+      .insert({
+        platform: data.platform as never,
+        title: data.title.trim(),
+        advertiser: data.advertiser.trim() || "TASKORA",
+        reward: data.reward,
+        slots_left: data.slots,
+        steps: data.steps.length ? data.steps : ["Complete the required action", "Return and submit proof"],
+        proof: data.proof,
+        link: data.link ?? null,
+        is_active: true,
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return task;
   });
