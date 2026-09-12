@@ -1,11 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
+import { validateTelegramSession } from "@/lib/taskora.functions";
 
 /**
  * Telegram-native entry only.
- * Google / email / password registration is forbidden by the master product spec.
- * Full initData HMAC validation must complete on the server before any session is trusted.
+ * Google / email / password registration is forbidden.
  */
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -28,16 +28,17 @@ declare global {
         initDataUnsafe?: { user?: { id?: number; first_name?: string; username?: string } };
         ready?: () => void;
         expand?: () => void;
-        colorScheme?: string;
       };
     };
   }
 }
 
 function AuthScreen() {
-  const navigate = useNavigate();
-  const [status, setStatus] = useState<"checking" | "need-telegram" | "ready" | "error">("checking");
+  const [status, setStatus] = useState<"checking" | "need-telegram" | "ready" | "valid" | "error">(
+    "checking",
+  );
   const [message, setMessage] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<string | null>(null);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -51,10 +52,9 @@ function AuthScreen() {
     const initData = tg?.initData ?? "";
     if (!initData) {
       setStatus("need-telegram");
-      setMessage("Open TASKORA from your Telegram bot. Browser email/Google login is not supported.");
+      setMessage("Open TASKORA from your Telegram bot Mini App button. Browser login is not supported.");
       return;
     }
-
     setStatus("ready");
   }, []);
 
@@ -63,14 +63,27 @@ function AuthScreen() {
     const initData = window.Telegram?.WebApp?.initData ?? "";
     if (!initData) {
       setStatus("need-telegram");
-      setMessage("Telegram initData missing. Launch from the bot Mini App button.");
+      setMessage("Telegram initData missing.");
       return;
     }
 
-    // Session must be created only after server-side initData validation.
-    // Wire to a server function that validates HMAC with the bot token, then issues a session.
-    setMessage("Telegram session bridge is not fully wired yet. Server must validate initData before entry.");
-    setStatus("error");
+    try {
+      const result = await validateTelegramSession({ data: { initData } });
+      setIdentity(
+        [result.firstName, result.username ? `@${result.username}` : null, `id:${result.telegramId}`]
+          .filter(Boolean)
+          .join(" · "),
+      );
+      setStatus("valid");
+      setMessage(
+        result.sessionReady
+          ? "Session ready."
+          : "initData signature verified. Full app session bridge (link telegram_id → login) is the next deploy step — set TELEGRAM_BOT_TOKEN on the server.",
+      );
+    } catch (e) {
+      setStatus("error");
+      setMessage(e instanceof Error ? e.message : "Validation failed");
+    }
   }
 
   return (
@@ -85,7 +98,7 @@ function AuthScreen() {
 
       <div className="card-surface space-y-4 p-5">
         <p className="text-sm text-muted-foreground">
-          Sign-in is Telegram-only. There is no Google login, email login, or password registration.
+          Sign-in is Telegram-only. No Google login, email, or password.
         </p>
 
         {status === "checking" ? (
@@ -105,7 +118,8 @@ function AuthScreen() {
           Continue with Telegram
         </button>
 
-        {message && status === "error" ? (
+        {identity ? <p className="text-center text-xs text-muted-foreground">{identity}</p> : null}
+        {message && status !== "need-telegram" ? (
           <p className="text-center text-xs text-warning">{message}</p>
         ) : null}
       </div>

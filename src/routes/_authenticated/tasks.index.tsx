@@ -2,10 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Screen, ScreenTitle } from "@/components/Screen";
 import { TaskCard } from "@/components/TaskCard";
-import { CATEGORIES, TASKS } from "@/lib/taskora-data";
+import { CATEGORIES } from "@/lib/taskora-data";
 import type { Platform } from "@/components/PlatformIcon";
+import { listTasks } from "@/lib/taskora.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks/")({
+  loader: async () => {
+    const rows = await listTasks().catch(() => []);
+    return { rows };
+  },
   head: () => ({
     meta: [
       { title: "Tasks — TASKORA" },
@@ -13,19 +18,29 @@ export const Route = createFileRoute("/_authenticated/tasks/")({
         name: "description",
         content: "Browse verified social tasks across Telegram, YouTube, WhatsApp, X and more.",
       },
-      { property: "og:title", content: "Tasks — TASKORA" },
-      {
-        property: "og:description",
-        content: "Browse verified social tasks and earn real crypto rewards.",
-      },
     ],
   }),
   component: TasksScreen,
 });
 
 function TasksScreen() {
+  const { rows } = Route.useLoaderData();
   const [filter, setFilter] = useState<"all" | Platform>("all");
-  const list = TASKS.filter((t) => filter === "all" || t.platform === filter);
+
+  const tasks = rows
+    .filter((t) => filter === "all" || t.platform === filter)
+    .map((t) => ({
+      id: t.id,
+      platform: t.platform as Platform,
+      title: t.title,
+      advertiser: t.advertiser,
+      reward: Number(t.reward),
+      seconds: t.seconds,
+      status: "available" as const,
+      slotsLeft: t.slots_left,
+      steps: t.steps ?? [],
+      proof: t.proof,
+    }));
 
   return (
     <Screen>
@@ -50,12 +65,12 @@ function TasksScreen() {
       </div>
 
       <div className="space-y-2.5">
-        {list.map((task) => (
+        {tasks.map((task) => (
           <TaskCard key={task.id} task={task} />
         ))}
-        {list.length === 0 ? (
+        {tasks.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            No tasks here yet — check back soon.
+            No tasks available. Owner must publish real campaigns.
           </p>
         ) : null}
       </div>

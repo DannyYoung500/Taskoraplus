@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import { validateTelegramInitData } from "@/lib/telegram-initdata";
 
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 
@@ -21,6 +22,25 @@ function publicClient() {
     },
   });
 }
+
+/** Validate Telegram Mini App initData (HMAC). Does not invent balances or rewards. */
+export const validateTelegramSession = createServerFn({ method: "POST" })
+  .inputValidator((d: { initData: string }) => d)
+  .handler(async ({ data }) => {
+    const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
+    const validated = await validateTelegramInitData(data.initData, botToken);
+    return {
+      telegramId: validated.user.id,
+      username: validated.user.username ?? null,
+      firstName: validated.user.first_name ?? null,
+      photoUrl: validated.user.photo_url ?? null,
+      languageCode: validated.user.language_code ?? null,
+      startParam: validated.startParam ?? null,
+      // Session bridge to Supabase Auth / custom JWT must be wired next with a trusted path.
+      sessionReady: false,
+      note: "initData signature valid. Issue app session only after user row is linked to telegram_id.",
+    };
+  });
 
 export const listTasks = createServerFn({ method: "GET" }).handler(async () => {
   const { data, error } = await publicClient()
@@ -86,9 +106,13 @@ export const getDashboard = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Submit proof. NEVER auto-credits reward.
+ * All rewards require owner/admin verification (or a future real automated adapter).
+ */
 export const submitTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; proofText?: string }) => d)
+  .inputValidator((d: { taskId: string; proofText?: string; proofUrl?: string }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -110,12 +134,12 @@ export const submitTask = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) throw new Error("You already submitted this task.");
 
-    const autoVerified = task.proof === "auto";
     const { error } = await supabaseAdmin.from("submissions").insert({
       user_id: userId,
       task_id: task.id,
-      status: autoVerified ? "verified" : "pending",
+      status: "pending",
       proof_text: data.proofText ?? null,
+      proof_url: data.proofUrl ?? null,
     });
     if (error) throw new Error(error.message);
 
@@ -124,29 +148,100 @@ export const submitTask = createServerFn({ method: "POST" })
       .update({ slots_left: Math.max(0, task.slots_left - 1) })
       .eq("id", task.id);
 
-    if (autoVerified) {
+    return { status: "pending" as const };
+  });
+
+/** Owner/admin: approve or reject a submission. Reward credit is idempotent. */
+export const reviewSubmission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { submissionId: string; decision: "verified" | "rejected"; reason?: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Owner/admin authorization required.");
+
+    const { data: submission } = await supabaseAdmin
+      .from("submissions")
+      .select("*, tasks(id, reward, advertiser, title)")
+      .eq("id", data.submissionId)
+      .maybeSingle();
+    if (!submission) throw new Error("Submission not found.");
+    if (submission.status !== "pending") {
+      throw new Error(`Submission already ${submission.status}.`);
+    }
+
+    if (data.decision === "rejected") {
+      const { error } = await supabaseAdmin
+        .from("submissions")
+        .update({ status: "rejected" })
+        .eq("id", data.submissionId)
+        .eq("status", "pending");
+      if (error) throw new Error(error.message);
+      return { status: "rejected" as const };
+    }
+
+    // Idempotent credit: only transition pending → verified once, then insert one ledger row.
+    const { data: updated, error: updErr } = await supabaseAdmin
+      .from("submissions")
+      .update({ status: "verified" })
+      .eq("id", data.submissionId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (updErr) throw new Error(updErr.message);
+    if (!updated) throw new Error("Submission was already processed.");
+
+    const task = submission.tasks as { reward: number; advertiser: string; title: string } | null;
+    const reward = Number(task?.reward ?? 0);
+    if (reward > 0) {
       await supabaseAdmin.from("transactions").insert({
-        user_id: userId,
-        label: `Verified — ${task.advertiser}`,
-        amount: task.reward,
+        user_id: submission.user_id,
+        label: `Verified — ${task?.advertiser ?? "task"}`,
+        amount: reward,
         kind: "reward",
       });
+
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("referred_by")
-        .eq("id", userId)
+        .eq("id", submission.user_id)
         .maybeSingle();
       if (profile?.referred_by) {
         await supabaseAdmin.from("transactions").insert({
           user_id: profile.referred_by,
           label: "Referral share",
-          amount: Number((Number(task.reward) * 0.08).toFixed(2)),
+          amount: Number((reward * 0.08).toFixed(2)),
           kind: "referral",
         });
       }
     }
 
-    return { status: autoVerified ? "verified" : "pending" };
+    return { status: "verified" as const };
+  });
+
+export const listPendingSubmissions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Owner/admin authorization required.");
+
+    const { data, error } = await supabaseAdmin
+      .from("submissions")
+      .select("*, tasks(title, platform, reward, advertiser)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
   });
 
 export const dailyCheckin = createServerFn({ method: "POST" })
