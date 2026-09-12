@@ -10,67 +10,68 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AmbassadorRouteImport } from './routes/ambassador'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as WalletRouteImport } from './routes/wallet'
-import { Route as TasksIndexRouteImport } from './routes/tasks.index'
-import { Route as TasksTaskIdRouteImport } from './routes/tasks.$taskId'
+import { Route as AuthenticatedAmbassadorRouteImport } from './routes/_authenticated/ambassador'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
+import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks.index'
+import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenticated/tasks.$taskId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AmbassadorRoute = AmbassadorRouteImport.update({
-  id: '/ambassador',
+const AuthenticatedAmbassadorRoute = AuthenticatedAmbassadorRouteImport.update({
+  id: '/_authenticated/ambassador',
   path: '/ambassador',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/_authenticated/profile',
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WalletRoute = WalletRouteImport.update({
-  id: '/wallet',
+const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
+  id: '/_authenticated/wallet',
   path: '/wallet',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TasksIndexRoute = TasksIndexRouteImport.update({
-  id: '/tasks/',
+const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
+  id: '/_authenticated/tasks/',
   path: '/tasks/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TasksTaskIdRoute = TasksTaskIdRouteImport.update({
-  id: '/tasks/$taskId',
-  path: '/tasks/$taskId',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const AuthenticatedTasksTaskIdRoute =
+  AuthenticatedTasksTaskIdRouteImport.update({
+    id: '/_authenticated/tasks/$taskId',
+    path: '/tasks/$taskId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/ambassador': typeof AmbassadorRoute
-  '/profile': typeof ProfileRoute
-  '/wallet': typeof WalletRoute
-  '/tasks/$taskId': typeof TasksTaskIdRoute
-  '/tasks/': typeof TasksIndexRoute
+  '/ambassador': typeof AuthenticatedAmbassadorRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/wallet': typeof AuthenticatedWalletRoute
+  '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute
+  '/tasks/': typeof AuthenticatedTasksIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/ambassador': typeof AmbassadorRoute
-  '/profile': typeof ProfileRoute
-  '/wallet': typeof WalletRoute
-  '/tasks/$taskId': typeof TasksTaskIdRoute
-  '/tasks': typeof TasksIndexRoute
+  '/ambassador': typeof AuthenticatedAmbassadorRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/wallet': typeof AuthenticatedWalletRoute
+  '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute
+  '/tasks': typeof AuthenticatedTasksIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/ambassador': typeof AmbassadorRoute
-  '/profile': typeof ProfileRoute
-  '/wallet': typeof WalletRoute
-  '/tasks/$taskId': typeof TasksTaskIdRoute
-  '/tasks/': typeof TasksIndexRoute
+  '/_authenticated/ambassador': typeof AuthenticatedAmbassadorRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/wallet': typeof AuthenticatedWalletRoute
+  '/_authenticated/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute
+  '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,20 +82,20 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/ambassador'
-    | '/profile'
-    | '/wallet'
-    | '/tasks/$taskId'
-    | '/tasks/'
+    | '/_authenticated/ambassador'
+    | '/_authenticated/profile'
+    | '/_authenticated/wallet'
+    | '/_authenticated/tasks/$taskId'
+    | '/_authenticated/tasks/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AmbassadorRoute: typeof AmbassadorRoute
-  ProfileRoute: typeof ProfileRoute
-  WalletRoute: typeof WalletRoute
-  TasksTaskIdRoute: typeof TasksTaskIdRoute
-  TasksIndexRoute: typeof TasksIndexRoute
+  AuthenticatedAmbassadorRoute: typeof AuthenticatedAmbassadorRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
+  AuthenticatedTasksTaskIdRoute: typeof AuthenticatedTasksTaskIdRoute
+  AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -106,39 +107,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/ambassador': {
-      id: '/ambassador'
+    '/_authenticated/ambassador': {
+      id: '/_authenticated/ambassador'
       path: '/ambassador'
       fullPath: '/ambassador'
-      preLoaderRoute: typeof AmbassadorRouteImport
+      preLoaderRoute: typeof AuthenticatedAmbassadorRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/profile': {
-      id: '/profile'
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
       path: '/profile'
       fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/wallet': {
-      id: '/wallet'
+    '/_authenticated/wallet': {
+      id: '/_authenticated/wallet'
       path: '/wallet'
       fullPath: '/wallet'
-      preLoaderRoute: typeof WalletRouteImport
+      preLoaderRoute: typeof AuthenticatedWalletRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tasks/': {
-      id: '/tasks/'
+    '/_authenticated/tasks/': {
+      id: '/_authenticated/tasks/'
       path: '/tasks'
       fullPath: '/tasks/'
-      preLoaderRoute: typeof TasksIndexRouteImport
+      preLoaderRoute: typeof AuthenticatedTasksIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tasks/$taskId': {
-      id: '/tasks/$taskId'
+    '/_authenticated/tasks/$taskId': {
+      id: '/_authenticated/tasks/$taskId'
       path: '/tasks/$taskId'
       fullPath: '/tasks/$taskId'
-      preLoaderRoute: typeof TasksTaskIdRouteImport
+      preLoaderRoute: typeof AuthenticatedTasksTaskIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -146,11 +147,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AmbassadorRoute: AmbassadorRoute,
-  ProfileRoute: ProfileRoute,
-  WalletRoute: WalletRoute,
-  TasksTaskIdRoute: TasksTaskIdRoute,
-  TasksIndexRoute: TasksIndexRoute,
+  AuthenticatedAmbassadorRoute: AuthenticatedAmbassadorRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedWalletRoute: AuthenticatedWalletRoute,
+  AuthenticatedTasksTaskIdRoute: AuthenticatedTasksTaskIdRoute,
+  AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

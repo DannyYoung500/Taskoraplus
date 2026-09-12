@@ -5,7 +5,7 @@ import { Screen } from "@/components/Screen";
 import { PlatformBadge, platformLabel } from "@/components/PlatformIcon";
 import { TASKS } from "@/lib/taskora-data";
 
-export const Route = createFileRoute("/tasks/$taskId")({
+export const Route = createFileRoute("/_authenticated/tasks/$taskId")({
   loader: ({ params }) => {
     const task = TASKS.find((t) => t.id === params.taskId);
     if (!task) throw notFound();
