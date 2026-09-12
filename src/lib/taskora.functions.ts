@@ -7,6 +7,7 @@ import {
   telegramDerivedPassword,
   telegramSyntheticEmail,
 } from "@/lib/telegram-auth-bridge";
+import { isOwnerTelegramId } from "@/lib/owner";
 
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 
@@ -27,10 +28,31 @@ function publicClient() {
   });
 }
 
-/**
- * Validate Telegram initData, ensure Auth user + profile, return session tokens.
- * Client must call supabase.auth.setSession with the returned tokens.
- */
+async function assertAdmin(userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+    _user_id: userId,
+    _role: "admin",
+  });
+  if (isAdmin) return;
+
+  // Fallback: profile.telegram_id in TASKORA_OWNER_TELEGRAM_IDS
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("telegram_id")
+    .eq("id", userId)
+    .maybeSingle();
+  const tg = (profile as { telegram_id?: number | null } | null)?.telegram_id;
+  if (isOwnerTelegramId(tg ?? null)) {
+    await supabaseAdmin.from("user_roles").upsert(
+      { user_id: userId, role: "admin" } as never,
+      { onConflict: "user_id,role" } as never,
+    );
+    return;
+  }
+  throw new Error("Owner/admin authorization required.");
+}
+
 export const loginWithTelegram = createServerFn({ method: "POST" })
   .inputValidator((d: { initData: string }) => d)
   .handler(async ({ data }) => {
@@ -46,7 +68,6 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Find existing by synthetic email
     const { data: listed } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
     let userId = listed?.users?.find((u) => u.email === email)?.id;
 
@@ -64,7 +85,6 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
         },
       });
       if (createErr || !created.user) {
-        // Race: user may already exist
         const { data: again } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
         userId = again?.users?.find((u) => u.email === email)?.id;
         if (!userId) throw new Error(createErr?.message ?? "Could not create Telegram user.");
@@ -72,7 +92,6 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
         userId = created.user.id;
       }
     } else {
-      // Keep password in sync for deterministic sign-in
       await supabaseAdmin.auth.admin.updateUserById(userId, {
         password,
         user_metadata: {
@@ -85,7 +104,6 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
       });
     }
 
-    // Profile row (trigger may already create it)
     const referralCode = `TASKORA-${String(telegramId).slice(-6).toUpperCase()}`;
     await supabaseAdmin.from("profiles").upsert(
       {
@@ -93,7 +111,6 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
         display_name: displayName,
         username: validated.user.username ?? null,
         referral_code: referralCode,
-        // telegram_id column exists after master schema migration
         ...({
           telegram_id: telegramId,
           photo_url: validated.user.photo_url ?? null,
@@ -102,7 +119,14 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
       { onConflict: "id" },
     );
 
-    // Issue session via password grant (server-side)
+    // Auto-grant admin when Telegram ID is listed as owner
+    if (isOwnerTelegramId(telegramId)) {
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: userId, role: "admin" } as never,
+        { onConflict: "user_id,role" } as never,
+      );
+    }
+
     const url = process.env["SUPABASE_URL"]!;
     const anon = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
     const authClient = createClient(url, anon, {
@@ -120,6 +144,7 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
       sessionReady: true as const,
       telegramId,
       userId,
+      isOwner: isOwnerTelegramId(telegramId),
       access_token: sessionData.session.access_token,
       refresh_token: sessionData.session.refresh_token,
       expires_at: sessionData.session.expires_at ?? null,
@@ -129,7 +154,6 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
     };
   });
 
-/** @deprecated use loginWithTelegram */
 export const validateTelegramSession = loginWithTelegram;
 
 export const listTasks = createServerFn({ method: "GET" }).handler(async () => {
@@ -160,11 +184,12 @@ export const getDashboard = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [profileRes, txRes, subsRes, refRes] = await Promise.all([
+    const [profileRes, txRes, subsRes, refRes, roleRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
       supabase.from("transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("submissions").select("id, task_id, status, created_at, tasks(reward, title)").eq("user_id", userId),
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).eq("referred_by", userId),
+      supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" }),
     ]);
 
     const transactions = txRes.data ?? [];
@@ -184,6 +209,9 @@ export const getDashboard = createServerFn({ method: "GET" })
       .filter((s) => s.status === "pending")
       .reduce((s, row) => s + Number(row.tasks?.reward ?? 0), 0);
 
+    const tg = (profileRes.data as { telegram_id?: number } | null)?.telegram_id;
+    const isOwner = Boolean(roleRes.data) || isOwnerTelegramId(tg ?? null);
+
     return {
       profile: profileRes.data,
       transactions,
@@ -193,6 +221,7 @@ export const getDashboard = createServerFn({ method: "GET" })
       pending,
       verifiedCount: submissions.filter((s) => s.status === "verified").length,
       referrals: refRes.count ?? 0,
+      isOwner,
     };
   });
 
@@ -242,13 +271,8 @@ export const reviewSubmission = createServerFn({ method: "POST" })
   .inputValidator((d: { submissionId: string; decision: "verified" | "rejected"; reason?: string }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
+    await assertAdmin(userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Owner/admin authorization required.");
 
     const { data: submission } = await supabaseAdmin
       .from("submissions")
@@ -311,14 +335,8 @@ export const reviewSubmission = createServerFn({ method: "POST" })
 export const listPendingSubmissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId } = context;
+    await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Owner/admin authorization required.");
-
     const { data, error } = await supabaseAdmin
       .from("submissions")
       .select("*, tasks(title, platform, reward, advertiser)")
@@ -326,6 +344,34 @@ export const listPendingSubmissions = createServerFn({ method: "GET" })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const getOwnerOverview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [users, tasks, pending, withdrawals, txs] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
+      supabaseAdmin.from("tasks").select("id", { count: "exact", head: true }).eq("is_active", true),
+      supabaseAdmin.from("submissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabaseAdmin.from("withdrawals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabaseAdmin.from("transactions").select("amount, kind"),
+    ]);
+
+    const rows = txs.data ?? [];
+    const rewardsPaid = rows
+      .filter((t) => t.kind === "reward" || t.kind === "referral" || t.kind === "bonus")
+      .reduce((s, t) => s + Number(t.amount), 0);
+
+    return {
+      totalUsers: users.count ?? 0,
+      activeTasks: tasks.count ?? 0,
+      pendingReviews: pending.count ?? 0,
+      pendingWithdrawals: withdrawals.count ?? 0,
+      rewardsPaid,
+    };
   });
 
 export const dailyCheckin = createServerFn({ method: "POST" })
@@ -421,7 +467,6 @@ export const applyReferral = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** Owner creates a publishable task (simple path until full Advertise flow ships). */
 export const ownerCreateTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -437,13 +482,8 @@ export const ownerCreateTask = createServerFn({ method: "POST" })
     }) => d,
   )
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Owner/admin authorization required.");
     if (!(data.reward > 0) || !(data.slots > 0) || !data.title.trim()) {
       throw new Error("Invalid task configuration.");
     }
