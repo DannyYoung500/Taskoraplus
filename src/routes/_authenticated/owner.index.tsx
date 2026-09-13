@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getOwnerOverview } from "@/lib/taskora.functions";
 
+const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
+
 export const Route = createFileRoute("/_authenticated/owner/")({
   loader: async () => {
     try {
@@ -20,16 +22,27 @@ function OwnerHub() {
   const { overview, error } = Route.useLoaderData();
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-6">
-      <h1 className="text-xl font-bold">Owner Control</h1>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Admin access is granted when your Telegram ID is in TASKORA_OWNER_TELEGRAM_IDS.
-      </p>
+    <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-5">
+      <header className="mb-5 flex items-center gap-3">
+        <img src={LOGO} alt="" className="size-10 rounded-full object-cover" />
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-primary">Owner</p>
+          <h1 className="text-xl font-bold">Control Center</h1>
+        </div>
+      </header>
 
-      {error ? <p className="mt-4 text-sm text-warning">{error}</p> : null}
+      {error ? (
+        <p className="card-surface mb-4 p-4 text-sm text-warning">
+          {error}
+          <br />
+          <span className="text-xs text-muted-foreground">
+            Set TASKORA_OWNER_TELEGRAM_IDS to your Telegram user id on Vercel.
+          </span>
+        </p>
+      ) : null}
 
       {overview ? (
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mb-5 grid grid-cols-2 gap-2">
           <Stat label="Users" value={String(overview.totalUsers)} />
           <Stat label="Active tasks" value={String(overview.activeTasks)} />
           <Stat label="Pending reviews" value={String(overview.pendingReviews)} />
@@ -38,7 +51,7 @@ function OwnerHub() {
         </div>
       ) : null}
 
-      <div className="mt-6 space-y-2">
+      <div className="space-y-2">
         <Link to="/owner/reviews" className="card-surface block p-4 text-sm font-semibold">
           Task review queue
         </Link>
@@ -47,6 +60,9 @@ function OwnerHub() {
         </Link>
         <Link to="/advertise" className="card-surface block p-4 text-sm font-semibold">
           Create / publish task
+        </Link>
+        <Link to="/home" className="card-surface block p-4 text-sm font-semibold text-muted-foreground">
+          Back to worker home
         </Link>
       </div>
     </main>
@@ -57,7 +73,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="card-surface p-3">
       <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="text-lg font-bold">{value}</p>
+      <p className="text-lg font-bold text-primary">{value}</p>
     </div>
   );
 }

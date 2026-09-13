@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { listTasks, getDashboard } from "@/lib/taskora.functions";
 
+const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
+
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
     const [tasks, dash] = await Promise.all([
@@ -17,11 +19,12 @@ function HomePage() {
   const balance = Number(dash?.balance ?? 0);
   const pending = Number(dash?.pending ?? 0);
   const name = dash?.profile?.display_name ?? "Tasker";
+  const isOwner = Boolean(dash?.isOwner);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-5">
       <header className="mb-5 flex items-center gap-3">
-        <img src="/taskora-logo.svg" alt="" className="size-10 object-contain" />
+        <img src={LOGO} alt="" className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">TASKORA</p>
           <h1 className="truncate text-lg font-bold">{name}</h1>
@@ -33,6 +36,15 @@ function HomePage() {
           ${balance.toFixed(2)}
         </Link>
       </header>
+
+      {isOwner ? (
+        <Link
+          to="/owner"
+          className="mb-4 block rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-bold text-primary"
+        >
+          Owner Control Center →
+        </Link>
+      ) : null}
 
       <section className="bg-brand relative mb-4 overflow-hidden rounded-3xl p-5 shadow-raised">
         <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "var(--gradient-sheen)" }} />
@@ -46,7 +58,6 @@ function HomePage() {
             <p className="mt-1 text-2xl font-bold">${pending.toFixed(2)}</p>
           </div>
         </div>
-        <p className="relative mt-3 text-xs text-muted-foreground">Verified tasks · Real rewards</p>
       </section>
 
       <div className="mb-4 grid grid-cols-2 gap-2">

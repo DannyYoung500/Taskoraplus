@@ -20,6 +20,8 @@ declare global {
   }
 }
 
+const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
+
 const STEPS: { at: number; label: string }[] = [
   { at: 0, label: "Opening TASKORA…" },
   { at: 12, label: "Connecting securely…" },
@@ -30,7 +32,6 @@ const STEPS: { at: number; label: string }[] = [
   { at: 96, label: "Welcome" },
 ];
 
-/** Premium entry: TASKORA brand logo only (never user avatar). Auto-auth, no Continue button. */
 export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
@@ -38,6 +39,7 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   const [phase, setPhase] = useState<"loading" | "welcome" | "error" | "need-telegram">("loading");
   const [error, setError] = useState<string | null>(null);
   const [welcomeName, setWelcomeName] = useState("Tasker");
+  const [goOwner, setGoOwner] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
@@ -68,6 +70,24 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       if (started.current) return;
       started.current = true;
 
+      // Already have a valid session? Skip re-login.
+      try {
+        const existing = await supabase.auth.getSession();
+        if (existing.data.session?.access_token) {
+          const { data: u } = await supabase.auth.getUser();
+          if (u.user?.id) {
+            window.clearInterval(tick);
+            setProgress(100);
+            setPhase("welcome");
+            setLabel("Welcome");
+            window.setTimeout(() => navigate({ to: redirectTo, replace: true }), 900);
+            return;
+          }
+        }
+      } catch {
+        /* continue to Telegram login */
+      }
+
       const initData = tg?.initData ?? "";
       if (!initData) {
         window.clearInterval(tick);
@@ -85,20 +105,31 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         });
         if (sessErr) throw sessErr;
 
+        // Confirm via Auth API (not local JWKS getClaims)
+        const { data: confirmed, error: userErr } = await supabase.auth.getUser();
+        if (userErr || !confirmed.user) {
+          throw userErr ?? new Error("Session could not be confirmed.");
+        }
+
         if (result.firstName) setWelcomeName(result.firstName);
+        setGoOwner(Boolean(result.isOwner));
         window.clearInterval(tick);
         setProgress(100);
         setLabel("Welcome");
         setPhase("welcome");
 
         window.setTimeout(() => {
-          navigate({ to: redirectTo, replace: true });
-        }, 1500);
+          navigate({ to: result.isOwner ? "/owner" : redirectTo, replace: true });
+        }, 1200);
       } catch (e) {
         window.clearInterval(tick);
         setPhase("error");
+        const msg = e instanceof Error ? e.message : "TASKORA could not authenticate with Telegram.";
+        // Soften opaque JWKS errors for the user
         setError(
-          e instanceof Error ? e.message : "TASKORA could not authenticate with Telegram.",
+          msg.includes("kid") || msg.includes("JWT") || msg.includes("ES256")
+            ? "Session keys out of sync. Check Vercel SUPABASE_URL and publishable key match project qvwetjpgplkhxuymsnyx, then Retry."
+            : msg,
         );
         setProgress(0);
         setLabel("Authentication failed");
@@ -107,17 +138,13 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
 
     const t = window.setTimeout(() => {
       void boot();
-    }, 120);
+    }, 150);
 
     return () => {
       window.clearInterval(tick);
       window.clearTimeout(t);
     };
   }, [navigate, redirectTo]);
-
-  function retry() {
-    window.location.reload();
-  }
 
   return (
     <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center overflow-hidden bg-[#0a0c12] px-6 text-white">
@@ -130,21 +157,20 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       />
 
       <div className="relative z-10 flex w-full flex-col items-center">
-        {/* Official TASKORA logo only — never user photo */}
         <div className="relative mb-5">
           <div className="absolute -inset-4 rounded-full bg-amber-400/15 blur-xl" />
           <img
-            src="/taskora-logo.svg"
+            src={LOGO}
             alt="TASKORA"
-            className="relative size-32 object-contain drop-shadow-[0_0_24px_rgba(245,197,66,0.35)]"
+            className="relative size-36 rounded-full object-cover shadow-[0_0_40px_rgba(245,197,66,0.35)]"
           />
         </div>
 
-        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-amber-200/60">
-          TASKORA
-        </p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-amber-200/60">TASKORA</p>
         <h1 className="mt-2 text-center text-2xl font-bold tracking-tight text-white">
-          {phase === "welcome" ? `Welcome, ${welcomeName}` : "Verified Tasks. Real Rewards."}
+          {phase === "welcome"
+            ? `Welcome, ${welcomeName}${goOwner ? " · Owner" : ""}`
+            : "Verified Tasks. Real Rewards."}
         </h1>
         <p className="mt-1 text-center text-xs text-white/40">@Taskoraplusbot</p>
 
@@ -164,27 +190,25 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
               />
             </div>
             {phase === "welcome" ? (
-              <p className="mt-4 text-center text-sm text-white/65">Opening your dashboard…</p>
+              <p className="mt-4 text-center text-sm text-white/65">
+                {goOwner ? "Opening Owner Control…" : "Opening your dashboard…"}
+              </p>
             ) : null}
           </div>
         ) : null}
 
         {phase === "need-telegram" || phase === "error" ? (
           <div className="mt-8 w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur">
-            <p className="text-sm text-white/80">
-              {error ?? "TASKORA could not authenticate with Telegram."}
-            </p>
+            <p className="text-sm text-white/80">{error}</p>
             <button
               type="button"
-              onClick={retry}
+              onClick={() => window.location.reload()}
               className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-[#0a0c12]"
               style={{ background: "linear-gradient(135deg, #FFE08A, #F5C542, #C9961A)" }}
             >
               Retry
             </button>
-            <p className="mt-3 text-[11px] text-white/40">
-              Telegram → @Taskoraplusbot → Open TASKORA
-            </p>
+            <p className="mt-3 text-[11px] text-white/40">Telegram → @Taskoraplusbot → Open TASKORA</p>
           </div>
         ) : null}
       </div>
