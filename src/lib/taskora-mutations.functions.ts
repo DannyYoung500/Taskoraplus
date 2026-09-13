@@ -1,8 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { RULES, hoursSince } from "@/lib/platform-rules.server";
 
-/** Submission with velocity limit + slot check. Prefer this over raw insert paths. */
+/** Inline rules — do not import *.server modules at top level (breaks client bundle). */
+const RULES = {
+  minWithdrawalUsd: 10,
+  newAccountWithdrawHoldHours: 24,
+  maxSubmissionsPerHour: 12,
+  submissionWindowMs: 60 * 60 * 1000,
+} as const;
+
+function hoursSince(iso: string | null | undefined): number {
+  if (!iso) return 9999;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return 9999;
+  return (Date.now() - t) / (1000 * 60 * 60);
+}
+
 export const submitTaskGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -19,7 +32,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .gte("created_at", since);
     if ((count ?? 0) >= RULES.maxSubmissionsPerHour) {
-      throw new Error(`Rate limit: max ${RULES.maxSubmissionsPerHour} submissions per hour.");
+      throw new Error(`Rate limit: max ${RULES.maxSubmissionsPerHour} submissions per hour.`);
     }
 
     const { data: task } = await supabaseAdmin
@@ -56,7 +69,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     return { status: "pending" as const };
   });
 
-/** Withdrawal with min amount, 24h new-account hold, shared-address detection. */
 export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { method: string; address: string; amount: number }) => d)
@@ -76,7 +88,8 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       .eq("id", userId)
       .maybeSingle();
 
-    if (profile && (profile as { status?: string }).status && (profile as { status?: string }).status !== "active") {
+    const status = (profile as { status?: string } | null)?.status;
+    if (status && status !== "active") {
       throw new Error("Account is not allowed to withdraw.");
     }
 
@@ -88,7 +101,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       );
     }
 
-    // Shared payout address across different users
     const { data: others } = await supabaseAdmin
       .from("withdrawals")
       .select("user_id")

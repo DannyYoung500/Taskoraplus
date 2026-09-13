@@ -33,17 +33,17 @@ export const Route = createFileRoute("/_authenticated/owner/")({
 });
 
 const MODULES = [
-  { to: "/owner/reviews", title: "Task review queue", desc: "Approve or reject proofs", Icon: ClipboardCheck },
-  { to: "/owner/withdrawals", title: "Withdrawal queue", desc: "Mark paid or reject", Icon: Wallet },
-  { to: "/owner/users", title: "Users & wallets", desc: "Search, suspend, adjust", Icon: Users },
-  { to: "/owner/tasks", title: "Task management", desc: "Pause / activate campaigns", Icon: Activity },
-  { to: "/advertise", title: "Publish task", desc: "Create marketplace tasks", Icon: Megaphone },
-  { to: "/owner/fraud", title: "Fraud & risk", desc: "Anti-abuse playbook", Icon: ShieldAlert },
-  { to: "/owner/analytics", title: "Analytics", desc: "Growth & payouts", Icon: BarChart3 },
-  { to: "/owner/tickets", title: "Support tickets", desc: "User help queue", Icon: LifeBuoy },
-  { to: "/owner/announce", title: "Broadcast", desc: "In-app announcements", Icon: Bell },
-  { to: "/owner/settings", title: "Platform settings", desc: "Limits & rates", Icon: Settings },
-] as const;
+  { to: "/owner/reviews" as const, title: "Task reviews", desc: "Approve or reject proofs", Icon: ClipboardCheck, tone: "amber" },
+  { to: "/owner/withdrawals" as const, title: "Withdrawals", desc: "Mark paid or reject", Icon: Wallet, tone: "green" },
+  { to: "/owner/users" as const, title: "Users", desc: "Search · suspend · adjust", Icon: Users, tone: "blue" },
+  { to: "/owner/tasks" as const, title: "Tasks", desc: "Activate · pause · complete", Icon: Activity, tone: "purple" },
+  { to: "/advertise" as const, title: "Publish", desc: "Create marketplace tasks", Icon: Megaphone, tone: "amber" },
+  { to: "/owner/fraud" as const, title: "Fraud", desc: "Risk playbook", Icon: ShieldAlert, tone: "red" },
+  { to: "/owner/analytics" as const, title: "Analytics", desc: "Growth & payouts", Icon: BarChart3, tone: "blue" },
+  { to: "/owner/tickets" as const, title: "Support", desc: "Ticket queue", Icon: LifeBuoy, tone: "green" },
+  { to: "/owner/announce" as const, title: "Broadcast", desc: "Announcements", Icon: Bell, tone: "amber" },
+  { to: "/owner/settings" as const, title: "Settings", desc: "Limits & rates", Icon: Settings, tone: "slate" },
+];
 
 function OwnerHub() {
   const { basic, error } = Route.useLoaderData();
@@ -51,64 +51,76 @@ function OwnerHub() {
   const stats = basic
     ? [
         { label: "Users", value: String(basic.totalUsers) },
-        { label: "Active tasks", value: String(basic.activeTasks) },
-        { label: "Pending reviews", value: String(basic.pendingReviews) },
-        { label: "Pending withdrawals", value: String(basic.pendingWithdrawals) },
-        { label: "Rewards paid", value: `$${Number(basic.rewardsPaid).toFixed(2)}` },
+        { label: "Tasks", value: String(basic.activeTasks) },
+        { label: "Reviews", value: String(basic.pendingReviews) },
+        { label: "Payouts", value: String(basic.pendingWithdrawals) },
+        { label: "Paid", value: `$${Number(basic.rewardsPaid).toFixed(0)}` },
       ]
     : [];
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
-      <header className="mb-5 flex items-center gap-3">
-        <img src={LOGO} alt="" className="size-11 rounded-full object-cover" />
-        <div className="min-w-0 flex-1">
-          <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300">
-            <Crown className="size-3.5" /> Owner
-          </p>
-          <h1 className="text-xl font-bold">Control Center</h1>
+      <div
+        className="mb-5 overflow-hidden rounded-3xl border border-amber-400/25 p-5"
+        style={{
+          background:
+            "radial-gradient(ellipse at 20% 0%, rgba(245,197,66,0.22), transparent 55%), linear-gradient(160deg,#161820,#0a0c12)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <img src={LOGO} alt="" className="size-12 rounded-full object-cover ring-2 ring-amber-400/40" />
+          <div className="min-w-0 flex-1">
+            <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300">
+              <Crown className="size-3" /> Owner control
+            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight">Command Center</h1>
+            <p className="text-[11px] text-white/45">TASKORA · live operations</p>
+          </div>
+          <Link to="/home" className="rounded-full border border-white/10 px-3 py-1.5 text-[11px] text-white/60">
+            App
+          </Link>
         </div>
-        <Link to="/home" className="text-xs text-white/45">
-          App ›
-        </Link>
-      </header>
+      </div>
 
       {error ? (
         <div className="mb-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
           {error}
           <p className="mt-2 text-[11px] text-white/50">
-            Set TASKORA_OWNER_TELEGRAM_IDS to your numeric Telegram ID on Vercel, then redeploy and reopen the Mini App.
+            Vercel env: TASKORA_OWNER_TELEGRAM_IDS=your_numeric_id → Redeploy → open Mini App as that Telegram user.
           </p>
         </div>
       ) : null}
 
       {stats.length ? (
-        <div className="mb-5 grid grid-cols-2 gap-2">
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-white/8 bg-[#12141c] p-3">
-              <p className="text-[11px] text-white/45">{s.label}</p>
+            <div
+              key={s.label}
+              className="min-w-[88px] shrink-0 rounded-2xl border border-white/8 bg-[#12141c] px-3 py-3"
+            >
+              <p className="text-[10px] uppercase tracking-wide text-white/40">{s.label}</p>
               <p className="mt-1 text-lg font-bold text-amber-300">{s.value}</p>
             </div>
           ))}
         </div>
       ) : null}
 
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/40">Modules</h2>
-      <div className="space-y-2">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">Modules</p>
+      <div className="grid grid-cols-2 gap-2.5">
         {MODULES.map(({ to, title, desc, Icon }) => (
           <Link
             key={to}
             to={to}
-            className="flex items-center gap-3 rounded-2xl border border-white/8 bg-[#12141c] p-3.5"
+            className="group rounded-2xl border border-white/8 bg-[#12141c] p-3.5 transition active:scale-[0.98]"
           >
-            <span className="inline-flex size-10 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300">
-              <Icon className="size-5" />
+            <span className="mb-2 inline-flex size-9 items-center justify-center rounded-xl bg-amber-400/12 text-amber-300">
+              <Icon className="size-4.5" />
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">{title}</p>
-              <p className="text-[11px] text-white/40">{desc}</p>
-            </div>
-            <ChevronRight className="size-4 text-white/30" />
+            <p className="text-sm font-semibold leading-tight">{title}</p>
+            <p className="mt-0.5 text-[10px] leading-snug text-white/40">{desc}</p>
+            <span className="mt-2 inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-300/80">
+              Open <ChevronRight className="size-3" />
+            </span>
           </Link>
         ))}
       </div>
