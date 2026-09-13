@@ -1,7 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, ListChecks, PlayCircle, Wallet, User } from "lucide-react";
 
-/** Spec nav: HOME · TASKS · WATCH & EARN · WALLET · PROFILE */
 const ITEMS = [
   { to: "/home", label: "Home", Icon: Home },
   { to: "/tasks", label: "Tasks", Icon: ListChecks },
@@ -12,6 +11,7 @@ const ITEMS = [
 
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Hide nav on bootstrap / auth / pure loading entry
   if (pathname === "/" || pathname.startsWith("/auth")) return null;
 
   return (
