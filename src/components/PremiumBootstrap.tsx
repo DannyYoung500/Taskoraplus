@@ -20,27 +20,37 @@ declare global {
   }
 }
 
+/** Official TASKORA logo (keep existing loader visual). */
 const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
 
-const STEPS: { at: number; label: string }[] = [
-  { at: 0, label: "Opening TASKORA…" },
-  { at: 12, label: "Connecting securely…" },
-  { at: 28, label: "Validating Telegram session…" },
-  { at: 48, label: "Connecting to dashboard…" },
-  { at: 68, label: "Preparing your home…" },
-  { at: 85, label: "Almost ready…" },
-  { at: 96, label: "Welcome" },
+/** 10-stage account initialization — slow enough to read (~7–10s total when ready). */
+const STAGES: { title: string; detail: string; until: number }[] = [
+  { title: "SECURE CONNECTION", detail: "Establishing secure connection...", until: 10 },
+  { title: "ACCOUNT AUTHENTICATION", detail: "Authenticating your account...", until: 20 },
+  { title: "SESSION INITIALIZATION", detail: "Initializing secure session...", until: 30 },
+  { title: "PROFILE SYNCHRONIZATION", detail: "Synchronizing your profile...", until: 40 },
+  { title: "ACCOUNT VERIFICATION", detail: "Verifying account status...", until: 50 },
+  { title: "PLATFORM SYNCHRONIZATION", detail: "Syncing connected platforms...", until: 60 },
+  { title: "WALLET INITIALIZATION", detail: "Initializing wallet...", until: 70 },
+  { title: "TASK SYNCHRONIZATION", detail: "Synchronizing your available tasks...", until: 80 },
+  { title: "WORKSPACE INITIALIZATION", detail: "Preparing your TASKORA workspace...", until: 90 },
+  { title: "FINAL ACCOUNT INITIALIZATION", detail: "Finalizing your secure TASKORA session...", until: 100 },
 ];
+
+function stageForProgress(p: number) {
+  return STAGES.find((s) => p <= s.until) ?? STAGES[STAGES.length - 1]!;
+}
 
 export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
-  const [label, setLabel] = useState(STEPS[0]!.label);
+  const [stage, setStage] = useState(STAGES[0]!);
   const [phase, setPhase] = useState<"loading" | "welcome" | "error" | "need-telegram">("loading");
   const [error, setError] = useState<string | null>(null);
   const [welcomeName, setWelcomeName] = useState("Tasker");
   const [goOwner, setGoOwner] = useState(false);
   const started = useRef(false);
+  const authDone = useRef(false);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -56,12 +66,18 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
     const user = tg?.initDataUnsafe?.user;
     if (user?.first_name) setWelcomeName(user.first_name);
 
+    // Smooth progress over ~8s to 92%, then hold until auth finishes + final stage hold
     const tick = window.setInterval(() => {
       setProgress((p) => {
+        if (authDone.current) {
+          const next = Math.min(100, p + 1.2);
+          setStage(stageForProgress(next));
+          return next;
+        }
         if (p >= 92) return p;
-        const next = Math.min(92, p + Math.random() * 4 + 1.5);
-        const step = [...STEPS].reverse().find((s) => next >= s.at);
-        if (step) setLabel(step.label);
+        // ~8 seconds to 92%: 9200ms / 180ms ≈ 51 ticks → ~1.8% per tick
+        const next = Math.min(92, p + 1.75);
+        setStage(stageForProgress(next));
         return next;
       });
     }, 180);
@@ -69,24 +85,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
     async function boot() {
       if (started.current) return;
       started.current = true;
-
-      // Already have a valid session? Skip re-login.
-      try {
-        const existing = await supabase.auth.getSession();
-        if (existing.data.session?.access_token) {
-          const { data: u } = await supabase.auth.getUser();
-          if (u.user?.id) {
-            window.clearInterval(tick);
-            setProgress(100);
-            setPhase("welcome");
-            setLabel("Welcome");
-            window.setTimeout(() => navigate({ to: redirectTo, replace: true }), 900);
-            return;
-          }
-        }
-      } catch {
-        /* continue to Telegram login */
-      }
 
       const initData = tg?.initData ?? "";
       if (!initData) {
@@ -97,7 +95,9 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       }
 
       try {
+        // ALWAYS re-auth with current Telegram identity — never reuse another account session
         await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+
         const result = await loginWithTelegram({ data: { initData } });
         const { error: sessErr } = await supabase.auth.setSession({
           access_token: result.access_token,
@@ -105,40 +105,60 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         });
         if (sessErr) throw sessErr;
 
-        // Confirm via Auth API (not local JWKS getClaims)
         const { data: confirmed, error: userErr } = await supabase.auth.getUser();
         if (userErr || !confirmed.user) {
           throw userErr ?? new Error("Session could not be confirmed.");
         }
 
+        // Ensure session telegram_id matches initData user (wrong-account guard)
+        const sessionTg = Number(confirmed.user.user_metadata?.telegram_id ?? 0);
+        if (sessionTg && sessionTg !== result.telegramId) {
+          await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+          throw new Error("Session identity mismatch. Please Retry.");
+        }
+
         if (result.firstName) setWelcomeName(result.firstName);
         setGoOwner(Boolean(result.isOwner));
+        authDone.current = true;
+
+        // Wait until progress reaches 100 and final stage has been visible ~1.5–2s
+        await new Promise<void>((resolve) => {
+          const check = window.setInterval(() => {
+            setProgress((p) => {
+              if (p >= 100) {
+                window.clearInterval(check);
+                window.setTimeout(resolve, 1800);
+              }
+              return Math.min(100, Math.max(p, 93) + 2);
+            });
+          }, 120);
+        });
+
         window.clearInterval(tick);
         setProgress(100);
-        setLabel("Welcome");
+        setStage(STAGES[9]!);
         setPhase("welcome");
 
         window.setTimeout(() => {
           navigate({ to: result.isOwner ? "/owner" : redirectTo, replace: true });
-        }, 1200);
+        }, 900);
       } catch (e) {
         window.clearInterval(tick);
         setPhase("error");
         const msg = e instanceof Error ? e.message : "TASKORA could not authenticate with Telegram.";
-        // Soften opaque JWKS errors for the user
         setError(
           msg.includes("kid") || msg.includes("JWT") || msg.includes("ES256")
-            ? "Session keys out of sync. Check Vercel SUPABASE_URL and publishable key match project qvwetjpgplkhxuymsnyx, then Retry."
+            ? "Session keys out of sync. Confirm Vercel Supabase keys match project qvwetjpgplkhxuymsnyx, then Retry."
             : msg,
         );
         setProgress(0);
-        setLabel("Authentication failed");
+        setStage(STAGES[0]!);
       }
     }
 
     const t = window.setTimeout(() => {
       void boot();
-    }, 150);
+    }, 200);
 
     return () => {
       window.clearInterval(tick);
@@ -176,8 +196,12 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
 
         {phase === "loading" || phase === "welcome" ? (
           <div className="mt-10 w-full max-w-xs">
-            <div className="mb-2 flex items-center justify-between text-[11px] text-white/55">
-              <span>{label}</span>
+            <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300/90">
+              {stage.title}
+            </p>
+            <p className="mt-1.5 text-center text-xs text-white/55">{stage.detail}</p>
+            <div className="mt-4 mb-2 flex items-center justify-between text-[11px] text-white/45">
+              <span>Account initialization</span>
               <span className="font-semibold tabular-nums text-amber-300">{Math.floor(progress)}%</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
