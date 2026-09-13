@@ -227,7 +227,9 @@ export const getDashboard = createServerFn({ method: "GET" })
 
 export const submitTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; proofText?: string; proofUrl?: string }) => d)
+  .inputValidator(
+    (d: { taskId: string; proofText?: string | undefined; proofUrl?: string | undefined }) => d,
+  )
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -478,7 +480,7 @@ export const ownerCreateTask = createServerFn({ method: "POST" })
       slots: number;
       steps: string[];
       proof: "auto" | "screenshot" | "username";
-      link?: string;
+      link?: string | undefined;
     }) => d,
   )
   .handler(async ({ data, context }) => {
