@@ -14,7 +14,6 @@ export const Route = createFileRoute("/_authenticated/profile")({
     ]);
     return { dash, accounts };
   },
-  head: () => ({ meta: [{ title: "Profile — TASKORA" }] }),
   component: ProfileScreen,
 });
 
@@ -41,10 +40,7 @@ function ProfileScreen() {
   const isOwner = Boolean(dash?.isOwner);
 
   const byPlatform = new Map(
-    (accounts as Array<{ platform: string; handle: string; status: string }>).map((a) => [
-      a.platform,
-      a,
-    ]),
+    (accounts as Array<{ platform: string; handle: string; status: string }>).map((a) => [a.platform, a]),
   );
 
   return (
@@ -53,18 +49,14 @@ function ProfileScreen() {
 
       <section className="card-surface flex items-center gap-3 p-4">
         {photo ? (
-          <img
-            src={photo}
-            alt=""
-            className="size-14 rounded-2xl object-cover ring-2 ring-primary/30"
-          />
+          <img src={photo} alt="" className="size-14 rounded-2xl object-cover ring-2 ring-primary/30" />
         ) : (
           <span className="bg-green-grad inline-flex size-14 items-center justify-center rounded-2xl text-xl font-bold text-primary-foreground">
             {name.charAt(0)}
           </span>
         )}
         <div className="min-w-0">
-          <p className="truncate text-base font-bold leading-tight">{name}</p>
+          <p className="truncate text-base font-bold">{name}</p>
           <p className="text-xs text-muted-foreground">{handle}</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
@@ -86,31 +78,25 @@ function ProfileScreen() {
       </section>
 
       {isOwner ? (
-        <Link
-          to="/owner"
-          className="mt-4 block rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm font-bold text-primary"
-        >
+        <Link to="/owner" className="mt-4 block rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm font-bold text-primary">
           Owner Control Center →
         </Link>
       ) : null}
 
+      <Link to="/support" className="card-surface mt-3 block p-4 text-sm font-semibold">
+        Support tickets →
+      </Link>
+
       <section className="mt-6">
         <h2 className="mb-3 text-base font-bold">Connected accounts</h2>
-        <p className="mb-2 text-[11px] text-muted-foreground">
-          Telegram is your login identity. Link other platforms for task eligibility.
-        </p>
         <div className="card-surface divide-y divide-border">
           {CONNECTABLE_PLATFORMS.map((platform) => {
             const row = byPlatform.get(platform);
             return (
               <Link key={platform} to="/connected" className="flex items-center gap-3 p-3.5">
                 <PlatformIcon platform={platform} size={22} />
-                <p className="flex-1 text-sm font-medium capitalize">
-                  {row?.handle ?? platform}
-                </p>
-                {row?.status === "verified" ? (
-                  <span className="text-[11px] font-semibold text-success">Verified</span>
-                ) : row ? (
+                <p className="flex-1 text-sm font-medium capitalize">{row?.handle ?? platform}</p>
+                {row ? (
                   <span className="text-[11px] font-semibold text-warning">{row.status}</span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
@@ -130,14 +116,18 @@ function ProfileScreen() {
             { label: "Language", value: "English", Icon: Globe },
             { label: "Notifications", value: "On", Icon: Bell },
             { label: "Security", value: "Telegram verified", Icon: ShieldCheck },
-            { label: "Support", value: "@Taskoraplusbot", Icon: LifeBuoy },
+            { label: "Support", value: "Open", Icon: LifeBuoy },
           ].map(({ label, value, Icon }) => (
-            <button key={label} type="button" className="flex w-full items-center gap-3 p-3.5 text-left">
+            <Link
+              key={label}
+              to={label === "Support" ? "/support" : "/profile"}
+              className="flex w-full items-center gap-3 p-3.5 text-left"
+            >
               <Icon className="size-4 text-primary" />
               <span className="flex-1 text-sm font-medium">{label}</span>
               <span className="text-xs text-muted-foreground">{value}</span>
               <ChevronRight className="size-4 text-muted-foreground" />
-            </button>
+            </Link>
           ))}
         </div>
       </section>
