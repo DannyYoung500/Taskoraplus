@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Bitcoin } from "lucide-react";
 import { Screen, ScreenTitle } from "@/components/Screen";
-import { getDashboard, requestWithdrawal } from "@/lib/taskora.functions";
+import { getDashboard } from "@/lib/taskora.functions";
+import { requestWithdrawalGuarded } from "@/lib/taskora-mutations.functions";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
   loader: async () => {
@@ -10,18 +11,10 @@ export const Route = createFileRoute("/_authenticated/wallet")({
       const dash = await getDashboard();
       return { dash, error: null as string | null };
     } catch (e) {
-      return {
-        dash: null,
-        error: e instanceof Error ? e.message : "Could not load wallet",
-      };
+      return { dash: null, error: e instanceof Error ? e.message : "Could not load wallet" };
     }
   },
-  head: () => ({
-    meta: [
-      { title: "Wallet — TASKORA" },
-      { name: "description", content: "Track your TASKORA balance, rewards history and crypto withdrawals." },
-    ],
-  }),
+  head: () => ({ meta: [{ title: "Wallet — TASKORA" }] }),
   component: WalletScreen,
 });
 
@@ -43,12 +36,8 @@ function WalletScreen() {
     setBusy(true);
     setMessage(null);
     try {
-      await requestWithdrawal({
-        data: {
-          method,
-          address: address.trim(),
-          amount: Number(amount),
-        },
+      await requestWithdrawalGuarded({
+        data: { method, address: address.trim(), amount: Number(amount) },
       });
       setMessage("Withdrawal requested. Owner will process it.");
       setAddress("");
@@ -62,14 +51,12 @@ function WalletScreen() {
 
   return (
     <Screen>
-      <ScreenTitle title="Wallet" subtitle="Crypto payouts only" />
+      <ScreenTitle title="Wallet" subtitle="Crypto payouts · min $10 · 24h new-account hold" />
 
       <section className="bg-brand relative overflow-hidden rounded-3xl p-5 text-navy-foreground shadow-raised">
         <p className="text-xs uppercase tracking-[0.18em] opacity-70">Available</p>
         <p className="mt-1 text-4xl font-bold tracking-tight">${balance.toFixed(2)}</p>
-        <p className="mt-2 text-xs opacity-80">
-          Pending ${pending.toFixed(2)} · Minimum withdrawal $10.00
-        </p>
+        <p className="mt-2 text-xs opacity-80">Pending ${pending.toFixed(2)}</p>
       </section>
 
       <section className="card-surface mt-4 p-4">
@@ -93,20 +80,20 @@ function WalletScreen() {
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Wallet address"
-          className="mt-3 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          className="mt-3 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm"
         />
         <input
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="Amount (USD)"
           inputMode="decimal"
-          className="mt-2 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          className="mt-2 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm"
         />
         <button
           type="button"
           disabled={busy}
           onClick={onWithdraw}
-          className="bg-green-grad mt-3 w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-50"
+          className="bg-green-grad mt-3 w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground disabled:opacity-50"
         >
           {busy ? "Submitting…" : "Request withdrawal"}
         </button>
