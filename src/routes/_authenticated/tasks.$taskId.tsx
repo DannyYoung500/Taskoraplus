@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
+import type { ComponentType } from "react";
 import { ArrowLeft, CheckCircle2, Clock3, ShieldCheck, Users } from "lucide-react";
 import { Screen } from "@/components/Screen";
 import { PlatformBadge, platformLabel } from "@/components/PlatformIcon";
@@ -42,7 +43,10 @@ function TaskDetail() {
 
   return (
     <Screen>
-      <Link to="/tasks" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+      <Link
+        to="/tasks"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
+      >
         <ArrowLeft className="size-4" /> Tasks
       </Link>
 
@@ -76,7 +80,12 @@ function TaskDetail() {
           ))}
         </ol>
         {task.link ? (
-          <a href={task.link} target="_blank" rel="noreferrer" className="mt-4 block text-center text-sm font-semibold text-primary">
+          <a
+            href={task.link}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 block text-center text-sm font-semibold text-primary"
+          >
             Open target
           </a>
         ) : null}
@@ -107,7 +116,11 @@ function TaskDetail() {
             onClick={() => (started ? onSubmit() : setStarted(true))}
             className="bg-green-grad w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground disabled:opacity-60"
           >
-            {busy ? "Submitting…" : started ? "Submit for verification" : `Start task · $${Number(task.reward).toFixed(2)}`}
+            {busy
+              ? "Submitting…"
+              : started
+                ? "Submit for verification"
+                : `Start task · $${Number(task.reward).toFixed(2)}`}
           </button>
         )}
       </div>
@@ -122,7 +135,7 @@ function Meta({
 }: {
   label: string;
   value: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  Icon: ComponentType<{ className?: string }>;
 }) {
   return (
     <div className="rounded-2xl bg-secondary px-2 py-3">

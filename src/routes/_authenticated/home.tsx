@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ComponentType } from "react";
 import {
   ClipboardCheck,
   PlayCircle,
@@ -36,13 +37,16 @@ function HomePage() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-4 text-white">
-      {/* Top bar */}
       <header className="mb-4 flex items-center gap-2.5">
         <img src={LOGO} alt="" className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p
             className="text-lg font-extrabold tracking-wide"
-            style={{ background: "linear-gradient(90deg,#FFE08A,#F5C542)", WebkitBackgroundClip: "text", color: "transparent" }}
+            style={{
+              background: "linear-gradient(90deg,#FFE08A,#F5C542)",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+            }}
           >
             TASKORA
           </p>
@@ -76,7 +80,6 @@ function HomePage() {
         </Link>
       ) : null}
 
-      {/* Balance card */}
       <section
         className="relative mb-4 overflow-hidden rounded-3xl border border-amber-500/25 p-5"
         style={{
@@ -114,7 +117,6 @@ function HomePage() {
         </Link>
       </section>
 
-      {/* Quick actions */}
       <div className="mb-5 grid grid-cols-4 gap-2">
         <Quick to="/tasks" label="Browse Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
         <Quick to="/watch-earn" label="Watch & Earn" sub="View Videos" Icon={PlayCircle} />
@@ -158,28 +160,38 @@ function HomePage() {
             No live tasks yet. Publish from Advertise / Owner Center.
           </p>
         ) : (
-          tasks.map((t: { id: string; title: string; reward: number; platform: string; seconds?: number }) => (
-            <Link
-              key={t.id}
-              to="/tasks/$taskId"
-              params={{ taskId: t.id }}
-              className="flex items-center gap-3 rounded-2xl border border-white/8 bg-[#12141c] p-3.5"
-            >
-              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5">
-                <PlatformIcon platform={t.platform as Platform} size={20} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{t.title}</p>
-                <p className="text-[11px] text-white/40">
-                  {t.platform}
-                  {t.seconds ? ` · ${Math.max(1, Math.round(t.seconds / 60))}–${Math.max(2, Math.round(t.seconds / 30))} mins` : ""}
-                </p>
-              </div>
-              <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300">
-                +${Number(t.reward).toFixed(2)}
-              </span>
-            </Link>
-          ))
+          tasks.map(
+            (t: {
+              id: string;
+              title: string;
+              reward: number;
+              platform: string;
+              seconds?: number;
+            }) => (
+              <Link
+                key={t.id}
+                to="/tasks/$taskId"
+                params={{ taskId: t.id }}
+                className="flex items-center gap-3 rounded-2xl border border-white/8 bg-[#12141c] p-3.5"
+              >
+                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5">
+                  <PlatformIcon platform={t.platform as Platform} size={20} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{t.title}</p>
+                  <p className="text-[11px] text-white/40">
+                    {t.platform}
+                    {t.seconds
+                      ? ` · ${Math.max(1, Math.round(t.seconds / 60))}–${Math.max(2, Math.round(t.seconds / 30))} mins`
+                      : ""}
+                  </p>
+                </div>
+                <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300">
+                  +${Number(t.reward).toFixed(2)}
+                </span>
+              </Link>
+            ),
+          )
         )}
       </div>
 
@@ -190,7 +202,9 @@ function HomePage() {
         <Crown className="size-5 text-amber-300" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Level Up & Unlock More Rewards</p>
-          <p className="text-[11px] text-white/45">Complete tasks, earn higher rewards, climb the leaderboard.</p>
+          <p className="text-[11px] text-white/45">
+            Complete tasks, earn higher rewards, climb the leaderboard.
+          </p>
         </div>
         <span className="rounded-full bg-amber-400 px-3 py-1.5 text-[11px] font-bold text-[#0a0c12]">
           Start Now ›
@@ -209,7 +223,7 @@ function Quick({
   to: string;
   label: string;
   sub: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  Icon: ComponentType<{ className?: string }>;
 }) {
   return (
     <Link
