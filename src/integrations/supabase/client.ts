@@ -28,10 +28,14 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseClient() {
-  // TASKORA is permanently bound to its production Supabase project.
-  // Keep the public project URL deterministic so a stale/mismatched Vercel
-  // SUPABASE_URL cannot cause the browser to verify tokens against another project.
-  const SUPABASE_URL = 'https://yvwnrzpgdmscyldlrbxv.supabase.co';
+  // TASKORA is bound to its production Supabase project. The project URL and the
+  // publishable key MUST belong to the same project, otherwise Supabase rejects
+  // requests with "Invalid API key". Resolve both from the environment so they
+  // always stay in sync; fall back to the known production URL if unset.
+  const SUPABASE_URL =
+    import.meta.env['VITE_SUPABASE_URL'] ||
+    process.env['SUPABASE_URL'] ||
+    'https://c--91dd3cbf-bd67-4477-9502-6311e4aa2b7d-prod.lovable.cloud';
   const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY'];
 
   if (!SUPABASE_PUBLISHABLE_KEY) {
