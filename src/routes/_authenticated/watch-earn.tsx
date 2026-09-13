@@ -1,37 +1,44 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PlayCircle } from "lucide-react";
+import { Screen, ScreenTitle } from "@/components/Screen";
 
 export const Route = createFileRoute("/_authenticated/watch-earn")({
+  head: () => ({ meta: [{ title: "Watch & Earn — TASKORA" }] }),
   component: WatchEarnPage,
 });
 
-/**
- * Watch & Earn is separate from Advertise.
- * Rewards only after provider server-side completion confirmation.
- * Do not credit from a frontend video-ended event alone.
- */
 function WatchEarnPage() {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-6">
-      <h1 className="text-xl font-bold">Watch & Earn</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Complete a rewarded video through the configured provider. TASKORA credits a reward only after
-        the provider confirms completion on the server.
-      </p>
+    <Screen>
+      <ScreenTitle title="Watch & Earn" subtitle="Rewarded video providers" />
 
-      <div className="card-surface mt-6 space-y-3 p-4">
-        <p className="text-sm font-semibold">Provider not connected</p>
-        <p className="text-xs text-muted-foreground">
-          Owner must configure a rewarded-video provider (server secrets only — never NEXT_PUBLIC_).
-          Limits, cooldown, and fraud controls belong in the Owner Control Center.
+      <section className="card-surface p-5">
+        <div className="mb-3 inline-flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+          <PlayCircle className="size-6" />
+        </div>
+        <h2 className="text-base font-bold">Provider integration</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Watch & Earn pays only after a verified provider callback. No client-side reward
+          simulation. Connect AdMob / rewarded-ad or offerwall credentials in owner settings when
+          ready.
         </p>
         <button
           type="button"
           disabled
-          className="w-full rounded-2xl bg-muted px-4 py-3 text-sm font-semibold text-muted-foreground"
+          className="bg-green-grad mt-5 w-full rounded-2xl py-3.5 text-sm font-bold text-primary-foreground opacity-50"
         >
-          Watch video (disabled until provider is live)
+          Provider not configured
         </button>
-      </div>
-    </main>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          Status: awaiting owner provider keys
+        </p>
+      </section>
+
+      <section className="card-surface mt-4 space-y-2 p-4 text-xs text-muted-foreground">
+        <p>· Server validates provider signature</p>
+        <p>· Ledger credit is idempotent</p>
+        <p>· Duplicate callbacks are ignored</p>
+      </section>
+    </Screen>
   );
 }
