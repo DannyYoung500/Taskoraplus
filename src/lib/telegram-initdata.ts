@@ -18,8 +18,8 @@ export type TelegramWebAppUser = {
 export type ValidatedInitData = {
   user: TelegramWebAppUser;
   authDate: number;
-  queryId?: string;
-  startParam?: string;
+  queryId?: string | undefined;
+  startParam?: string | undefined;
   raw: Record<string, string>;
 };
 
@@ -33,7 +33,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 async function hmacHex(key: ArrayBuffer | Uint8Array, message: string): Promise<string> {
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    key,
+    key as BufferSource,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

@@ -12,9 +12,15 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedAdvertiseRouteImport } from './routes/_authenticated/advertise'
 import { Route as AuthenticatedAmbassadorRouteImport } from './routes/_authenticated/ambassador'
+import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
+import { Route as AuthenticatedWatchEarnRouteImport } from './routes/_authenticated/watch-earn'
+import { Route as AuthenticatedOwnerIndexRouteImport } from './routes/_authenticated/owner.index'
+import { Route as AuthenticatedOwnerReviewsRouteImport } from './routes/_authenticated/owner.reviews'
+import { Route as AuthenticatedOwnerWithdrawalsRouteImport } from './routes/_authenticated/owner.withdrawals'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks.index'
 import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenticated/tasks.$taskId'
 
@@ -32,9 +38,19 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdvertiseRoute = AuthenticatedAdvertiseRouteImport.update({
+  id: '/advertise',
+  path: '/advertise',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAmbassadorRoute = AuthenticatedAmbassadorRouteImport.update({
   id: '/ambassador',
   path: '/ambassador',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
@@ -47,6 +63,28 @@ const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
   path: '/wallet',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedWatchEarnRoute = AuthenticatedWatchEarnRouteImport.update({
+  id: '/watch-earn',
+  path: '/watch-earn',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOwnerIndexRoute = AuthenticatedOwnerIndexRouteImport.update({
+  id: '/owner/',
+  path: '/owner/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOwnerReviewsRoute =
+  AuthenticatedOwnerReviewsRouteImport.update({
+    id: '/owner/reviews',
+    path: '/owner/reviews',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedOwnerWithdrawalsRoute =
+  AuthenticatedOwnerWithdrawalsRouteImport.update({
+    id: '/owner/withdrawals',
+    path: '/owner/withdrawals',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
@@ -62,19 +100,31 @@ const AuthenticatedTasksTaskIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/advertise': typeof AuthenticatedAdvertiseRoute
   '/ambassador': typeof AuthenticatedAmbassadorRoute
+  '/home': typeof AuthenticatedHomeRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/wallet': typeof AuthenticatedWalletRoute
+  '/watch-earn': typeof AuthenticatedWatchEarnRoute
+  '/owner/reviews': typeof AuthenticatedOwnerReviewsRoute
+  '/owner/withdrawals': typeof AuthenticatedOwnerWithdrawalsRoute
   '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute
+  '/owner/': typeof AuthenticatedOwnerIndexRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/advertise': typeof AuthenticatedAdvertiseRoute
   '/ambassador': typeof AuthenticatedAmbassadorRoute
+  '/home': typeof AuthenticatedHomeRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/wallet': typeof AuthenticatedWalletRoute
+  '/watch-earn': typeof AuthenticatedWatchEarnRoute
+  '/owner/reviews': typeof AuthenticatedOwnerReviewsRoute
+  '/owner/withdrawals': typeof AuthenticatedOwnerWithdrawalsRoute
   '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute
+  '/owner': typeof AuthenticatedOwnerIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
 }
 export interface FileRoutesById {
@@ -82,10 +132,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/advertise': typeof AuthenticatedAdvertiseRoute
   '/_authenticated/ambassador': typeof AuthenticatedAmbassadorRoute
+  '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/wallet': typeof AuthenticatedWalletRoute
+  '/_authenticated/watch-earn': typeof AuthenticatedWatchEarnRoute
+  '/_authenticated/owner/reviews': typeof AuthenticatedOwnerReviewsRoute
+  '/_authenticated/owner/withdrawals': typeof AuthenticatedOwnerWithdrawalsRoute
   '/_authenticated/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute
+  '/_authenticated/owner/': typeof AuthenticatedOwnerIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
 }
 export interface FileRouteTypes {
@@ -93,29 +149,47 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/advertise'
     | '/ambassador'
+    | '/home'
     | '/profile'
     | '/wallet'
+    | '/watch-earn'
+    | '/owner/reviews'
+    | '/owner/withdrawals'
     | '/tasks/$taskId'
+    | '/owner/'
     | '/tasks/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/advertise'
     | '/ambassador'
+    | '/home'
     | '/profile'
     | '/wallet'
+    | '/watch-earn'
+    | '/owner/reviews'
+    | '/owner/withdrawals'
     | '/tasks/$taskId'
+    | '/owner'
     | '/tasks'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/advertise'
     | '/_authenticated/ambassador'
+    | '/_authenticated/home'
     | '/_authenticated/profile'
     | '/_authenticated/wallet'
+    | '/_authenticated/watch-earn'
+    | '/_authenticated/owner/reviews'
+    | '/_authenticated/owner/withdrawals'
     | '/_authenticated/tasks/$taskId'
+    | '/_authenticated/owner/'
     | '/_authenticated/tasks/'
   fileRoutesById: FileRoutesById
 }
@@ -148,11 +222,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/advertise': {
+      id: '/_authenticated/advertise'
+      path: '/advertise'
+      fullPath: '/advertise'
+      preLoaderRoute: typeof AuthenticatedAdvertiseRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ambassador': {
       id: '/_authenticated/ambassador'
       path: '/ambassador'
       fullPath: '/ambassador'
       preLoaderRoute: typeof AuthenticatedAmbassadorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/home': {
+      id: '/_authenticated/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof AuthenticatedHomeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profile': {
@@ -167,6 +255,34 @@ declare module '@tanstack/react-router' {
       path: '/wallet'
       fullPath: '/wallet'
       preLoaderRoute: typeof AuthenticatedWalletRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/watch-earn': {
+      id: '/_authenticated/watch-earn'
+      path: '/watch-earn'
+      fullPath: '/watch-earn'
+      preLoaderRoute: typeof AuthenticatedWatchEarnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/owner/': {
+      id: '/_authenticated/owner/'
+      path: '/owner'
+      fullPath: '/owner/'
+      preLoaderRoute: typeof AuthenticatedOwnerIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/owner/reviews': {
+      id: '/_authenticated/owner/reviews'
+      path: '/owner/reviews'
+      fullPath: '/owner/reviews'
+      preLoaderRoute: typeof AuthenticatedOwnerReviewsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/owner/withdrawals': {
+      id: '/_authenticated/owner/withdrawals'
+      path: '/owner/withdrawals'
+      fullPath: '/owner/withdrawals'
+      preLoaderRoute: typeof AuthenticatedOwnerWithdrawalsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/tasks/': {
@@ -187,18 +303,30 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdvertiseRoute: typeof AuthenticatedAdvertiseRoute
   AuthenticatedAmbassadorRoute: typeof AuthenticatedAmbassadorRoute
+  AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
+  AuthenticatedWatchEarnRoute: typeof AuthenticatedWatchEarnRoute
+  AuthenticatedOwnerReviewsRoute: typeof AuthenticatedOwnerReviewsRoute
+  AuthenticatedOwnerWithdrawalsRoute: typeof AuthenticatedOwnerWithdrawalsRoute
   AuthenticatedTasksTaskIdRoute: typeof AuthenticatedTasksTaskIdRoute
+  AuthenticatedOwnerIndexRoute: typeof AuthenticatedOwnerIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdvertiseRoute: AuthenticatedAdvertiseRoute,
   AuthenticatedAmbassadorRoute: AuthenticatedAmbassadorRoute,
+  AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedWalletRoute: AuthenticatedWalletRoute,
+  AuthenticatedWatchEarnRoute: AuthenticatedWatchEarnRoute,
+  AuthenticatedOwnerReviewsRoute: AuthenticatedOwnerReviewsRoute,
+  AuthenticatedOwnerWithdrawalsRoute: AuthenticatedOwnerWithdrawalsRoute,
   AuthenticatedTasksTaskIdRoute: AuthenticatedTasksTaskIdRoute,
+  AuthenticatedOwnerIndexRoute: AuthenticatedOwnerIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
 }
 
