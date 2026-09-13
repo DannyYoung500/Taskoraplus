@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { listConnectedAccounts, requestConnectAccount } from "@/lib/connected-accounts.functions";
-import type { Platform } from "@/components/PlatformIcon";
+import { CONNECTABLE_PLATFORMS } from "@/lib/taskora-data";
+import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
+import { Screen, ScreenTitle } from "@/components/Screen";
 
 export const Route = createFileRoute("/_authenticated/connected")({
   loader: async () => {
@@ -11,11 +13,9 @@ export const Route = createFileRoute("/_authenticated/connected")({
   component: ConnectedPage,
 });
 
-const PLATFORMS: Platform[] = ["telegram", "youtube", "x", "tiktok", "instagram", "discord", "whatsapp"];
-
 function ConnectedPage() {
   const { accounts } = Route.useLoaderData();
-  const [platform, setPlatform] = useState<Platform>("telegram");
+  const [platform, setPlatform] = useState<Platform>(CONNECTABLE_PLATFORMS[0]!);
   const [handle, setHandle] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ function ConnectedPage() {
     setMsg(null);
     try {
       await requestConnectAccount({ data: { platform, handle } });
-      setMsg("Saved as pending. Real verification adapters are not live yet — status stays pending.");
+      setMsg("Saved as pending. Real verification adapters are not live yet.");
       setHandle("");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed");
@@ -35,19 +35,20 @@ function ConnectedPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-6">
-      <h1 className="text-xl font-bold">Connected accounts</h1>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Link handles for eligibility. Verification requires platform adapters (not faked).
-      </p>
+    <Screen>
+      <ScreenTitle
+        title="Connect socials"
+        subtitle="Telegram is already your identity — link other platforms"
+      />
 
-      <div className="card-surface mt-4 space-y-3 p-4">
+      <div className="card-surface space-y-3 p-4">
+        <label className="text-xs text-muted-foreground">Platform</label>
         <select
           value={platform}
           onChange={(e) => setPlatform(e.target.value as Platform)}
-          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
         >
-          {PLATFORMS.map((p) => (
+          {CONNECTABLE_PLATFORMS.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
@@ -57,7 +58,7 @@ function ConnectedPage() {
           value={handle}
           onChange={(e) => setHandle(e.target.value)}
           placeholder="@username or handle"
-          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
         />
         <button
           type="button"
@@ -71,17 +72,16 @@ function ConnectedPage() {
       </div>
 
       <div className="mt-6 space-y-2">
-        {(accounts as Array<{ id: string; platform: string; handle: string; status: string }>).map(
-          (a) => (
-            <div key={a.id} className="card-surface flex justify-between p-3 text-sm">
-              <span className="font-medium capitalize">
-                {a.platform}: {a.handle}
-              </span>
+        {(accounts as Array<{ id: string; platform: string; handle: string; status: string }>)
+          .filter((a) => a.platform !== "telegram")
+          .map((a) => (
+            <div key={a.id} className="card-surface flex items-center gap-3 p-3.5 text-sm">
+              <PlatformIcon platform={a.platform as Platform} size={20} />
+              <span className="min-w-0 flex-1 truncate font-medium">{a.handle}</span>
               <span className="text-xs text-muted-foreground">{a.status}</span>
             </div>
-          ),
-        )}
+          ))}
       </div>
-    </main>
+    </Screen>
   );
 }

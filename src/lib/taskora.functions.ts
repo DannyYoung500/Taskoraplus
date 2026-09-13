@@ -13,7 +13,8 @@ export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 
 function publicClient() {
   const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  return createClient<Database>(process.env["SUPABASE_URL"]!, key, {
+  const url = process.env["SUPABASE_URL"] ?? "https://qvwetjpgplkhxuymsnyx.supabase.co";
+  return createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
       fetch: (input, init) => {
@@ -36,13 +37,12 @@ async function assertAdmin(userId: string) {
   });
   if (isAdmin) return;
 
-  // Fallback: profile.telegram_id in TASKORA_OWNER_TELEGRAM_IDS
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("telegram_id")
     .eq("id", userId)
     .maybeSingle();
-  const tg = (profile as { telegram_id?: number | null } | null)?.telegram_id;
+  const tg = (profile as { telegram_id?: number | string | null } | null)?.telegram_id;
   if (isOwnerTelegramId(tg ?? null)) {
     await supabaseAdmin.from("user_roles").upsert(
       { user_id: userId, role: "admin" } as never,
@@ -65,11 +65,17 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
       [validated.user.first_name, validated.user.last_name].filter(Boolean).join(" ") ||
       validated.user.username ||
       `User ${telegramId}`;
+    const photoUrl = validated.user.photo_url ?? null;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: listed } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    let userId = listed?.users?.find((u) => u.email === email)?.id;
+    // Prefer lookup by metadata telegram_id, then synthetic email
+    let userId: string | undefined;
+    const { data: listed } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const match =
+      listed?.users?.find((u) => Number(u.user_metadata?.telegram_id) === telegramId) ??
+      listed?.users?.find((u) => u.email === email);
+    userId = match?.id;
 
     if (!userId) {
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -80,13 +86,15 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
           telegram_id: telegramId,
           username: validated.user.username ?? null,
           display_name: displayName,
-          photo_url: validated.user.photo_url ?? null,
+          photo_url: photoUrl,
           auth_provider: "telegram",
         },
       });
       if (createErr || !created.user) {
-        const { data: again } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
-        userId = again?.users?.find((u) => u.email === email)?.id;
+        const { data: again } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        userId =
+          again?.users?.find((u) => Number(u.user_metadata?.telegram_id) === telegramId)?.id ??
+          again?.users?.find((u) => u.email === email)?.id;
         if (!userId) throw new Error(createErr?.message ?? "Could not create Telegram user.");
       } else {
         userId = created.user.id;
@@ -98,7 +106,7 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
           telegram_id: telegramId,
           username: validated.user.username ?? null,
           display_name: displayName,
-          photo_url: validated.user.photo_url ?? null,
+          photo_url: photoUrl,
           auth_provider: "telegram",
         },
       });
@@ -113,21 +121,21 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
         referral_code: referralCode,
         ...({
           telegram_id: telegramId,
-          photo_url: validated.user.photo_url ?? null,
+          photo_url: photoUrl,
         } as Record<string, unknown>),
       } as never,
       { onConflict: "id" },
     );
 
-    // Auto-grant admin when Telegram ID is listed as owner
-    if (isOwnerTelegramId(telegramId)) {
+    const owner = isOwnerTelegramId(telegramId);
+    if (owner) {
       await supabaseAdmin.from("user_roles").upsert(
         { user_id: userId, role: "admin" } as never,
         { onConflict: "user_id,role" } as never,
       );
     }
 
-    const url = process.env["SUPABASE_URL"]!;
+    const url = process.env["SUPABASE_URL"] ?? "https://qvwetjpgplkhxuymsnyx.supabase.co";
     const anon = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
     const authClient = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -144,12 +152,13 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
       sessionReady: true as const,
       telegramId,
       userId,
-      isOwner: isOwnerTelegramId(telegramId),
+      isOwner: owner,
       access_token: sessionData.session.access_token,
       refresh_token: sessionData.session.refresh_token,
       expires_at: sessionData.session.expires_at ?? null,
       username: validated.user.username ?? null,
       firstName: validated.user.first_name ?? null,
+      photoUrl,
       startParam: validated.startParam ?? null,
     };
   });
@@ -209,8 +218,16 @@ export const getDashboard = createServerFn({ method: "GET" })
       .filter((s) => s.status === "pending")
       .reduce((s, row) => s + Number(row.tasks?.reward ?? 0), 0);
 
-    const tg = (profileRes.data as { telegram_id?: number } | null)?.telegram_id;
+    const tg = (profileRes.data as { telegram_id?: number | string } | null)?.telegram_id;
     const isOwner = Boolean(roleRes.data) || isOwnerTelegramId(tg ?? null);
+
+    // Keep role in sync if env lists this Telegram ID
+    if (isOwner && !roleRes.data) {
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: userId, role: "admin" } as never,
+        { onConflict: "user_id,role" } as never,
+      );
+    }
 
     return {
       profile: profileRes.data,
@@ -222,6 +239,7 @@ export const getDashboard = createServerFn({ method: "GET" })
       verifiedCount: submissions.filter((s) => s.status === "verified").length,
       referrals: refRes.count ?? 0,
       isOwner,
+      telegramId: tg ?? null,
     };
   });
 

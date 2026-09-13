@@ -20,11 +20,16 @@ function HomePage() {
   const pending = Number(dash?.pending ?? 0);
   const name = dash?.profile?.display_name ?? "Tasker";
   const isOwner = Boolean(dash?.isOwner);
+  const photo = (dash?.profile as { photo_url?: string | null } | null)?.photo_url ?? null;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-5">
       <header className="mb-5 flex items-center gap-3">
-        <img src={LOGO} alt="" className="size-10 rounded-full object-cover" />
+        {photo ? (
+          <img src={photo} alt="" className="size-11 rounded-full object-cover ring-2 ring-primary/25" />
+        ) : (
+          <img src={LOGO} alt="" className="size-11 rounded-full object-cover" />
+        )}
         <div className="min-w-0 flex-1">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">TASKORA</p>
           <h1 className="truncate text-lg font-bold">{name}</h1>
@@ -40,7 +45,7 @@ function HomePage() {
       {isOwner ? (
         <Link
           to="/owner"
-          className="mb-4 block rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-bold text-primary"
+          className="mb-4 block rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3.5 text-sm font-bold text-primary shadow-glow"
         >
           Owner Control Center →
         </Link>
@@ -58,19 +63,20 @@ function HomePage() {
             <p className="mt-1 text-2xl font-bold">${pending.toFixed(2)}</p>
           </div>
         </div>
+        <p className="relative mt-3 text-xs text-muted-foreground">Verified tasks · Real rewards</p>
       </section>
 
       <div className="mb-4 grid grid-cols-2 gap-2">
-        <Link to="/tasks" className="card-surface p-3 text-center text-xs font-semibold">
+        <Link to="/tasks" className="card-surface p-3.5 text-center text-xs font-semibold">
           Browse tasks
         </Link>
-        <Link to="/watch-earn" className="card-surface p-3 text-center text-xs font-semibold">
+        <Link to="/watch-earn" className="card-surface p-3.5 text-center text-xs font-semibold">
           Watch & Earn
         </Link>
-        <Link to="/ambassador" className="card-surface p-3 text-center text-xs font-semibold">
+        <Link to="/ambassador" className="card-surface p-3.5 text-center text-xs font-semibold">
           Invite & earn
         </Link>
-        <Link to="/leaderboard" className="card-surface p-3 text-center text-xs font-semibold">
+        <Link to="/leaderboard" className="card-surface p-3.5 text-center text-xs font-semibold">
           Leaderboard
         </Link>
       </div>
@@ -84,7 +90,9 @@ function HomePage() {
 
       <div className="space-y-2">
         {tasks.length === 0 ? (
-          <p className="card-surface p-4 text-sm text-muted-foreground">No tasks available right now.</p>
+          <p className="card-surface p-4 text-sm text-muted-foreground">
+            No live tasks yet. Owner publishes real campaigns from Control Center.
+          </p>
         ) : (
           tasks.map((t: { id: string; title: string; reward: number; platform: string }) => (
             <Link
