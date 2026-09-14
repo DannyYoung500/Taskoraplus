@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Lock, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
@@ -76,7 +76,7 @@ function TelegramGateScreen() {
       }
       if ("temporaryError" in result && result.temporaryError) {
         setPhase("unavailable");
-        setMessage(result.temporaryError);
+        setMessage(String(result.temporaryError));
         return;
       }
       setPhase("not_member");
@@ -128,9 +128,7 @@ function TelegramGateScreen() {
             TASKORA
           </p>
           <h1 className="mt-2 text-center text-xl font-extrabold tracking-tight">{title}</h1>
-          <p className="mt-2 max-w-sm text-center text-xs leading-relaxed text-white/50">
-            {description}
-          </p>
+          <p className="mt-2 max-w-sm text-center text-xs leading-relaxed text-white/50">{description}</p>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-[#12141c] p-5">
@@ -172,7 +170,7 @@ function TelegramGateScreen() {
               <button
                 type="button"
                 onClick={joinChannel}
-                className="w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold text-[#05070c]"
+                className="w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold text-white"
                 style={{ background: "linear-gradient(135deg,#2AABEE,#229ED9)" }}
               >
                 {settings?.joinButtonText ?? "JOIN TELEGRAM CHANNEL"}
@@ -200,20 +198,10 @@ function TelegramGateScreen() {
   );
 }
 
-function Status({
-  icon,
-  label,
-  detail,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  detail: string;
-}) {
+function Status({ icon, label, detail }: { icon: ReactNode; label: string; detail: string }) {
   return (
     <div className="text-center">
-      <div className="mx-auto mb-3 inline-flex size-12 items-center justify-center rounded-2xl bg-white/5">
-        {icon}
-      </div>
+      <div className="mx-auto mb-3 inline-flex size-12 items-center justify-center rounded-2xl bg-white/5">{icon}</div>
       <p className="text-sm font-bold tracking-wide">{label}</p>
       <p className="mt-1 text-xs text-white/45">{detail}</p>
     </div>
