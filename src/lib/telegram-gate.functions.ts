@@ -3,8 +3,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isOwnerTelegramId } from "@/lib/owner";
 import { validateTelegramInitData } from "@/lib/telegram-initdata";
 
+export type TelegramGateChatType = "channel" | "group" | "supergroup";
+
 export type TelegramGateSettings = {
   enabled: boolean;
+  chatType: TelegramGateChatType;
   channelId: string;
   channelUrl: string;
   channelName: string;
@@ -24,15 +27,16 @@ export type TelegramGateSettings = {
 
 const DEFAULTS: TelegramGateSettings = {
   enabled: false,
+  chatType: "channel",
   channelId: "",
   channelUrl: "",
   channelName: "TASKORA Community",
   title: "JOIN TASKORA COMMUNITY",
-  description: "Join our official Telegram channel to unlock TASKORA and start earning.",
-  joinButtonText: "JOIN TELEGRAM CHANNEL",
+  description: "Join our official Telegram channel or group to unlock TASKORA and start earning.",
+  joinButtonText: "JOIN TELEGRAM",
   checkButtonText: "CHECK MEMBERSHIP",
   successMessage: "Your TASKORA access has been unlocked.",
-  failureMessage: "Please join the official TASKORA channel and try again.",
+  failureMessage: "Please join the official TASKORA community and try again.",
   checkIntervalSeconds: 300,
   revokeOnLeave: true,
   allowAdmins: true,
@@ -60,9 +64,16 @@ async function assertOwner(userId: string) {
   throw new Error("Owner/admin authorization required.");
 }
 
+function normalizeChatType(v: unknown): TelegramGateChatType {
+  const s = String(v ?? "channel").toLowerCase();
+  if (s === "group" || s === "supergroup") return s;
+  return "channel";
+}
+
 function normalizeSettings(row: Record<string, unknown> | null | undefined): TelegramGateSettings {
   return {
     enabled: Boolean(row?.enabled ?? DEFAULTS.enabled),
+    chatType: normalizeChatType(row?.chat_type),
     channelId: String(row?.channel_id ?? DEFAULTS.channelId),
     channelUrl: String(row?.channel_url ?? DEFAULTS.channelUrl),
     channelName: String(row?.channel_name ?? DEFAULTS.channelName),
@@ -147,6 +158,7 @@ export const saveTelegramGateSettings = createServerFn({ method: "POST" })
     const payload = {
       id: true,
       enabled: Boolean(data.enabled),
+      chat_type: normalizeChatType(data.chatType),
       channel_id: data.channelId.trim() || null,
       channel_url: data.channelUrl.trim() || null,
       channel_name: data.channelName.trim() || DEFAULTS.channelName,
@@ -181,8 +193,8 @@ export const saveTelegramGateSettings = createServerFn({ method: "POST" })
         entity_id: "true",
         meta: {
           enabled: payload.enabled,
+          chat_type: payload.chat_type,
           channel_id: payload.channel_id,
-          channel_url: payload.channel_url,
         },
       });
     } catch {
@@ -202,11 +214,18 @@ export const testTelegramGateConnection = createServerFn({ method: "POST" })
       return { ok: false as const, error: "TELEGRAM_BOT_TOKEN is not configured on the server." };
     }
     if (!settings.channelId) {
-      return { ok: false as const, error: "Channel ID is not set in Telegram Gate settings." };
+      return {
+        ok: false as const,
+        error: "Chat ID is not set. Use @username or numeric -100… for channel/group.",
+      };
     }
     try {
       const meRes = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
-      const me = (await meRes.json()) as { ok?: boolean; description?: string; result?: { username?: string } };
+      const me = (await meRes.json()) as {
+        ok?: boolean;
+        description?: string;
+        result?: { username?: string };
+      };
       if (!me.ok) {
         return { ok: false as const, error: me.description ?? "Bot token rejected by Telegram." };
       }
@@ -215,20 +234,24 @@ export const testTelegramGateConnection = createServerFn({ method: "POST" })
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ chat_id: settings.channelId }),
       });
-      const chat = (await chatRes.json()) as { ok?: boolean; description?: string; result?: { title?: string; type?: string } };
+      const chat = (await chatRes.json()) as {
+        ok?: boolean;
+        description?: string;
+        result?: { title?: string; type?: string };
+      };
       if (!chat.ok) {
         return {
           ok: false as const,
           error:
             chat.description ??
-            "Cannot read channel. Add the bot as admin in the channel and check Channel ID.",
+            "Cannot read chat. Add the bot as admin in the channel or group and check Chat ID.",
         };
       }
       return {
         ok: true as const,
         botUsername: me.result?.username ?? null,
         channelTitle: chat.result?.title ?? settings.channelName,
-        channelType: chat.result?.type ?? null,
+        channelType: chat.result?.type ?? settings.chatType,
       };
     } catch (e) {
       return {
@@ -344,7 +367,7 @@ export const getTelegramGateStatus = createServerFn({ method: "POST" })
           };
         }
       } catch {
-        /* continue to live check */
+        /* continue */
       }
     }
 

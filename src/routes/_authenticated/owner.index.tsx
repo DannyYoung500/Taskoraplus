@@ -12,10 +12,10 @@ import {
   Activity,
   LifeBuoy,
   Bell,
+  FileText,
 } from "lucide-react";
 import { getOwnerOverview } from "@/lib/taskora.functions";
-
-const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
+import { TASKORA_LOGO } from "@/lib/brand";
 
 export const Route = createFileRoute("/_authenticated/owner/")({
   loader: async () => {
@@ -33,16 +33,17 @@ export const Route = createFileRoute("/_authenticated/owner/")({
 });
 
 const MODULES = [
-  { to: "/owner/reviews" as const, title: "Task reviews", desc: "Approve or reject proofs", Icon: ClipboardCheck, tone: "amber" },
-  { to: "/owner/withdrawals" as const, title: "Withdrawals", desc: "Mark paid or reject", Icon: Wallet, tone: "green" },
-  { to: "/owner/users" as const, title: "Users", desc: "Search · suspend · adjust", Icon: Users, tone: "blue" },
-  { to: "/owner/tasks" as const, title: "Tasks", desc: "Activate · pause · complete", Icon: Activity, tone: "purple" },
-  { to: "/advertise" as const, title: "Publish", desc: "Create marketplace tasks", Icon: Megaphone, tone: "amber" },
-  { to: "/owner/fraud" as const, title: "Fraud", desc: "Risk playbook", Icon: ShieldAlert, tone: "red" },
-  { to: "/owner/analytics" as const, title: "Analytics", desc: "Growth & payouts", Icon: BarChart3, tone: "blue" },
-  { to: "/owner/tickets" as const, title: "Support", desc: "Ticket queue", Icon: LifeBuoy, tone: "green" },
-  { to: "/owner/announce" as const, title: "Broadcast", desc: "Announcements", Icon: Bell, tone: "amber" },
-  { to: "/owner/settings" as const, title: "Settings", desc: "Limits & rates", Icon: Settings, tone: "slate" },
+  { to: "/owner/reviews" as const, title: "Task reviews", desc: "Approve or reject proofs", Icon: ClipboardCheck },
+  { to: "/owner/withdrawals" as const, title: "Withdrawals", desc: "Mark paid or reject", Icon: Wallet },
+  { to: "/owner/users" as const, title: "Users", desc: "Search · suspend · adjust", Icon: Users },
+  { to: "/owner/tasks" as const, title: "Tasks", desc: "Activate · pause · complete", Icon: Activity },
+  { to: "/advertise" as const, title: "Publish", desc: "Create marketplace tasks", Icon: Megaphone },
+  { to: "/owner/documents" as const, title: "Documents", desc: "Upload long PDFs / briefs", Icon: FileText },
+  { to: "/owner/fraud" as const, title: "Fraud", desc: "Risk playbook", Icon: ShieldAlert },
+  { to: "/owner/analytics" as const, title: "Analytics", desc: "Growth & payouts", Icon: BarChart3 },
+  { to: "/owner/tickets" as const, title: "Support", desc: "Ticket queue", Icon: LifeBuoy },
+  { to: "/owner/announce" as const, title: "Broadcast", desc: "Announcements", Icon: Bell },
+  { to: "/owner/settings" as const, title: "Settings", desc: "Gate · channel or group", Icon: Settings },
 ];
 
 function OwnerHub() {
@@ -68,7 +69,7 @@ function OwnerHub() {
         }}
       >
         <div className="flex items-center gap-3">
-          <img src={LOGO} alt="" className="size-12 rounded-full object-cover ring-2 ring-amber-400/40" />
+          <img src={TASKORA_LOGO} alt="" className="size-12 rounded-full object-cover ring-2 ring-amber-400/40" />
           <div className="min-w-0 flex-1">
             <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300">
               <Crown className="size-3" /> Owner control
@@ -114,7 +115,7 @@ function OwnerHub() {
             className="group rounded-2xl border border-white/8 bg-[#12141c] p-3.5 transition active:scale-[0.98]"
           >
             <span className="mb-2 inline-flex size-9 items-center justify-center rounded-xl bg-amber-400/12 text-amber-300">
-              <Icon className="size-4.5" />
+              <Icon className="size-4" />
             </span>
             <p className="text-sm font-semibold leading-tight">{title}</p>
             <p className="mt-0.5 text-[10px] leading-snug text-white/40">{desc}</p>

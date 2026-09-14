@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   getTelegramGateSettings,
   saveTelegramGateSettings,
   testTelegramGateConnection,
   getTelegramGateAnalytics,
   type TelegramGateSettings,
+  type TelegramGateChatType,
 } from "@/lib/telegram-gate.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/settings")({
@@ -69,7 +70,7 @@ function OwnerSettings() {
       const res = await testTelegramGateConnection();
       if (res.ok) {
         setTestResult(
-          `✓ Connected · bot @${res.botUsername ?? "?"} · channel “${res.channelTitle ?? "?"}”`,
+          `✓ Connected · bot @${res.botUsername ?? "?"} · ${res.channelType ?? "chat"} “${res.channelTitle ?? "?"}”`,
         );
       } else {
         setTestResult(`✕ Connection failed · ${res.error}`);
@@ -88,12 +89,19 @@ function OwnerSettings() {
         Operational defaults. Bot token stays on Vercel (never in the browser).
       </p>
 
+      <Link
+        to="/owner/documents"
+        className="mt-4 flex items-center justify-between rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200"
+      >
+        <span>PDF / document library</span>
+        <span className="text-xs text-amber-300/80">Open →</span>
+      </Link>
+
       <div className="mt-4 space-y-3">
         {[
           { k: "Min withdrawal", v: "$10.00" },
           { k: "Payout methods", v: "USDT TRC20 · BEP20 · BTC · TON" },
           { k: "Referral share", v: "8% of verified rewards" },
-          { k: "Daily check-in", v: "$0.10" },
           { k: "Owner Telegram IDs", v: "TASKORA_OWNER_TELEGRAM_IDS (server)" },
           { k: "Bot token", v: "TELEGRAM_BOT_TOKEN (server)" },
         ].map((row) => (
@@ -112,7 +120,7 @@ function OwnerSettings() {
           <div>
             <h2 className="text-base font-bold">Telegram Gate</h2>
             <p className="mt-1 text-[11px] text-white/40">
-              Require official channel membership before app access.
+              Require channel or group membership before app access.
             </p>
           </div>
           <button
@@ -143,20 +151,34 @@ function OwnerSettings() {
 
         {gate ? (
           <div className="mt-4 space-y-3">
+            <label className="block text-xs text-white/55">
+              Chat type
+              <select
+                className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-300/40"
+                value={gate.chatType}
+                onChange={(e) =>
+                  setGate({ ...gate, chatType: e.target.value as TelegramGateChatType })
+                }
+              >
+                <option value="channel">Channel</option>
+                <option value="supergroup">Supergroup</option>
+                <option value="group">Group</option>
+              </select>
+            </label>
             <Field
-              label="Channel ID"
+              label="Chat ID"
               value={gate.channelId}
-              placeholder="@channel or -100..."
+              placeholder="@username or -100… (channel or group)"
               onChange={(v) => setGate({ ...gate, channelId: v })}
             />
             <Field
-              label="Channel URL"
+              label="Join URL"
               value={gate.channelUrl}
-              placeholder="https://t.me/yourchannel"
+              placeholder="https://t.me/yourchannel or invite link"
               onChange={(v) => setGate({ ...gate, channelUrl: v })}
             />
             <Field
-              label="Channel name"
+              label="Display name"
               value={gate.channelName}
               onChange={(v) => setGate({ ...gate, channelName: v })}
             />
@@ -190,7 +212,7 @@ function OwnerSettings() {
               onChange={(v) => setGate({ ...gate, allowAdmins: v })}
             />
             <Toggle
-              label="Channel creator can pass"
+              label="Creator can pass"
               checked={gate.allowCreators}
               onChange={(v) => setGate({ ...gate, allowCreators: v })}
             />
@@ -237,7 +259,7 @@ function OwnerSettings() {
       </section>
 
       <p className="mt-4 text-[11px] text-white/40">
-        Run SQL: supabase/TELEGRAM_GATE.sql · Bot must be an admin in the channel for getChatMember.
+        Bot must be <strong>admin</strong> in the channel or group. Chat ID: @username or -100…
       </p>
     </main>
   );
