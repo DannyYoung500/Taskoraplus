@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ComponentType } from "react";
 import {
   Users,
   ClipboardCheck,
@@ -13,6 +14,13 @@ import {
   LifeBuoy,
   Bell,
   FileText,
+  Coins,
+  Flag,
+  ScrollText,
+  HeartPulse,
+  Link2,
+  Trophy,
+  Lock,
 } from "lucide-react";
 import { getOwnerOverview } from "@/lib/taskora.functions";
 import { TASKORA_LOGO } from "@/lib/brand";
@@ -32,18 +40,33 @@ export const Route = createFileRoute("/_authenticated/owner/")({
   component: OwnerHub,
 });
 
-const MODULES = [
-  { to: "/owner/reviews" as const, title: "Task reviews", desc: "Approve or reject proofs", Icon: ClipboardCheck },
-  { to: "/owner/withdrawals" as const, title: "Withdrawals", desc: "Mark paid or reject", Icon: Wallet },
-  { to: "/owner/users" as const, title: "Users", desc: "Search · suspend · adjust", Icon: Users },
-  { to: "/owner/tasks" as const, title: "Tasks", desc: "Activate · pause · complete", Icon: Activity },
-  { to: "/advertise" as const, title: "Publish", desc: "Create marketplace tasks", Icon: Megaphone },
-  { to: "/owner/documents" as const, title: "Documents", desc: "Upload long PDFs / briefs", Icon: FileText },
-  { to: "/owner/fraud" as const, title: "Fraud", desc: "Risk playbook", Icon: ShieldAlert },
-  { to: "/owner/analytics" as const, title: "Analytics", desc: "Growth & payouts", Icon: BarChart3 },
-  { to: "/owner/tickets" as const, title: "Support", desc: "Ticket queue", Icon: LifeBuoy },
-  { to: "/owner/announce" as const, title: "Broadcast", desc: "Announcements", Icon: Bell },
-  { to: "/owner/settings" as const, title: "Settings", desc: "Gate · channel or group", Icon: Settings },
+type Mod = {
+  to: string;
+  title: string;
+  desc: string;
+  Icon: ComponentType<{ className?: string }>;
+};
+
+/** Menu aligned to Owner Dashboard Master Specification (PDF) */
+const MODULES: Mod[] = [
+  { to: "/owner/reviews", title: "Proof & Moderation", desc: "Approve · reject · bulk", Icon: ClipboardCheck },
+  { to: "/owner/withdrawals", title: "Withdrawals", desc: "Risk screen · pay · reject", Icon: Wallet },
+  { to: "/owner/users", title: "Users", desc: "Search · suspend · notes", Icon: Users },
+  { to: "/owner/tasks", title: "Tasks", desc: "Lifecycle · pause · expire", Icon: Activity },
+  { to: "/advertise", title: "Campaigns / Publish", desc: "Create tasks · long briefs", Icon: Megaphone },
+  { to: "/owner/documents", title: "Documents", desc: "PDF library · policies", Icon: FileText },
+  { to: "/owner/economy", title: "Economy Controls", desc: "Min $10 · prices · referral", Icon: Coins },
+  { to: "/owner/fraud", title: "Fraud & Risk", desc: "Queue · scores · holds", Icon: ShieldAlert },
+  { to: "/owner/analytics", title: "Analytics", desc: "Users · finance · ops", Icon: BarChart3 },
+  { to: "/owner/tickets", title: "Support", desc: "Tickets · SLA", Icon: LifeBuoy },
+  { to: "/owner/announce", title: "Notifications", desc: "Broadcast · in-app", Icon: Bell },
+  { to: "/owner/settings", title: "Telegram Gate", desc: "Channel or group", Icon: Lock },
+  { to: "/owner/flags", title: "Feature Flags", desc: "Kill switches · maintenance", Icon: Flag },
+  { to: "/owner/audit", title: "Audit Logs", desc: "Privileged actions", Icon: ScrollText },
+  { to: "/owner/health", title: "System Health", desc: "DB · Bot · Auth", Icon: HeartPulse },
+  { to: "/connected", title: "Connected Accounts", desc: "Platform verification", Icon: Link2 },
+  { to: "/leaderboard", title: "XP & Leaderboards", desc: "Levels · rankings", Icon: Trophy },
+  { to: "/owner/settings", title: "Payment Settings", desc: "Rails · mins · fees", Icon: Settings },
 ];
 
 function OwnerHub() {
@@ -75,7 +98,7 @@ function OwnerHub() {
               <Crown className="size-3" /> Owner control
             </p>
             <h1 className="text-2xl font-extrabold tracking-tight">Command Center</h1>
-            <p className="text-[11px] text-white/45">TASKORA · live operations</p>
+            <p className="text-[11px] text-white/45">Master Operations · mobile-first</p>
           </div>
           <Link to="/home" className="rounded-full border border-white/10 px-3 py-1.5 text-[11px] text-white/60">
             App
@@ -87,7 +110,7 @@ function OwnerHub() {
         <div className="mb-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
           {error}
           <p className="mt-2 text-[11px] text-white/50">
-            Vercel env: TASKORA_OWNER_TELEGRAM_IDS=your_numeric_id → Redeploy → open Mini App as that Telegram user.
+            Vercel: TASKORA_OWNER_TELEGRAM_IDS=your_numeric_id → Redeploy → open as that Telegram user.
           </p>
         </div>
       ) : null}
@@ -106,12 +129,12 @@ function OwnerHub() {
         </div>
       ) : null}
 
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">Modules</p>
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">Operations menu</p>
       <div className="grid grid-cols-2 gap-2.5">
         {MODULES.map(({ to, title, desc, Icon }) => (
           <Link
-            key={to}
-            to={to}
+            key={`${to}-${title}`}
+            to={to as "/owner"}
             className="group rounded-2xl border border-white/8 bg-[#12141c] p-3.5 transition active:scale-[0.98]"
           >
             <span className="mb-2 inline-flex size-9 items-center justify-center rounded-xl bg-amber-400/12 text-amber-300">
