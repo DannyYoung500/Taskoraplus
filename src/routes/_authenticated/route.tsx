@@ -1,11 +1,16 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
+
+declare global {
+  interface Window {
+    Telegram?: { WebApp?: { initData?: string } };
+  }
+}
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    // Use getSession + getUser (Auth API) instead of getClaims (local JWKS),
-    // which was throwing unrecognized JWT kid ES256.
     const { data: sess } = await supabase.auth.getSession();
     if (!sess.session?.access_token) throw redirect({ to: "/" });
 
@@ -14,6 +19,13 @@ export const Route = createFileRoute("/_authenticated")({
       await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
       throw redirect({ to: "/" });
     }
+
+    const initData = window.Telegram?.WebApp?.initData ?? "";
+    if (initData) {
+      const gate = await getTelegramGateStatus({ data: { initData, force: false } });
+      if (!gate.allowed) throw redirect({ to: "/telegram-gate" });
+    }
+
     return { user: { id: data.user.id } };
   },
   component: () => <Outlet />,
