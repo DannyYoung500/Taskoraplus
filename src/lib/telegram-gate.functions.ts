@@ -48,20 +48,12 @@ async function adminClient() {
 
 async function assertOwner(userId: string) {
   const supabaseAdmin = await adminClient();
-  const { data: role } = await supabaseAdmin.rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
+  const { data: role } = await supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" });
   if (role) return;
 
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("telegram_id")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data: profile } = await supabaseAdmin.from("profiles").select("telegram_id").eq("id", userId).maybeSingle();
   const telegramId = (profile as { telegram_id?: number | string | null } | null)?.telegram_id;
   if (isOwnerTelegramId(telegramId ?? null)) return;
-
   throw new Error("Owner/admin authorization required.");
 }
 
@@ -88,14 +80,7 @@ function normalizeSettings(row: Record<string, unknown> | null | undefined): Tel
 
 async function readSettings() {
   const supabaseAdmin = await adminClient();
-  const { data, error } = await supabaseAdmin
-    .from("telegram_gate_settings")
-    .select("*")
-    .eq("id", true)
-    .maybeSingle();
-
-  // A missing migration must never lock the whole application. Treat it as disabled
-  // until the migration is installed.
+  const { data, error } = await (supabaseAdmin as any).from("telegram_gate_settings").select("*").eq("id", true).maybeSingle();
   if (error) return { ...DEFAULTS };
   return normalizeSettings(data as Record<string, unknown> | null);
 }
@@ -108,13 +93,13 @@ async function logEvent(input: {
   errorCode?: string | null;
 }) {
   const supabaseAdmin = await adminClient();
-  await supabaseAdmin.from("telegram_gate_events").insert({
+  await (supabaseAdmin as any).from("telegram_gate_events").insert({
     user_id: input.userId,
     telegram_id: input.telegramId,
     status: input.status,
     membership_status: input.membershipStatus ?? null,
     error_code: input.errorCode ?? null,
-  } as never);
+  });
 }
 
 export const getTelegramGateSettings = createServerFn({ method: "GET" })
@@ -130,7 +115,6 @@ export const saveTelegramGateSettings = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
     const supabaseAdmin = await adminClient();
-
     const payload = {
       id: true,
       enabled: Boolean(data.enabled),
@@ -151,12 +135,8 @@ export const saveTelegramGateSettings = createServerFn({ method: "POST" })
       allow_restricted: Boolean(data.allowRestricted),
       updated_by: context.userId,
     };
-
-    const { error } = await supabaseAdmin
-      .from("telegram_gate_settings")
-      .upsert(payload as never, { onConflict: "id" });
+    const { error } = await (supabaseAdmin as any).from("telegram_gate_settings").upsert(payload, { onConflict: "id" });
     if (error) throw new Error(error.message);
-
     return normalizeSettings(payload);
   });
 
@@ -169,32 +149,36 @@ export const getTelegramGateStatus = createServerFn({ method: "POST" })
 
     const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
     if (!settings.channelId || !botToken) {
-      return {
-        allowed: false as const,
-        configured: false as const,
-        temporaryError: "Telegram gate is not configured yet. Please contact the TASKORA owner.",
-        settings,
-      };
+      return { allowed: false as const, configured: false as const, temporaryError: "Telegram gate is not configured yet. Please contact the TASKORA owner.", settings };
     }
 
     const validated = await validateTelegramInitData(data.initData, botToken);
     const telegramId = validated.user.id;
     const supabaseAdmin = await adminClient();
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("telegram_id")
-      .eq("id", context.userId)
-      .maybeSingle();
+    const { data: profile } = await supabaseAdmin.from("profiles").select("telegram_id").eq("id", context.userId).maybeSingle();
     const profileTelegramId = Number((profile as { telegram_id?: number | string | null } | null)?.telegram_id ?? 0);
-    if (!profileTelegramId || profileTelegramId !== telegramId) {
-      throw new Error("Telegram identity mismatch. Re-open TASKORA from Telegram.");
-    }
+    if (!profileTelegramId || profileTelegramId !== telegramId) throw new Error("Telegram identity mismatch. Re-open TASKORA from Telegram.");
 
     const owner = isOwnerTelegramId(telegramId);
     if (owner) {
       await logEvent({ userId: context.userId, telegramId, status: "bypassed", membershipStatus: "owner" });
       return { allowed: true as const, configured: true as const, bypassed: true as const, settings };
+    }
+
+    if (!data.force) {
+      const cutoff = new Date(Date.now() - settings.checkIntervalSeconds * 1000).toISOString();
+      const { data: recent } = await (supabaseAdmin as any)
+        .from("telegram_gate_events")
+        .select("status,membership_status")
+        .eq("user_id", context.userId)
+        .eq("status", "verified")
+        .gte("checked_at", cutoff)
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (recent?.status === "verified") {
+        return { allowed: true as const, configured: true as const, cached: true as const, membershipStatus: recent.membership_status ?? "member", settings };
+      }
     }
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/getChatMember`, {
@@ -205,28 +189,13 @@ export const getTelegramGateStatus = createServerFn({ method: "POST" })
 
     if (!response.ok) {
       await logEvent({ userId: context.userId, telegramId, status: "error", errorCode: `telegram_http_${response.status}` });
-      return {
-        allowed: false as const,
-        configured: true as const,
-        temporaryError: "Telegram membership verification is temporarily unavailable. Please try again.",
-        settings,
-      };
+      return { allowed: false as const, configured: true as const, temporaryError: "Telegram membership verification is temporarily unavailable. Please try again.", settings };
     }
 
-    const payload = (await response.json()) as {
-      ok?: boolean;
-      description?: string;
-      result?: { status?: string; is_member?: boolean };
-    };
-
+    const payload = (await response.json()) as { ok?: boolean; description?: string; result?: { status?: string; is_member?: boolean } };
     if (!payload.ok || !payload.result?.status) {
       await logEvent({ userId: context.userId, telegramId, status: "error", errorCode: payload.description ?? "telegram_api_error" });
-      return {
-        allowed: false as const,
-        configured: true as const,
-        temporaryError: "Telegram could not verify membership. Please try again.",
-        settings,
-      };
+      return { allowed: false as const, configured: true as const, temporaryError: "Telegram could not verify membership. Please try again.", settings };
     }
 
     const membershipStatus = payload.result.status;
@@ -243,18 +212,8 @@ export const getTelegramGateStatus = createServerFn({ method: "POST" })
 
     if (!settings.revokeOnLeave && (membershipStatus === "left" || membershipStatus === "kicked")) {
       const cutoff = new Date(Date.now() - settings.checkIntervalSeconds * 1000).toISOString();
-      const { data: recent } = await supabaseAdmin
-        .from("telegram_gate_events")
-        .select("status")
-        .eq("user_id", context.userId)
-        .eq("status", "verified")
-        .gte("checked_at", cutoff)
-        .order("checked_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (recent?.status === "verified") {
-        return { allowed: true as const, configured: true as const, membershipStatus, cached: true as const, settings };
-      }
+      const { data: recent } = await (supabaseAdmin as any).from("telegram_gate_events").select("status").eq("user_id", context.userId).eq("status", "verified").gte("checked_at", cutoff).order("checked_at", { ascending: false }).limit(1).maybeSingle();
+      if (recent?.status === "verified") return { allowed: true as const, configured: true as const, membershipStatus, cached: true as const, settings };
     }
 
     await logEvent({ userId: context.userId, telegramId, status: "not_member", membershipStatus });
