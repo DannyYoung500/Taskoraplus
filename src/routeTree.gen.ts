@@ -1,11 +1,12 @@
 /* eslint-disable */
 // @ts-nocheck
 // noinspection JSUnusedGlobalSymbols
-// Generated for TASKORA — includes all authenticated + owner routes
+// Generated for TASKORA — includes telegram-gate + owner routes
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as TelegramGateRouteImport } from './routes/telegram-gate'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedAdvertiseRouteImport } from './routes/_authenticated/advertise'
 import { Route as AuthenticatedAmbassadorRouteImport } from './routes/_authenticated/ambassador'
@@ -31,6 +32,7 @@ import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenti
 
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const AuthRoute = AuthRouteImport.update({ id: '/auth', path: '/auth', getParentRoute: () => rootRouteImport } as any)
+const TelegramGateRoute = TelegramGateRouteImport.update({ id: '/telegram-gate', path: '/telegram-gate', getParentRoute: () => rootRouteImport } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({ id: '/_authenticated', getParentRoute: () => rootRouteImport } as any)
 
 const AuthenticatedAdvertiseRoute = AuthenticatedAdvertiseRouteImport.update({ id: '/advertise', path: '/advertise', getParentRoute: () => AuthenticatedRouteRoute } as any)
@@ -60,6 +62,7 @@ const AuthenticatedTasksTaskIdRoute = AuthenticatedTasksTaskIdRouteImport.update
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/telegram-gate': typeof TelegramGateRoute
   '/advertise': typeof AuthenticatedAdvertiseRoute
   '/ambassador': typeof AuthenticatedAmbassadorRoute
   '/connected': typeof AuthenticatedConnectedRoute
@@ -85,6 +88,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/telegram-gate': typeof TelegramGateRoute
   '/advertise': typeof AuthenticatedAdvertiseRoute
   '/ambassador': typeof AuthenticatedAmbassadorRoute
   '/connected': typeof AuthenticatedConnectedRoute
@@ -111,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/telegram-gate': typeof TelegramGateRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_authenticated/advertise': typeof AuthenticatedAdvertiseRoute
   '/_authenticated/ambassador': typeof AuthenticatedAmbassadorRoute
@@ -145,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  TelegramGateRoute: typeof TelegramGateRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
 }
 
@@ -152,6 +158,7 @@ declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
     '/auth': { id: '/auth'; path: '/auth'; fullPath: '/auth'; preLoaderRoute: typeof AuthRouteImport; parentRoute: typeof rootRouteImport }
+    '/telegram-gate': { id: '/telegram-gate'; path: '/telegram-gate'; fullPath: '/telegram-gate'; preLoaderRoute: typeof TelegramGateRouteImport; parentRoute: typeof rootRouteImport }
     '/_authenticated': { id: '/_authenticated'; path: ''; fullPath: '/'; preLoaderRoute: typeof AuthenticatedRouteRouteImport; parentRoute: typeof rootRouteImport }
     '/_authenticated/advertise': { id: '/_authenticated/advertise'; path: '/advertise'; fullPath: '/advertise'; preLoaderRoute: typeof AuthenticatedAdvertiseRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/ambassador': { id: '/_authenticated/ambassador'; path: '/ambassador'; fullPath: '/ambassador'; preLoaderRoute: typeof AuthenticatedAmbassadorRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
@@ -230,6 +237,7 @@ const AuthenticatedRouteRouteWithChildren = AuthenticatedRouteRoute._addFileChil
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute,
   AuthRoute,
+  TelegramGateRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
 }
 
