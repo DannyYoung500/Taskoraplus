@@ -22,8 +22,15 @@ export const Route = createFileRoute("/_authenticated")({
 
     const initData = window.Telegram?.WebApp?.initData ?? "";
     if (initData) {
-      const gate = await getTelegramGateStatus({ data: { initData, force: false } });
-      if (!gate.allowed) throw redirect({ to: "/telegram-gate" });
+      try {
+        const gate = await getTelegramGateStatus({ data: { initData, force: false } });
+        if (!gate.allowed) throw redirect({ to: "/telegram-gate" });
+      } catch (e) {
+        // Soft-fail: do not block the whole app if gate tables/API misconfigured
+        // Redirect only when the server explicitly denied membership
+        if (e && typeof e === "object" && "to" in e) throw e;
+        // otherwise continue — owner can fix config
+      }
     }
 
     return { user: { id: data.user.id } };
