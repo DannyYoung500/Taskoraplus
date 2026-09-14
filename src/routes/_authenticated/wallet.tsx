@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Bitcoin } from "lucide-react";
-import { Screen, ScreenTitle } from "@/components/Screen";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Screen, ScreenTitle, Card, GoldButton } from "@/components/Screen";
 import { getDashboard } from "@/lib/taskora.functions";
 import { requestWithdrawalGuarded } from "@/lib/taskora-mutations.functions";
 
@@ -51,27 +51,34 @@ function WalletScreen() {
 
   return (
     <Screen>
-      <ScreenTitle title="Wallet" subtitle="Crypto payouts · min $10 · 24h new-account hold" />
+      <ScreenTitle title="Wallet" subtitle="Crypto payouts · min $10 · owner review" />
 
-      <section className="bg-brand relative overflow-hidden rounded-3xl p-5 text-navy-foreground shadow-raised">
-        <p className="text-xs uppercase tracking-[0.18em] opacity-70">Available</p>
-        <p className="mt-1 text-4xl font-bold tracking-tight">${balance.toFixed(2)}</p>
-        <p className="mt-2 text-xs opacity-80">Pending ${pending.toFixed(2)}</p>
+      <section
+        className="relative overflow-hidden rounded-3xl border border-amber-400/25 p-5"
+        style={{
+          background:
+            "radial-gradient(ellipse at 80% 20%, rgba(245,197,66,0.2), transparent 50%), linear-gradient(145deg,#161820,#0a0c12)",
+        }}
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200/70">Available</p>
+        <p className="mt-1 text-4xl font-extrabold tracking-tight text-amber-300">${balance.toFixed(2)}</p>
+        <p className="mt-2 text-xs text-white/50">Pending ${pending.toFixed(2)}</p>
       </section>
 
-      <section className="card-surface mt-4 p-4">
-        <h2 className="text-sm font-bold">Withdraw</h2>
+      <Card className="mt-4 p-4">
+        <h2 className="text-sm font-bold text-white">Withdraw</h2>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {METHODS.map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => setMethod(m)}
-              className={`flex items-center gap-2 rounded-2xl px-3 py-3 text-xs font-semibold ${
-                method === m ? "bg-green-grad text-primary-foreground" : "bg-secondary text-secondary-foreground"
+              className={`rounded-2xl px-3 py-3 text-xs font-semibold ${
+                method === m
+                  ? "border border-amber-400/40 bg-amber-400/15 text-amber-200"
+                  : "border border-white/8 bg-white/5 text-white/60"
               }`}
             >
-              <Bitcoin className="size-4" />
               {m}
             </button>
           ))}
@@ -80,61 +87,54 @@ function WalletScreen() {
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Wallet address"
-          className="mt-3 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm"
+          className="mt-3 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-amber-300/40"
         />
         <input
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount (USD)"
+          placeholder="Amount (USD) · min 10"
           inputMode="decimal"
-          className="mt-2 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm"
+          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-amber-300/40"
         />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onWithdraw}
-          className="bg-green-grad mt-3 w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground disabled:opacity-50"
-        >
+        <GoldButton className="mt-3" disabled={busy} onClick={() => void onWithdraw()}>
           {busy ? "Submitting…" : "Request withdrawal"}
-        </button>
-        {message ? <p className="mt-2 text-center text-xs text-muted-foreground">{message}</p> : null}
-      </section>
+        </GoldButton>
+        {message ? <p className="mt-2 text-center text-xs text-white/50">{message}</p> : null}
+      </Card>
 
       <section className="mt-6">
         <h2 className="mb-3 text-base font-bold">Activity</h2>
-        <div className="card-surface divide-y divide-border">
+        <Card className="divide-y divide-white/8">
           {txs.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">No transactions yet.</p>
+            <p className="p-4 text-sm text-white/45">No transactions yet. Complete tasks to earn.</p>
           ) : (
-            txs.slice(0, 30).map((e) => {
+            txs.slice(0, 30).map((e: { id: string; amount: number; label: string; created_at: string }) => {
               const amt = Number(e.amount);
               return (
                 <div key={e.id} className="flex items-center gap-3 p-3.5">
                   <span
                     className={`inline-flex size-9 items-center justify-center rounded-full ${
-                      amt < 0 ? "bg-secondary" : "bg-accent"
+                      amt < 0 ? "bg-white/5" : "bg-amber-400/15"
                     }`}
                   >
                     {amt < 0 ? (
-                      <ArrowUpRight className="size-4 text-muted-foreground" />
+                      <ArrowUpRight className="size-4 text-white/50" />
                     ) : (
-                      <ArrowDownLeft className="size-4 text-accent-foreground" />
+                      <ArrowDownLeft className="size-4 text-amber-300" />
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{e.label}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(e.created_at).toLocaleString()}
-                    </p>
+                    <p className="text-[11px] text-white/35">{new Date(e.created_at).toLocaleString()}</p>
                   </div>
-                  <p className={`text-sm font-bold ${amt < 0 ? "text-muted-foreground" : "text-success"}`}>
+                  <p className={`text-sm font-bold ${amt < 0 ? "text-white/50" : "text-amber-300"}`}>
                     {amt < 0 ? "-" : "+"}${Math.abs(amt).toFixed(2)}
                   </p>
                 </div>
               );
             })
           )}
-        </div>
+        </Card>
       </section>
     </Screen>
   );
