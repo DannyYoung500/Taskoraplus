@@ -21,6 +21,10 @@ import {
   Link2,
   Trophy,
   Lock,
+  Landmark,
+  BookOpen,
+  ArrowDownCircle,
+  Shield,
 } from "lucide-react";
 import { getOwnerOverview } from "@/lib/taskora.functions";
 import { TASKORA_LOGO } from "@/lib/brand";
@@ -47,26 +51,29 @@ type Mod = {
   Icon: ComponentType<{ className?: string }>;
 };
 
-/** Menu aligned to Owner Dashboard Master Specification (PDF) */
 const MODULES: Mod[] = [
   { to: "/owner/reviews", title: "Proof & Moderation", desc: "Approve · reject · bulk", Icon: ClipboardCheck },
-  { to: "/owner/withdrawals", title: "Withdrawals", desc: "Risk screen · pay · reject", Icon: Wallet },
+  { to: "/owner/withdrawals", title: "Withdrawals", desc: "Risk · pay · reject", Icon: Wallet },
+  { to: "/owner/deposits", title: "Deposits", desc: "Pending · confirmed", Icon: ArrowDownCircle },
+  { to: "/owner/ledger", title: "Ledger", desc: "Reconciliation view", Icon: BookOpen },
   { to: "/owner/users", title: "Users", desc: "Search · suspend · notes", Icon: Users },
-  { to: "/owner/tasks", title: "Tasks", desc: "Lifecycle · pause · expire", Icon: Activity },
-  { to: "/advertise", title: "Campaigns / Publish", desc: "Create tasks · long briefs", Icon: Megaphone },
-  { to: "/owner/documents", title: "Documents", desc: "PDF library · policies", Icon: FileText },
-  { to: "/owner/economy", title: "Economy Controls", desc: "Min $10 · prices · referral", Icon: Coins },
-  { to: "/owner/fraud", title: "Fraud & Risk", desc: "Queue · scores · holds", Icon: ShieldAlert },
-  { to: "/owner/analytics", title: "Analytics", desc: "Users · finance · ops", Icon: BarChart3 },
-  { to: "/owner/tickets", title: "Support", desc: "Tickets · SLA", Icon: LifeBuoy },
-  { to: "/owner/announce", title: "Notifications", desc: "Broadcast · in-app", Icon: Bell },
+  { to: "/owner/connected", title: "Connected Accounts", desc: "Verify · revoke", Icon: Link2 },
+  { to: "/owner/tasks", title: "Tasks", desc: "Lifecycle control", Icon: Activity },
+  { to: "/owner/campaigns", title: "Campaigns", desc: "Budget · pause · end", Icon: Landmark },
+  { to: "/advertise", title: "Publish", desc: "Create tasks", Icon: Megaphone },
+  { to: "/owner/documents", title: "Documents", desc: "PDF library", Icon: FileText },
+  { to: "/owner/economy", title: "Economy", desc: "$10 min · prices · 5%", Icon: Coins },
+  { to: "/owner/fraud", title: "Fraud & Risk", desc: "Queue · scores", Icon: ShieldAlert },
+  { to: "/owner/analytics", title: "Analytics", desc: "Users · finance", Icon: BarChart3 },
+  { to: "/owner/tickets", title: "Support", desc: "Tickets", Icon: LifeBuoy },
+  { to: "/owner/announce", title: "Notifications", desc: "Broadcast", Icon: Bell },
   { to: "/owner/settings", title: "Telegram Gate", desc: "Channel or group", Icon: Lock },
-  { to: "/owner/flags", title: "Feature Flags", desc: "Kill switches · maintenance", Icon: Flag },
+  { to: "/owner/flags", title: "Feature Flags", desc: "Kill switches", Icon: Flag },
+  { to: "/owner/roles", title: "Roles", desc: "Permissions catalog", Icon: Shield },
   { to: "/owner/audit", title: "Audit Logs", desc: "Privileged actions", Icon: ScrollText },
   { to: "/owner/health", title: "System Health", desc: "DB · Bot · Auth", Icon: HeartPulse },
-  { to: "/connected", title: "Connected Accounts", desc: "Platform verification", Icon: Link2 },
-  { to: "/leaderboard", title: "XP & Leaderboards", desc: "Levels · rankings", Icon: Trophy },
-  { to: "/owner/settings", title: "Payment Settings", desc: "Rails · mins · fees", Icon: Settings },
+  { to: "/leaderboard", title: "XP & Boards", desc: "Levels · ranks", Icon: Trophy },
+  { to: "/owner/settings", title: "Payment Settings", desc: "Mins · fees", Icon: Settings },
 ];
 
 function OwnerHub() {
@@ -98,7 +105,7 @@ function OwnerHub() {
               <Crown className="size-3" /> Owner control
             </p>
             <h1 className="text-2xl font-extrabold tracking-tight">Command Center</h1>
-            <p className="text-[11px] text-white/45">Master Operations · mobile-first</p>
+            <p className="text-[11px] text-white/45">Master Operations · from PDF spec</p>
           </div>
           <Link to="/home" className="rounded-full border border-white/10 px-3 py-1.5 text-[11px] text-white/60">
             App
