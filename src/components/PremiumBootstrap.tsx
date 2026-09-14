@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { loginWithTelegram } from "@/lib/taskora.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { TASKORA_LOGO } from "@/lib/brand";
 
 declare global {
   interface Window {
@@ -20,44 +21,49 @@ declare global {
   }
 }
 
-/** Official TASKORA profile / loader logo */
-const LOGO = "/file_00000000ed3c81f4aa87692163117fac.png";
+const LOGO = TASKORA_LOGO;
 
-const STAGES: { title: string; detail: string; until: number }[] = [
-  { title: "SECURE CONNECTION", detail: "Establishing secure connection...", until: 10 },
-  { title: "ACCOUNT AUTHENTICATION", detail: "Authenticating your account...", until: 20 },
-  { title: "SESSION INITIALIZATION", detail: "Initializing secure session...", until: 30 },
-  { title: "PROFILE SYNCHRONIZATION", detail: "Synchronizing your profile...", until: 40 },
-  { title: "ACCOUNT VERIFICATION", detail: "Verifying account status...", until: 50 },
-  { title: "PLATFORM SYNCHRONIZATION", detail: "Syncing connected platforms...", until: 60 },
-  { title: "WALLET INITIALIZATION", detail: "Initializing wallet...", until: 70 },
-  { title: "TASK SYNCHRONIZATION", detail: "Synchronizing your available tasks...", until: 80 },
-  { title: "WORKSPACE INITIALIZATION", detail: "Preparing your TASKORA workspace...", until: 90 },
-  { title: "FINAL ACCOUNT INITIALIZATION", detail: "Finalizing your secure TASKORA session...", until: 100 },
+/** 10 stages — each must be readable; total ~8–10s even when auth is fast */
+const STAGES: { title: string; detail: string }[] = [
+  { title: "SECURE CONNECTION", detail: "Establishing secure connection..." },
+  { title: "ACCOUNT AUTHENTICATION", detail: "Authenticating your account..." },
+  { title: "SESSION INITIALIZATION", detail: "Initializing secure session..." },
+  { title: "PROFILE SYNCHRONIZATION", detail: "Synchronizing your profile..." },
+  { title: "ACCOUNT VERIFICATION", detail: "Verifying account status..." },
+  { title: "PLATFORM SYNCHRONIZATION", detail: "Syncing connected platforms..." },
+  { title: "WALLET INITIALIZATION", detail: "Initializing wallet..." },
+  { title: "TASK SYNCHRONIZATION", detail: "Synchronizing your available tasks..." },
+  { title: "WORKSPACE INITIALIZATION", detail: "Preparing your TASKORA workspace..." },
+  { title: "FINAL ACCOUNT INITIALIZATION", detail: "Finalizing your secure TASKORA session..." },
 ];
 
-function stageForProgress(p: number) {
-  return STAGES.find((s) => p <= s.until) ?? STAGES[STAGES.length - 1]!;
-}
+/** ms visible per stage (stage 10 held longer after auth) */
+const STAGE_MS = 850;
+const FINAL_HOLD_MS = 2000;
+const WELCOME_MS = 1100;
 
 export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
-  const [stage, setStage] = useState(STAGES[0]!);
+  const [stageIndex, setStageIndex] = useState(0);
   const [phase, setPhase] = useState<"loading" | "welcome" | "error" | "need-telegram">("loading");
   const [error, setError] = useState<string | null>(null);
   const [welcomeName, setWelcomeName] = useState("Tasker");
-  const [goOwner, setGoOwner] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const started = useRef(false);
-  const authDone = useRef(false);
+  const authPromise = useRef<Promise<void> | null>(null);
+  const authResult = useRef<{ ok: boolean; firstName?: string; isOwner?: boolean; error?: string }>({
+    ok: false,
+  });
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     try {
+      // Show our custom loader first; ready() removes Telegram's native spinner
       tg?.ready?.();
       tg?.expand?.();
-      tg?.setHeaderColor?.("#0a0c12");
-      tg?.setBackgroundColor?.("#0a0c12");
+      tg?.setHeaderColor?.("#05070c");
+      tg?.setBackgroundColor?.("#05070c");
     } catch {
       /* ignore */
     }
@@ -65,35 +71,17 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
     const user = tg?.initDataUnsafe?.user;
     if (user?.first_name) setWelcomeName(user.first_name);
 
-    const tick = window.setInterval(() => {
-      setProgress((p) => {
-        if (authDone.current) {
-          const next = Math.min(100, p + 1.2);
-          setStage(stageForProgress(next));
-          return next;
-        }
-        if (p >= 92) return p;
-        const next = Math.min(92, p + 1.75);
-        setStage(stageForProgress(next));
-        return next;
-      });
-    }, 180);
-
-    async function boot() {
-      if (started.current) return;
-      started.current = true;
-
+    async function runAuth() {
       const initData = tg?.initData ?? "";
       if (!initData) {
-        window.clearInterval(tick);
-        setPhase("need-telegram");
-        setError("Open TASKORA from @Taskoraplusbot inside Telegram.");
+        authResult.current = {
+          ok: false,
+          error: "Open TASKORA from @Taskoraplusbot inside Telegram.",
+        };
         return;
       }
-
       try {
         await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-
         const result = await loginWithTelegram({ data: { initData } });
         const { error: sessErr } = await supabase.auth.setSession({
           access_token: result.access_token,
@@ -112,78 +100,99 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
           throw new Error("Session identity mismatch. Please Retry.");
         }
 
-        if (result.firstName) setWelcomeName(result.firstName);
-        setGoOwner(Boolean(result.isOwner));
-        authDone.current = true;
-
-        await new Promise<void>((resolve) => {
-          const check = window.setInterval(() => {
-            setProgress((p) => {
-              if (p >= 100) {
-                window.clearInterval(check);
-                window.setTimeout(resolve, 1800);
-              }
-              return Math.min(100, Math.max(p, 93) + 2);
-            });
-          }, 120);
-        });
-
-        window.clearInterval(tick);
-        setProgress(100);
-        setStage(STAGES[9]!);
-        setPhase("welcome");
-
-        window.setTimeout(() => {
-          navigate({ to: result.isOwner ? "/owner" : redirectTo, replace: true });
-        }, 900);
+        authResult.current = {
+          ok: true,
+          firstName: result.firstName,
+          isOwner: Boolean(result.isOwner),
+        };
       } catch (e) {
-        window.clearInterval(tick);
-        setPhase("error");
         const msg = e instanceof Error ? e.message : "TASKORA could not authenticate with Telegram.";
-        setError(
-          msg.includes("kid") || msg.includes("JWT") || msg.includes("ES256")
-            ? "Session keys out of sync. Confirm Vercel Supabase keys match project qvwetjpgplkhxuymsnyx, then Retry."
-            : msg,
-        );
-        setProgress(0);
-        setStage(STAGES[0]!);
+        authResult.current = {
+          ok: false,
+          error:
+            msg.includes("kid") || msg.includes("JWT") || msg.includes("ES256")
+              ? "Session keys out of sync. Confirm Vercel Supabase keys, then Retry."
+              : msg,
+        };
       }
     }
 
-    const t = window.setTimeout(() => {
-      void boot();
-    }, 200);
+    async function sequence() {
+      if (started.current) return;
+      started.current = true;
 
-    return () => {
-      window.clearInterval(tick);
-      window.clearTimeout(t);
-    };
+      // Auth runs in parallel with stage animation — UI never jumps early
+      authPromise.current = runAuth();
+
+      for (let i = 0; i < STAGES.length; i++) {
+        setStageIndex(i);
+        const startPct = (i / STAGES.length) * 100;
+        const endPct = ((i + 1) / STAGES.length) * 100;
+        setProgress(startPct);
+
+        const hold = i === STAGES.length - 1 ? FINAL_HOLD_MS : STAGE_MS;
+        const steps = Math.max(8, Math.floor(hold / 80));
+        for (let s = 1; s <= steps; s++) {
+          await new Promise((r) => window.setTimeout(r, hold / steps));
+          setProgress(startPct + ((endPct - startPct) * s) / steps);
+        }
+      }
+
+      setProgress(100);
+      setStageIndex(STAGES.length - 1);
+
+      // Ensure auth finished before leaving loader
+      await authPromise.current;
+
+      if (!authResult.current.ok) {
+        if (!tg?.initData) {
+          setPhase("need-telegram");
+        } else {
+          setPhase("error");
+        }
+        setError(authResult.current.error ?? "Authentication failed.");
+        return;
+      }
+
+      if (authResult.current.firstName) setWelcomeName(authResult.current.firstName);
+      setIsOwner(Boolean(authResult.current.isOwner));
+      setPhase("welcome");
+
+      // Always open the main app (Home). Owner opens Control Center from Profile / menu.
+      window.setTimeout(() => {
+        navigate({ to: redirectTo, replace: true });
+      }, WELCOME_MS);
+    }
+
+    void sequence();
   }, [navigate, redirectTo]);
 
+  const stage = STAGES[stageIndex]!;
+
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center overflow-hidden bg-[#0a0c12] px-6 text-white">
+    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center overflow-hidden bg-[#05070c] px-6 text-white">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 28%, rgba(245,197,66,0.16), transparent 52%), radial-gradient(ellipse at 50% 90%, rgba(245,197,66,0.05), transparent 45%)",
+            "radial-gradient(ellipse at 50% 28%, rgba(245,197,66,0.18), transparent 52%), radial-gradient(ellipse at 50% 95%, rgba(245,197,66,0.06), transparent 45%)",
         }}
       />
 
       <div className="relative z-10 flex w-full flex-col items-center">
         <div className="relative mb-5">
-          <div className="absolute -inset-4 rounded-full bg-amber-400/15 blur-xl" />
+          <div className="absolute -inset-5 rounded-full bg-amber-400/20 blur-2xl" />
           <img
             src={LOGO}
             alt="TASKORA"
-            className="relative size-36 rounded-full object-cover shadow-[0_0_40px_rgba(245,197,66,0.35)]"
+            className="relative size-40 rounded-full object-cover shadow-[0_0_48px_rgba(245,197,66,0.4)] ring-2 ring-amber-400/30"
           />
         </div>
 
-        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-amber-200/60">TASKORA</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-amber-200/65">TASKORA</p>
         <h1 className="mt-2 text-center text-2xl font-bold tracking-tight text-white">
           {phase === "welcome"
-            ? `Welcome, ${welcomeName}${goOwner ? " · Owner" : ""}`
+            ? `Welcome, ${welcomeName}`
             : "Verified Tasks. Real Rewards."}
         </h1>
         <p className="mt-1 text-center text-xs text-white/40">@Taskoraplusbot</p>
@@ -195,12 +204,14 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
             </p>
             <p className="mt-1.5 text-center text-xs text-white/55">{stage.detail}</p>
             <div className="mt-4 mb-2 flex items-center justify-between text-[11px] text-white/45">
-              <span>Account initialization</span>
+              <span>
+                Step {stageIndex + 1} of {STAGES.length}
+              </span>
               <span className="font-semibold tabular-nums text-amber-300">{Math.floor(progress)}%</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
               <div
-                className="h-full rounded-full transition-[width] duration-200 ease-out"
+                className="h-full rounded-full transition-[width] duration-150 ease-out"
                 style={{
                   width: `${progress}%`,
                   background: "linear-gradient(90deg, #C9961A, #F5C542, #FFE08A)",
@@ -209,9 +220,11 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
             </div>
             {phase === "welcome" ? (
               <p className="mt-4 text-center text-sm text-white/65">
-                {goOwner ? "Opening Owner Control…" : "Opening your dashboard…"}
+                {isOwner ? "Opening TASKORA…" : "Opening your dashboard…"}
               </p>
-            ) : null}
+            ) : (
+              <p className="mt-3 text-center text-[10px] text-white/30">Please wait — finishing setup</p>
+            )}
           </div>
         ) : null}
 
@@ -221,7 +234,7 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-[#0a0c12]"
+              className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-[#05070c]"
               style={{ background: "linear-gradient(135deg, #FFE08A, #F5C542, #C9961A)" }}
             >
               Retry
