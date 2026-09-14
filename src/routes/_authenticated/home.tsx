@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import { listTasks, getDashboard } from "@/lib/taskora.functions";
 import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
-
-const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
+import { TASKORA_LOGO } from "@/lib/brand";
 
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
@@ -38,7 +37,7 @@ function HomePage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-4 text-white">
       <header className="mb-4 flex items-center gap-2.5">
-        <img src={LOGO} alt="" className="size-10 rounded-full object-cover" />
+        <img src={TASKORA_LOGO} alt="" className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p
             className="text-lg font-extrabold tracking-wide"
@@ -54,7 +53,7 @@ function HomePage() {
             Complete tasks · Earn rewards
           </p>
         </div>
-        <Link to="/profile" className="relative rounded-full border border-white/10 p-2 text-white/70">
+        <Link to="/notifications" className="relative rounded-full border border-white/10 p-2 text-white/70">
           <Bell className="size-4" />
         </Link>
         <Link to="/profile" className="overflow-hidden rounded-full border border-primary/40">
@@ -202,9 +201,7 @@ function HomePage() {
         <Crown className="size-5 text-amber-300" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Level Up & Unlock More Rewards</p>
-          <p className="text-[11px] text-white/45">
-            Complete tasks, earn higher rewards, climb the leaderboard.
-          </p>
+          <p className="text-[11px] text-white/45">Complete tasks, earn higher rewards, climb the leaderboard.</p>
         </div>
         <span className="rounded-full bg-amber-400 px-3 py-1.5 text-[11px] font-bold text-[#0a0c12]">
           Start Now ›

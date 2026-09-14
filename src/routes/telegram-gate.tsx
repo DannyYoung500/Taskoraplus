@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Lock, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
+import { TASKORA_LOGO } from "@/lib/brand";
 
 declare global {
   interface Window {
@@ -15,8 +16,6 @@ declare global {
     };
   }
 }
-
-const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
 
 export const Route = createFileRoute("/telegram-gate")({
   ssr: false,
@@ -120,31 +119,21 @@ function TelegramGateScreen() {
       <div className="relative z-10 w-full">
         <div className="mb-6 flex flex-col items-center">
           <img
-            src={LOGO}
+            src={TASKORA_LOGO}
             alt="TASKORA"
             className="size-20 rounded-full object-cover shadow-[0_0_36px_rgba(245,197,66,0.35)]"
           />
-          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200/70">
-            TASKORA
-          </p>
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200/70">TASKORA</p>
           <h1 className="mt-2 text-center text-xl font-extrabold tracking-tight">{title}</h1>
           <p className="mt-2 max-w-sm text-center text-xs leading-relaxed text-white/50">{description}</p>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-[#12141c] p-5">
           {phase === "locked" || phase === "not_member" ? (
-            <Status
-              icon={<Lock className="size-5 text-amber-300" />}
-              label="ACCESS LOCKED"
-              detail="Telegram membership required"
-            />
+            <Status icon={<Lock className="size-5 text-amber-300" />} label="ACCESS LOCKED" detail="Telegram membership required" />
           ) : null}
           {phase === "checking" ? (
-            <Status
-              icon={<Loader2 className="size-5 animate-spin text-amber-300" />}
-              label="VERIFYING MEMBERSHIP..."
-              detail="Checking your Telegram channel status"
-            />
+            <Status icon={<Loader2 className="size-5 animate-spin text-amber-300" />} label="VERIFYING MEMBERSHIP..." detail="Checking your Telegram channel status" />
           ) : null}
           {phase === "verified" ? (
             <Status
@@ -184,15 +173,7 @@ function TelegramGateScreen() {
               </button>
             </div>
           ) : null}
-
-          {phase === "checking" ? (
-            <p className="mt-4 text-center text-[11px] text-white/35">This may take a few seconds…</p>
-          ) : null}
         </div>
-
-        {settings?.channelName ? (
-          <p className="mt-4 text-center text-[11px] text-white/35">Channel · {settings.channelName}</p>
-        ) : null}
       </div>
     </main>
   );
