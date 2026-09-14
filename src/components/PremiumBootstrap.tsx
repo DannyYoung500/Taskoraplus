@@ -20,10 +20,9 @@ declare global {
   }
 }
 
-/** Official TASKORA logo (keep existing loader visual). */
-const LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
+/** Official TASKORA profile / loader logo */
+const LOGO = "/file_00000000ed3c81f4aa87692163117fac.png";
 
-/** 10-stage account initialization — slow enough to read (~7–10s total when ready). */
 const STAGES: { title: string; detail: string; until: number }[] = [
   { title: "SECURE CONNECTION", detail: "Establishing secure connection...", until: 10 },
   { title: "ACCOUNT AUTHENTICATION", detail: "Authenticating your account...", until: 20 },
@@ -66,7 +65,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
     const user = tg?.initDataUnsafe?.user;
     if (user?.first_name) setWelcomeName(user.first_name);
 
-    // Smooth progress over ~8s to 92%, then hold until auth finishes + final stage hold
     const tick = window.setInterval(() => {
       setProgress((p) => {
         if (authDone.current) {
@@ -75,7 +73,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
           return next;
         }
         if (p >= 92) return p;
-        // ~8 seconds to 92%: 9200ms / 180ms ≈ 51 ticks → ~1.8% per tick
         const next = Math.min(92, p + 1.75);
         setStage(stageForProgress(next));
         return next;
@@ -95,7 +92,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       }
 
       try {
-        // ALWAYS re-auth with current Telegram identity — never reuse another account session
         await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
 
         const result = await loginWithTelegram({ data: { initData } });
@@ -110,7 +106,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
           throw userErr ?? new Error("Session could not be confirmed.");
         }
 
-        // Ensure session telegram_id matches initData user (wrong-account guard)
         const sessionTg = Number(confirmed.user.user_metadata?.telegram_id ?? 0);
         if (sessionTg && sessionTg !== result.telegramId) {
           await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
@@ -121,7 +116,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         setGoOwner(Boolean(result.isOwner));
         authDone.current = true;
 
-        // Wait until progress reaches 100 and final stage has been visible ~1.5–2s
         await new Promise<void>((resolve) => {
           const check = window.setInterval(() => {
             setProgress((p) => {
