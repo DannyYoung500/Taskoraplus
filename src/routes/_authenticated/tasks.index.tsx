@@ -1,64 +1,81 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { Screen, ScreenTitle } from "@/components/Screen";
+import { TaskCard } from "@/components/TaskCard";
+import { CATEGORIES } from "@/lib/taskora-data";
+import type { Platform } from "@/components/PlatformIcon";
 import { listTasks } from "@/lib/taskora.functions";
-import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
 
 export const Route = createFileRoute("/_authenticated/tasks/")({
   loader: async () => {
-    const tasks = await listTasks().catch(() => []);
-    return { tasks };
+    const rows = await listTasks().catch(() => []);
+    return { rows };
   },
-  component: TasksPage,
+  head: () => ({
+    meta: [
+      { title: "Tasks — TASKORA" },
+      {
+        name: "description",
+        content: "Browse verified social tasks across Telegram, YouTube, WhatsApp, X and more.",
+      },
+    ],
+  }),
+  component: TasksScreen,
 });
 
-function TasksPage() {
-  const { tasks } = Route.useLoaderData();
+function TasksScreen() {
+  const { rows } = Route.useLoaderData();
+  const [filter, setFilter] = useState<"all" | Platform>("all");
+
+  const tasks = rows
+    .filter((t) => filter === "all" || t.platform === filter)
+    .map((t) => ({
+      id: t.id,
+      platform: t.platform as Platform,
+      title: t.title,
+      advertiser: t.advertiser,
+      reward: Number(t.reward),
+      seconds: t.seconds,
+    }));
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
-      <h1 className="text-xl font-bold">Browse Tasks</h1>
-      <p className="mt-1 text-xs text-white/45">Verified tasks · real rewards</p>
+    <Screen>
+      <ScreenTitle title="Tasks" subtitle="Verified tasks. Real rewards." />
 
-      <div className="mt-4 space-y-2.5">
-        {tasks.length === 0 ? (
-          <p className="rounded-2xl border border-white/8 bg-[#12141c] p-5 text-sm text-white/50">
-            No live tasks yet. Owner can publish from Advertise.
-          </p>
-        ) : (
-          tasks.map(
-            (t: {
-              id: string;
-              title: string;
-              reward: number;
-              platform: string;
-              advertiser?: string;
-              seconds?: number;
-              slots_left?: number;
-            }) => (
-              <Link
-                key={t.id}
-                to="/tasks/$taskId"
-                params={{ taskId: t.id }}
-                className="flex items-center gap-3 rounded-2xl border border-white/8 bg-[#12141c] p-3.5"
-              >
-                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/5">
-                  <PlatformIcon platform={t.platform as Platform} size={22} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{t.title}</p>
-                  <p className="text-[11px] text-white/40">
-                    {t.platform}
-                    {t.advertiser ? ` · ${t.advertiser}` : ""}
-                    {typeof t.slots_left === "number" ? ` · ${t.slots_left} slots` : ""}
-                  </p>
-                </div>
-                <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300">
-                  +${Number(t.reward).toFixed(2)}
-                </span>
-              </Link>
-            ),
-          )
-        )}
+      <div className="-mx-4 mb-4 overflow-x-auto px-4 [scrollbar-width:none]">
+        <div className="flex w-max gap-2">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setFilter(c.key)}
+              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
+                filter === c.key
+                  ? "text-[#05070c] shadow-[0_0_20px_rgba(245,197,66,0.25)]"
+                  : "border border-white/10 bg-white/5 text-white/60"
+              }`}
+              style={
+                filter === c.key
+                  ? { background: "linear-gradient(135deg,#FFE08A,#F5C542,#C9961A)" }
+                  : undefined
+              }
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
       </div>
-    </main>
+
+      <div className="space-y-2.5">
+        {tasks.map((task) => (
+          <TaskCard key={task.id} task={task} />
+        ))}
+        {tasks.length === 0 ? (
+          <p className="rounded-2xl border border-white/8 bg-[#12141c] py-12 text-center text-sm text-white/45">
+            No tasks available. Owner must publish from Advertise.
+          </p>
+        ) : null}
+      </div>
+    </Screen>
   );
 }

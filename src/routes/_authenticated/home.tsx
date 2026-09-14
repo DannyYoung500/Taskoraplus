@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import {
   ClipboardCheck,
   PlayCircle,
@@ -10,8 +10,9 @@ import {
   Crown,
   Gift,
   ChevronRight,
+  CalendarCheck,
 } from "lucide-react";
-import { listTasks, getDashboard } from "@/lib/taskora.functions";
+import { listTasks, getDashboard, dailyCheckin } from "@/lib/taskora.functions";
 import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO } from "@/lib/brand";
 
@@ -33,11 +34,27 @@ function HomePage() {
   const name = dash?.profile?.display_name ?? "Tasker";
   const isOwner = Boolean(dash?.isOwner);
   const photo = (dash?.profile as { photo_url?: string | null } | null)?.photo_url ?? null;
+  const streak = (dash?.profile as { streak?: number } | null)?.streak ?? 0;
+  const [checkMsg, setCheckMsg] = useState<string | null>(null);
+  const [checkBusy, setCheckBusy] = useState(false);
+
+  async function onCheckin() {
+    setCheckBusy(true);
+    setCheckMsg(null);
+    try {
+      const r = await dailyCheckin();
+      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · bonus applied`);
+    } catch (e) {
+      setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
+    } finally {
+      setCheckBusy(false);
+    }
+  }
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-4 text-white">
       <header className="mb-4 flex items-center gap-2.5">
-        <img src={TASKORA_LOGO} alt="" className="size-10 rounded-full object-cover" />
+        <img src={TASKORA_LOGO} alt="" className="size-10 rounded-full object-cover ring-2 ring-amber-400/30" />
         <div className="min-w-0 flex-1">
           <p
             className="text-lg font-extrabold tracking-wide"
@@ -56,7 +73,7 @@ function HomePage() {
         <Link to="/notifications" className="relative rounded-full border border-white/10 p-2 text-white/70">
           <Bell className="size-4" />
         </Link>
-        <Link to="/profile" className="overflow-hidden rounded-full border border-primary/40">
+        <Link to="/profile" className="overflow-hidden rounded-full border border-amber-400/40">
           {photo ? (
             <img src={photo} alt="" className="size-9 object-cover" />
           ) : (
@@ -115,6 +132,24 @@ function HomePage() {
           <ChevronRight className="size-3.5" />
         </Link>
       </section>
+
+      <button
+        type="button"
+        disabled={checkBusy}
+        onClick={() => void onCheckin()}
+        className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3 text-left active:scale-[0.99]"
+      >
+        <span className="inline-flex size-10 items-center justify-center rounded-xl bg-amber-400/12 text-amber-300">
+          <CalendarCheck className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Daily check-in</p>
+          <p className="text-[11px] text-white/40">
+            {checkMsg ?? `Streak ${streak}d · tap to claim`}
+          </p>
+        </div>
+        <span className="text-[11px] font-bold text-amber-300">{checkBusy ? "…" : "Claim"}</span>
+      </button>
 
       <div className="mb-5 grid grid-cols-4 gap-2">
         <Quick to="/tasks" label="Browse Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
