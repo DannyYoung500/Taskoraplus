@@ -9,6 +9,7 @@ import {
   PlusCircle,
   Loader2,
   User,
+  ExternalLink,
 } from "lucide-react";
 import { ownerListUsers, ownerSetUserStatus, ownerAdjustWallet } from "@/lib/owner.functions";
 
@@ -31,6 +32,7 @@ function OwnerUsers() {
   const initial = Route.useLoaderData();
   const [rows, setRows] = useState(initial.rows);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended" | "banned">("all");
   const [msg, setMsg] = useState(initial.error);
   const [busy, setBusy] = useState<string | null>(null);
   const [adjustFor, setAdjustFor] = useState<string | null>(null);
@@ -38,10 +40,12 @@ function OwnerUsers() {
   const [adjReason, setAdjReason] = useState("");
   const [adjMode, setAdjMode] = useState<"add" | "deduct">("deduct");
 
-  async function refresh(q?: string) {
+  async function refresh(q?: string, st?: string) {
     setMsg(null);
     try {
-      const next = await ownerListUsers({ data: { search: q ?? search } });
+      const next = await ownerListUsers({
+        data: { search: q ?? search, status: (st ?? statusFilter) === "all" ? undefined : (st ?? statusFilter) },
+      });
       setRows(next);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed");
@@ -91,11 +95,13 @@ function OwnerUsers() {
     }
   }
 
+  const photoOf = (u: any) => u.photo_url || u.avatar_url || null;
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
       <h1 className="text-xl font-bold">Users & wallets</h1>
       <p className="mt-1 text-xs text-white/45">
-        Search · suspend · ban · add / deduct balance
+        Real Telegram photos · search · suspend · ban · adjust balance
       </p>
 
       <div className="mt-4 flex gap-2">
@@ -105,7 +111,7 @@ function OwnerUsers() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void refresh()}
-            placeholder="Name, @username, referral code"
+            placeholder="Name, @username, TG id, referral"
             className="w-full rounded-xl border border-white/10 bg-[#12141c] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-sky-400/40"
           />
         </div>
@@ -116,6 +122,26 @@ function OwnerUsers() {
         >
           Search
         </button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {(["all", "active", "suspended", "banned"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => {
+              setStatusFilter(s);
+              void refresh(search, s);
+            }}
+            className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase ${
+              statusFilter === s
+                ? "bg-sky-400 text-[#0a0c12]"
+                : "border border-white/10 bg-white/5 text-white/50"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
       </div>
 
       {msg ? (
@@ -130,7 +156,7 @@ function OwnerUsers() {
             No users found.
           </p>
         ) : (
-          rows.map((u) => {
+          rows.map((u: any) => {
             const tgHandle = u.username ? `@${String(u.username).replace(/^@/, "")}` : null;
             const status = String(u.status ?? "active");
             const statusColor =
@@ -139,16 +165,19 @@ function OwnerUsers() {
                 : status === "suspended"
                   ? "text-amber-300 bg-amber-500/15"
                   : "text-emerald-300 bg-emerald-500/15";
+            const photo = photoOf(u);
+            const tgLink = u.username
+              ? `https://t.me/${String(u.username).replace(/^@/, "")}`
+              : u.telegram_id
+                ? `tg://user?id=${u.telegram_id}`
+                : null;
 
             return (
-              <div
-                key={u.id}
-                className="rounded-2xl border border-white/8 bg-[#12141c] p-3.5"
-              >
+              <div key={u.id} className="rounded-2xl border border-white/8 bg-[#12141c] p-3.5">
                 <div className="flex items-start gap-3">
-                  {u.avatar_url ? (
+                  {photo ? (
                     <img
-                      src={String(u.avatar_url)}
+                      src={String(photo)}
                       alt=""
                       className="size-12 shrink-0 rounded-full object-cover ring-2 ring-sky-400/25"
                     />
@@ -161,9 +190,7 @@ function OwnerUsers() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
-                          {u.display_name || "Tasker"}
-                        </p>
+                        <p className="truncate text-sm font-semibold">{u.display_name || "Tasker"}</p>
                         <p className="mt-0.5 truncate text-[11px] text-white/40">
                           {tgHandle ?? u.id.slice(0, 8)}
                           {u.telegram_id != null ? ` · TG ${u.telegram_id}` : ""}
@@ -184,32 +211,14 @@ function OwnerUsers() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    disabled={busy === u.id}
-                    onClick={() => setStatus(u.id, "active")}
-                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/25 bg-emerald-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-200"
-                  >
-                    <CheckCircle2 className="size-3" />
-                    Active
+                  <button type="button" disabled={busy === u.id} onClick={() => setStatus(u.id, "active")} className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/25 bg-emerald-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-200">
+                    <CheckCircle2 className="size-3" /> Active
                   </button>
-                  <button
-                    type="button"
-                    disabled={busy === u.id}
-                    onClick={() => setStatus(u.id, "suspended")}
-                    className="inline-flex items-center gap-1 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-amber-200"
-                  >
-                    <ShieldOff className="size-3" />
-                    Suspend
+                  <button type="button" disabled={busy === u.id} onClick={() => setStatus(u.id, "suspended")} className="inline-flex items-center gap-1 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-amber-200">
+                    <ShieldOff className="size-3" /> Suspend
                   </button>
-                  <button
-                    type="button"
-                    disabled={busy === u.id}
-                    onClick={() => setStatus(u.id, "banned")}
-                    className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/5 px-2.5 py-1.5 text-[10px] font-semibold text-red-300"
-                  >
-                    <Ban className="size-3" />
-                    Ban
+                  <button type="button" disabled={busy === u.id} onClick={() => setStatus(u.id, "banned")} className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/5 px-2.5 py-1.5 text-[10px] font-semibold text-red-300">
+                    <Ban className="size-3" /> Ban
                   </button>
                   <button
                     type="button"
@@ -224,68 +233,27 @@ function OwnerUsers() {
                   >
                     {adjustFor === u.id ? "Cancel" : "Adjust $"}
                   </button>
+                  {tgLink ? (
+                    <a href={tgLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-semibold text-white/70">
+                      <ExternalLink className="size-3" /> Telegram
+                    </a>
+                  ) : null}
                 </div>
 
                 {adjustFor === u.id ? (
                   <div className="mt-3 space-y-2 rounded-xl border border-sky-400/20 bg-sky-400/5 p-3">
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAdjMode("deduct")}
-                        className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${
-                          adjMode === "deduct"
-                            ? "bg-red-500/20 text-red-200 ring-1 ring-red-400/40"
-                            : "bg-white/5 text-white/50"
-                        }`}
-                      >
-                        <MinusCircle className="size-3.5" />
-                        Deduct
+                      <button type="button" onClick={() => setAdjMode("deduct")} className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${adjMode === "deduct" ? "bg-red-500/20 text-red-200 ring-1 ring-red-400/40" : "bg-white/5 text-white/50"}`}>
+                        <MinusCircle className="size-3.5" /> Deduct
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setAdjMode("add")}
-                        className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${
-                          adjMode === "add"
-                            ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40"
-                            : "bg-white/5 text-white/50"
-                        }`}
-                      >
-                        <PlusCircle className="size-3.5" />
-                        Add
+                      <button type="button" onClick={() => setAdjMode("add")} className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${adjMode === "add" ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40" : "bg-white/5 text-white/50"}`}>
+                        <PlusCircle className="size-3.5" /> Add
                       </button>
                     </div>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={adjAmount}
-                      onChange={(e) => setAdjAmount(e.target.value)}
-                      placeholder="Amount (USD)"
-                      className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40"
-                    />
-                    <input
-                      value={adjReason}
-                      onChange={(e) => setAdjReason(e.target.value)}
-                      placeholder="Reason (required, audited)"
-                      className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40"
-                    />
-                    <button
-                      type="button"
-                      disabled={busy === u.id}
-                      onClick={() => void submitAdjust(u.id)}
-                      className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold ${
-                        adjMode === "deduct"
-                          ? "bg-red-500 text-white"
-                          : "bg-emerald-500 text-white"
-                      }`}
-                    >
-                      {busy === u.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : adjMode === "deduct" ? (
-                        `Deduct $${Number(adjAmount || 0).toFixed(2)}`
-                      ) : (
-                        `Add $${Number(adjAmount || 0).toFixed(2)}`
-                      )}
+                    <input type="number" min="0" step="0.01" value={adjAmount} onChange={(e) => setAdjAmount(e.target.value)} placeholder="Amount (USD)" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40" />
+                    <input value={adjReason} onChange={(e) => setAdjReason(e.target.value)} placeholder="Reason (required, audited)" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40" />
+                    <button type="button" disabled={busy === u.id} onClick={() => void submitAdjust(u.id)} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold ${adjMode === "deduct" ? "bg-red-500 text-white" : "bg-emerald-500 text-white"}`}>
+                      {busy === u.id ? <Loader2 className="size-4 animate-spin" /> : adjMode === "deduct" ? `Deduct $${Number(adjAmount || 0).toFixed(2)}` : `Add $${Number(adjAmount || 0).toFixed(2)}`}
                     </button>
                   </div>
                 ) : null}
