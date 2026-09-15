@@ -12,19 +12,20 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { BottomNav } from "../components/BottomNav";
+import { BLUE_GRAD } from "../lib/brand";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#05070c] px-4 text-white">
+    <div className="flex min-h-screen items-center justify-center bg-[#0b1424] px-4 text-white">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-amber-300">404</h1>
+        <h1 className="text-7xl font-bold text-blue-400">404</h1>
         <h2 className="mt-4 text-xl font-semibold">Page not found</h2>
-        <p className="mt-2 text-sm text-white/50">This screen does not exist in TASKORA.</p>
+        <p className="mt-2 text-sm text-slate-400">This screen does not exist in TASKORA.</p>
         <div className="mt-6">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-bold text-[#05070c]"
-            style={{ background: "linear-gradient(135deg,#FFE08A,#F5C542,#C9961A)" }}
+            className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-bold text-white"
+            style={{ background: BLUE_GRAD }}
           >
             Go home
           </Link>
@@ -42,24 +43,25 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#05070c] px-4 text-white">
+    <div className="flex min-h-screen items-center justify-center bg-[#0b1424] px-4 text-white">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight">This page didn&apos;t load</h1>
-        <p className="mt-2 text-sm text-white/50">Try again or reopen from @Taskoraplusbot.</p>
+        <p className="mt-2 text-sm text-slate-400">Try again or reopen from @Taskoraplusbot.</p>
+        <p className="mt-2 break-all text-[10px] text-slate-500">{error.message}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-bold text-[#05070c]"
-            style={{ background: "linear-gradient(135deg,#FFE08A,#F5C542,#C9961A)" }}
+            className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-bold text-white"
+            style={{ background: BLUE_GRAD }}
           >
             Try again
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-2xl border border-white/15 px-4 py-2 text-sm font-medium text-white/80"
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-500/30 px-4 py-2 text-sm font-medium text-slate-200"
           >
             Go home
           </a>
@@ -82,7 +84,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "description",
         content: "Complete verified social tasks and earn real crypto rewards inside Telegram.",
       },
-      { name: "theme-color", content: "#05070c" },
+      { name: "theme-color", content: "#0b1424" },
       { property: "og:title", content: "TASKORA — Verified Tasks. Real Rewards." },
       {
         property: "og:description",
@@ -115,7 +117,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="bg-[#05070c] text-white">
+      <body className="bg-[#0b1424] text-slate-100">
         {children}
         <Scripts />
       </body>

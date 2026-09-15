@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { loginWithTelegram } from "@/lib/taskora.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { TASKORA_LOGO } from "@/lib/brand";
+import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 
 declare global {
   interface Window {
@@ -21,9 +21,6 @@ declare global {
   }
 }
 
-const LOGO = TASKORA_LOGO;
-
-/** 10 stages — each must be readable; total ~8–10s even when auth is fast */
 const STAGES: { title: string; detail: string }[] = [
   { title: "SECURE CONNECTION", detail: "Establishing secure connection..." },
   { title: "ACCOUNT AUTHENTICATION", detail: "Authenticating your account..." },
@@ -37,7 +34,6 @@ const STAGES: { title: string; detail: string }[] = [
   { title: "FINAL ACCOUNT INITIALIZATION", detail: "Finalizing your secure TASKORA session..." },
 ];
 
-/** ms visible per stage (stage 10 held longer after auth) */
 const STAGE_MS = 850;
 const FINAL_HOLD_MS = 2000;
 const WELCOME_MS = 1100;
@@ -49,21 +45,17 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   const [phase, setPhase] = useState<"loading" | "welcome" | "error" | "need-telegram">("loading");
   const [error, setError] = useState<string | null>(null);
   const [welcomeName, setWelcomeName] = useState("Tasker");
-  const [isOwner, setIsOwner] = useState(false);
   const started = useRef(false);
   const authPromise = useRef<Promise<void> | null>(null);
-  const authResult = useRef<{ ok: boolean; firstName?: string; isOwner?: boolean; error?: string }>({
-    ok: false,
-  });
+  const authResult = useRef<{ ok: boolean; firstName?: string; error?: string }>({ ok: false });
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     try {
-      // Show our custom loader first; ready() removes Telegram's native spinner
       tg?.ready?.();
       tg?.expand?.();
-      tg?.setHeaderColor?.("#05070c");
-      tg?.setBackgroundColor?.("#05070c");
+      tg?.setHeaderColor?.("#0b1424");
+      tg?.setBackgroundColor?.("#0b1424");
     } catch {
       /* ignore */
     }
@@ -100,11 +92,7 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
           throw new Error("Session identity mismatch. Please Retry.");
         }
 
-        authResult.current = {
-          ok: true,
-          firstName: result.firstName,
-          isOwner: Boolean(result.isOwner),
-        };
+        authResult.current = { ok: true, firstName: result.firstName };
       } catch (e) {
         const msg = e instanceof Error ? e.message : "TASKORA could not authenticate with Telegram.";
         authResult.current = {
@@ -120,8 +108,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
     async function sequence() {
       if (started.current) return;
       started.current = true;
-
-      // Auth runs in parallel with stage animation — UI never jumps early
       authPromise.current = runAuth();
 
       for (let i = 0; i < STAGES.length; i++) {
@@ -129,7 +115,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         const startPct = (i / STAGES.length) * 100;
         const endPct = ((i + 1) / STAGES.length) * 100;
         setProgress(startPct);
-
         const hold = i === STAGES.length - 1 ? FINAL_HOLD_MS : STAGE_MS;
         const steps = Math.max(8, Math.floor(hold / 80));
         for (let s = 1; s <= steps; s++) {
@@ -140,25 +125,17 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
 
       setProgress(100);
       setStageIndex(STAGES.length - 1);
-
-      // Ensure auth finished before leaving loader
       await authPromise.current;
 
       if (!authResult.current.ok) {
-        if (!tg?.initData) {
-          setPhase("need-telegram");
-        } else {
-          setPhase("error");
-        }
+        setPhase(!tg?.initData ? "need-telegram" : "error");
         setError(authResult.current.error ?? "Authentication failed.");
         return;
       }
 
       if (authResult.current.firstName) setWelcomeName(authResult.current.firstName);
-      setIsOwner(Boolean(authResult.current.isOwner));
       setPhase("welcome");
-
-      // Always open the main app (Home). Owner opens Control Center from Profile / menu.
+      // Always Home — never auto-open Owner dashboard
       window.setTimeout(() => {
         navigate({ to: redirectTo, replace: true });
       }, WELCOME_MS);
@@ -170,76 +147,69 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   const stage = STAGES[stageIndex]!;
 
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center overflow-hidden bg-[#05070c] px-6 text-white">
+    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center overflow-hidden bg-[#0b1424] px-6 text-white">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 28%, rgba(245,197,66,0.18), transparent 52%), radial-gradient(ellipse at 50% 95%, rgba(245,197,66,0.06), transparent 45%)",
+            "radial-gradient(ellipse at 50% 28%, rgba(59,130,246,0.22), transparent 52%), radial-gradient(ellipse at 50% 95%, rgba(37,99,235,0.08), transparent 45%)",
         }}
       />
 
       <div className="relative z-10 flex w-full flex-col items-center">
         <div className="relative mb-5">
-          <div className="absolute -inset-5 rounded-full bg-amber-400/20 blur-2xl" />
+          <div className="absolute -inset-5 rounded-full bg-blue-500/25 blur-2xl" />
           <img
-            src={LOGO}
+            src={TASKORA_LOGO}
             alt="TASKORA"
-            className="relative size-40 rounded-full object-cover shadow-[0_0_48px_rgba(245,197,66,0.4)] ring-2 ring-amber-400/30"
+            className="relative size-40 rounded-full object-cover shadow-[0_0_48px_rgba(59,130,246,0.45)] ring-2 ring-blue-400/40"
           />
         </div>
 
-        <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-amber-200/65">TASKORA</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-blue-300/80">TASKORA</p>
         <h1 className="mt-2 text-center text-2xl font-bold tracking-tight text-white">
-          {phase === "welcome"
-            ? `Welcome, ${welcomeName}`
-            : "Verified Tasks. Real Rewards."}
+          {phase === "welcome" ? `Welcome, ${welcomeName}` : "Verified Tasks. Real Rewards."}
         </h1>
-        <p className="mt-1 text-center text-xs text-white/40">@Taskoraplusbot</p>
+        <p className="mt-1 text-center text-xs text-slate-400">@Taskoraplusbot</p>
 
         {phase === "loading" || phase === "welcome" ? (
           <div className="mt-10 w-full max-w-xs">
-            <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300/90">
+            <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">
               {stage.title}
             </p>
-            <p className="mt-1.5 text-center text-xs text-white/55">{stage.detail}</p>
-            <div className="mt-4 mb-2 flex items-center justify-between text-[11px] text-white/45">
+            <p className="mt-1.5 text-center text-xs text-slate-400">{stage.detail}</p>
+            <div className="mt-4 mb-2 flex items-center justify-between text-[11px] text-slate-400">
               <span>
                 Step {stageIndex + 1} of {STAGES.length}
               </span>
-              <span className="font-semibold tabular-nums text-amber-300">{Math.floor(progress)}%</span>
+              <span className="font-semibold tabular-nums text-blue-300">{Math.floor(progress)}%</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full transition-[width] duration-150 ease-out"
-                style={{
-                  width: `${progress}%`,
-                  background: "linear-gradient(90deg, #C9961A, #F5C542, #FFE08A)",
-                }}
+                style={{ width: `${progress}%`, background: BLUE_GRAD }}
               />
             </div>
             {phase === "welcome" ? (
-              <p className="mt-4 text-center text-sm text-white/65">
-                {isOwner ? "Opening TASKORA…" : "Opening your dashboard…"}
-              </p>
+              <p className="mt-4 text-center text-sm text-slate-300">Opening TASKORA…</p>
             ) : (
-              <p className="mt-3 text-center text-[10px] text-white/30">Please wait — finishing setup</p>
+              <p className="mt-3 text-center text-[10px] text-slate-500">Please wait — finishing setup</p>
             )}
           </div>
         ) : null}
 
         {phase === "need-telegram" || phase === "error" ? (
-          <div className="mt-8 w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur">
-            <p className="text-sm text-white/80">{error}</p>
+          <div className="mt-8 w-full max-w-sm rounded-2xl border border-slate-500/20 bg-white/5 p-5 text-center backdrop-blur">
+            <p className="text-sm text-slate-200">{error}</p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-[#05070c]"
-              style={{ background: "linear-gradient(135deg, #FFE08A, #F5C542, #C9961A)" }}
+              className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-white"
+              style={{ background: BLUE_GRAD }}
             >
               Retry
             </button>
-            <p className="mt-3 text-[11px] text-white/40">Telegram → @Taskoraplusbot → Open TASKORA</p>
+            <p className="mt-3 text-[11px] text-slate-500">Telegram → @Taskoraplusbot → Open TASKORA</p>
           </div>
         ) : null}
       </div>
