@@ -21,7 +21,6 @@ const TIERS = [
 ];
 
 const TELEGRAM_BOT_USERNAME = "Taskoraplusbot";
-const TELEGRAM_MINI_APP_SHORT_NAME = "taskora";
 
 function AmbassadorScreen() {
   const { dash } = Route.useLoaderData();
@@ -29,7 +28,7 @@ function AmbassadorScreen() {
   const telegramId = dash?.telegramId ?? null;
   const referrals = dash?.referrals ?? 0;
   const referralLink = telegramId
-    ? `https://t.me/${TELEGRAM_BOT_USERNAME}/${TELEGRAM_MINI_APP_SHORT_NAME}?startapp=${encodeURIComponent(String(telegramId))}`
+    ? `https://t.me/${TELEGRAM_BOT_USERNAME}/?startapp=${encodeURIComponent(String(telegramId))}`
     : "";
   const [inviteCode, setInviteCode] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
