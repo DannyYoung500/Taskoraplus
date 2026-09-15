@@ -110,8 +110,6 @@
   --primary-foreground: #ffffff;
   --secondary: #1a2a42;
   --secondary-foreground: #e2e8f0;
-  --muted: #1a2a42;
-  --muted-foreground: #94a3b8;
   --accent: #1e3a5f;
   --accent-foreground: #93c5fd;
   --border: rgba(148, 163, 184, 0.14);
@@ -153,6 +151,9 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   html {
@@ -166,5 +167,17 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
+  }
+
+  img,
+  svg {
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
