@@ -11,7 +11,8 @@ import {
   User,
   ExternalLink,
 } from "lucide-react";
-import { ownerListUsers, ownerSetUserStatus, ownerAdjustWallet } from "@/lib/owner.functions";
+import { ownerListUsers, ownerAdjustWallet } from "@/lib/owner.functions";
+import { ownerSetUserStatus } from "@/lib/owner-user-status.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/users")({
   loader: async () => {
@@ -44,7 +45,10 @@ function OwnerUsers() {
     setMsg(null);
     try {
       const next = await ownerListUsers({
-        data: { search: q ?? search, status: (st ?? statusFilter) === "all" ? undefined : (st ?? statusFilter) },
+        data: {
+          search: q ?? search,
+          status: (st ?? statusFilter) === "all" ? undefined : (st ?? statusFilter),
+        },
       });
       setRows(next);
     } catch (e) {
@@ -54,12 +58,13 @@ function OwnerUsers() {
 
   async function setStatus(userId: string, status: "active" | "suspended" | "banned") {
     setBusy(userId);
+    setMsg(null);
     try {
-      await ownerSetUserStatus({ data: { userId, status } });
+      const res = await ownerSetUserStatus({ data: { userId, status } });
       await refresh();
-      setMsg(`User set to ${status}.`);
+      setMsg(`User set to ${res.status}${res.previous ? ` (was ${res.previous})` : ""}.`);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Failed");
+      setMsg(e instanceof Error ? e.message : "Failed to update status");
     } finally {
       setBusy(null);
     }
@@ -211,13 +216,28 @@ function OwnerUsers() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <button type="button" disabled={busy === u.id} onClick={() => setStatus(u.id, "active")} className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/25 bg-emerald-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-200">
+                  <button
+                    type="button"
+                    disabled={busy === u.id}
+                    onClick={() => void setStatus(u.id, "active")}
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/25 bg-emerald-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-200"
+                  >
                     <CheckCircle2 className="size-3" /> Active
                   </button>
-                  <button type="button" disabled={busy === u.id} onClick={() => setStatus(u.id, "suspended")} className="inline-flex items-center gap-1 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-amber-200">
+                  <button
+                    type="button"
+                    disabled={busy === u.id}
+                    onClick={() => void setStatus(u.id, "suspended")}
+                    className="inline-flex items-center gap-1 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 py-1.5 text-[10px] font-semibold text-amber-200"
+                  >
                     <ShieldOff className="size-3" /> Suspend
                   </button>
-                  <button type="button" disabled={busy === u.id} onClick={() => setStatus(u.id, "banned")} className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/5 px-2.5 py-1.5 text-[10px] font-semibold text-red-300">
+                  <button
+                    type="button"
+                    disabled={busy === u.id}
+                    onClick={() => void setStatus(u.id, "banned")}
+                    className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/5 px-2.5 py-1.5 text-[10px] font-semibold text-red-300"
+                  >
                     <Ban className="size-3" /> Ban
                   </button>
                   <button
@@ -234,7 +254,12 @@ function OwnerUsers() {
                     {adjustFor === u.id ? "Cancel" : "Adjust $"}
                   </button>
                   {tgLink ? (
-                    <a href={tgLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-semibold text-white/70">
+                    <a
+                      href={tgLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-semibold text-white/70"
+                    >
                       <ExternalLink className="size-3" /> Telegram
                     </a>
                   ) : null}
@@ -243,17 +268,59 @@ function OwnerUsers() {
                 {adjustFor === u.id ? (
                   <div className="mt-3 space-y-2 rounded-xl border border-sky-400/20 bg-sky-400/5 p-3">
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setAdjMode("deduct")} className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${adjMode === "deduct" ? "bg-red-500/20 text-red-200 ring-1 ring-red-400/40" : "bg-white/5 text-white/50"}`}>
+                      <button
+                        type="button"
+                        onClick={() => setAdjMode("deduct")}
+                        className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${
+                          adjMode === "deduct"
+                            ? "bg-red-500/20 text-red-200 ring-1 ring-red-400/40"
+                            : "bg-white/5 text-white/50"
+                        }`}
+                      >
                         <MinusCircle className="size-3.5" /> Deduct
                       </button>
-                      <button type="button" onClick={() => setAdjMode("add")} className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${adjMode === "add" ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40" : "bg-white/5 text-white/50"}`}>
+                      <button
+                        type="button"
+                        onClick={() => setAdjMode("add")}
+                        className={`flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-bold ${
+                          adjMode === "add"
+                            ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40"
+                            : "bg-white/5 text-white/50"
+                        }`}
+                      >
                         <PlusCircle className="size-3.5" /> Add
                       </button>
                     </div>
-                    <input type="number" min="0" step="0.01" value={adjAmount} onChange={(e) => setAdjAmount(e.target.value)} placeholder="Amount (USD)" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40" />
-                    <input value={adjReason} onChange={(e) => setAdjReason(e.target.value)} placeholder="Reason (required, audited)" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40" />
-                    <button type="button" disabled={busy === u.id} onClick={() => void submitAdjust(u.id)} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold ${adjMode === "deduct" ? "bg-red-500 text-white" : "bg-emerald-500 text-white"}`}>
-                      {busy === u.id ? <Loader2 className="size-4 animate-spin" /> : adjMode === "deduct" ? `Deduct $${Number(adjAmount || 0).toFixed(2)}` : `Add $${Number(adjAmount || 0).toFixed(2)}`}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={adjAmount}
+                      onChange={(e) => setAdjAmount(e.target.value)}
+                      placeholder="Amount (USD)"
+                      className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40"
+                    />
+                    <input
+                      value={adjReason}
+                      onChange={(e) => setAdjReason(e.target.value)}
+                      placeholder="Reason (required, audited)"
+                      className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-400/40"
+                    />
+                    <button
+                      type="button"
+                      disabled={busy === u.id}
+                      onClick={() => void submitAdjust(u.id)}
+                      className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold ${
+                        adjMode === "deduct" ? "bg-red-500 text-white" : "bg-emerald-500 text-white"
+                      }`}
+                    >
+                      {busy === u.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : adjMode === "deduct" ? (
+                        `Deduct $${Number(adjAmount || 0).toFixed(2)}`
+                      ) : (
+                        `Add $${Number(adjAmount || 0).toFixed(2)}`
+                      )}
                     </button>
                   </div>
                 ) : null}
