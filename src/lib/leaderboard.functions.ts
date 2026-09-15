@@ -6,7 +6,8 @@ export type LeaderboardRow = {
   rank: number;
   display_name: string;
   username: string | null;
-  avatar_url: string | null;
+  /** Telegram profile photo URL stored on profiles.photo_url */
+  photo_url: string | null;
   telegram_id: number | null;
   earned: number;
   referrals: number;
@@ -38,8 +39,9 @@ export const getLeaderboard = createServerFn({ method: "GET" })
     const [{ data: profiles }, { data: allProfiles }] = await Promise.all([
       supabaseAdmin
         .from("profiles")
-        .select("id, display_name, username, avatar_url, telegram_id")
+        .select("id, display_name, username, photo_url, telegram_id")
         .in("id", ids),
+      // referral counts: how many profiles have referred_by = this user
       supabaseAdmin.from("profiles").select("id, referred_by").not("referred_by", "is", null),
     ]);
 
@@ -56,7 +58,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
         {
           display_name: p.display_name as string | null,
           username: (p as { username?: string | null }).username ?? null,
-          avatar_url: (p as { avatar_url?: string | null }).avatar_url ?? null,
+          photo_url: (p as { photo_url?: string | null }).photo_url ?? null,
           telegram_id: (p as { telegram_id?: number | null }).telegram_id ?? null,
         },
       ]),
@@ -69,7 +71,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
         rank: i + 1,
         display_name: p?.display_name?.trim() || "Tasker",
         username: p?.username ?? null,
-        avatar_url: p?.avatar_url ?? null,
+        photo_url: p?.photo_url ?? null,
         telegram_id: p?.telegram_id ?? null,
         earned,
         referrals: refCounts.get(user_id) ?? 0,
