@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
@@ -34,7 +35,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function GateMonitor({ children }: { children: React.ReactNode }) {
-  React.useEffect(() => {
+  useEffect(() => {
     const check = () => { void verifyGate().catch(() => undefined); };
     const timer = window.setInterval(check, 15000);
     document.addEventListener("visibilitychange", check);
