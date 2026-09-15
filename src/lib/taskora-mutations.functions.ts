@@ -131,3 +131,45 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+/** Create a pending crypto deposit intent (owner confirms or webhook completes). */
+export const requestDepositGuarded = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { method: string; amount: number; txHash?: string | undefined; note?: string | undefined }) => d,
+  )
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const amount = Number(data.amount);
+    if (!(amount >= 1)) throw new Error("Minimum deposit is $1.00.");
+    if (!(amount <= 50_000)) throw new Error("Maximum single deposit is $50,000.");
+
+    const method = (data.method || "").trim();
+    if (!method) throw new Error("Choose a deposit network.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("status")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profile && String((profile as { status?: string }).status ?? "active") !== "active") {
+      throw new Error("Account is not allowed to deposit.");
+    }
+
+    const { data: row, error } = await supabaseAdmin
+      .from("deposits")
+      .insert({
+        user_id: userId,
+        amount,
+        method,
+        status: "pending",
+        reference: data.txHash?.trim() || null,
+        notes: data.note?.trim() || null,
+      } as never)
+      .select("id, status, amount, method, created_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
