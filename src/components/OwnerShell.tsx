@@ -103,7 +103,7 @@ const SECTIONS: { label: string; items: Item[] }[] = [
 
 export function OwnerShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
@@ -115,31 +115,21 @@ export function OwnerShell({ children }: { children: ReactNode }) {
     })).filter((sec) => sec.items.length > 0);
   }, [q]);
 
-  function isActive(to: string, title: string) {
+  function isActive(to: string) {
     if (to === "/owner") return pathname === "/owner" || pathname === "/owner/";
-    // Prefer exact path match; for shared routes match by path only once
     return pathname === to || pathname.startsWith(`${to}/`);
   }
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md bg-[#0b1424] text-slate-100">
-      {/* Drawer */}
       {open ? (
         <aside className="fixed inset-y-0 left-0 z-50 flex w-[min(100%,300px)] flex-col border-r border-slate-500/15 bg-[#0a1220] shadow-2xl">
           <div className="flex items-center gap-2 border-b border-slate-500/15 px-3 py-3">
             <img src={TASKORA_LOGO} alt="" className="size-8 rounded-full object-cover" />
-            <span
-              className="flex-1 text-sm font-extrabold tracking-wide"
-              style={{ color: "#a3e635" }}
-            >
+            <span className="flex-1 text-sm font-extrabold tracking-wide" style={{ color: "#a3e635" }}>
               TASKORA →
             </span>
-            <button
-              type="button"
-              aria-label="Close menu"
-              onClick={() => setOpen(false)}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5"
-            >
+            <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5">
               <X className="size-4" />
             </button>
           </div>
@@ -159,22 +149,19 @@ export function OwnerShell({ children }: { children: ReactNode }) {
           <nav className="flex-1 overflow-y-auto px-2 pb-8 pt-1">
             {filtered.map((sec) => (
               <div key={sec.label} className="mb-3">
-                <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {sec.label}
-                </p>
+                <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{sec.label}</p>
                 <ul className="space-y-0.5">
                   {sec.items.map((item) => {
-                    const active = isActive(item.to, item.title);
+                    const active = isActive(item.to);
                     const Icon = item.Icon;
                     return (
                       <li key={`${item.to}-${item.title}`}>
                         <Link
-                          to={item.to as "/owner"}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          to={item.to as any}
                           onClick={() => setOpen(false)}
                           className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition ${
-                            active
-                              ? "font-semibold text-[#0b1424]"
-                              : "text-slate-300 hover:bg-white/5"
+                            active ? "font-semibold text-[#0b1424]" : "text-slate-300 hover:bg-white/5"
                           }`}
                           style={active ? { background: "#a3e635" } : undefined}
                         >
@@ -191,14 +178,8 @@ export function OwnerShell({ children }: { children: ReactNode }) {
         </aside>
       ) : null}
 
-      {/* Scrim */}
       {open ? (
-        <button
-          type="button"
-          aria-label="Close"
-          className="fixed inset-0 z-40 bg-black/50"
-          onClick={() => setOpen(false)}
-        />
+        <button type="button" aria-label="Close" className="fixed inset-0 z-40 bg-black/50" onClick={() => setOpen(false)} />
       ) : null}
 
       <div className="relative flex min-h-screen w-full flex-col">
@@ -216,10 +197,8 @@ export function OwnerShell({ children }: { children: ReactNode }) {
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-400">Owner</p>
             <p className="truncate text-sm font-bold">Command Center</p>
           </div>
-          <Link
-            to="/home"
-            className="rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-[11px] font-semibold text-blue-300"
-          >
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <Link to={"/home" as any} className="rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-[11px] font-semibold text-blue-300">
             App
           </Link>
         </header>
