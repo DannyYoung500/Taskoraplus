@@ -34,9 +34,11 @@ const STAGES: { title: string; detail: string }[] = [
   { title: "FINAL ACCOUNT INITIALIZATION", detail: "Finalizing your secure TASKORA session..." },
 ];
 
-const STAGE_MS = 850;
-const FINAL_HOLD_MS = 2000;
-const WELCOME_MS = 1100;
+/** Faster stages — total ~4–5s max if auth is quick (was ~10s+) */
+const STAGE_MS = 380;
+const FINAL_HOLD_MS = 700;
+const WELCOME_MS = 700;
+const MIN_TOTAL_MS = 2800;
 
 export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string }) {
   const navigate = useNavigate();
@@ -108,6 +110,7 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
     async function sequence() {
       if (started.current) return;
       started.current = true;
+      const t0 = Date.now();
       authPromise.current = runAuth();
 
       for (let i = 0; i < STAGES.length; i++) {
@@ -116,16 +119,29 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         const endPct = ((i + 1) / STAGES.length) * 100;
         setProgress(startPct);
         const hold = i === STAGES.length - 1 ? FINAL_HOLD_MS : STAGE_MS;
-        const steps = Math.max(8, Math.floor(hold / 80));
+        const steps = Math.max(4, Math.floor(hold / 60));
         for (let s = 1; s <= steps; s++) {
           await new Promise((r) => window.setTimeout(r, hold / steps));
           setProgress(startPct + ((endPct - startPct) * s) / steps);
+          // If auth already finished and we're past mid stages, skip ahead
+          if (authResult.current.ok && i >= 5) break;
+        }
+        if (authResult.current.ok && i >= 6) {
+          setStageIndex(STAGES.length - 1);
+          setProgress(100);
+          break;
         }
       }
 
       setProgress(100);
       setStageIndex(STAGES.length - 1);
       await authPromise.current;
+
+      // Respect minimum feel without forcing 10s
+      const elapsed = Date.now() - t0;
+      if (elapsed < MIN_TOTAL_MS) {
+        await new Promise((r) => window.setTimeout(r, MIN_TOTAL_MS - elapsed));
+      }
 
       if (!authResult.current.ok) {
         setPhase(!tg?.initData ? "need-telegram" : "error");
@@ -135,7 +151,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
 
       if (authResult.current.firstName) setWelcomeName(authResult.current.firstName);
       setPhase("welcome");
-      // Always Home — never auto-open Owner dashboard
       window.setTimeout(() => {
         navigate({ to: redirectTo, replace: true });
       }, WELCOME_MS);
