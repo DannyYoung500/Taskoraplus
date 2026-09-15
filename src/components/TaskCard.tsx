@@ -22,12 +22,12 @@ export function TaskCard({
     <Link
       to="/tasks/$taskId"
       params={{ taskId: task.id }}
-      className="flex items-center gap-3 rounded-2xl border border-white/8 bg-[#12141c] p-3.5 transition-transform active:scale-[0.98]"
+      className="flex items-center gap-3 rounded-2xl border border-slate-500/15 bg-[#121f33] p-3.5 transition-transform active:scale-[0.98]"
     >
       <PlatformBadge platform={task.platform as Platform} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold leading-tight text-white">{task.title}</p>
-        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-white/40">
+        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-slate-400">
           <span className="truncate">{task.advertiser}</span>
           <span className="inline-flex items-center gap-1">
             <Clock3 className="size-3" />
@@ -38,15 +38,15 @@ export function TaskCard({
               <CheckCircle2 className="size-3" /> Verified
             </span>
           ) : status === "pending" ? (
-            <span className="text-amber-300">In review</span>
+            <span className="text-blue-300">In review</span>
           ) : null}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300">
+        <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-blue-300">
           ${Number(task.reward).toFixed(2)}
         </span>
-        <ChevronRight className="size-4 text-white/30" />
+        <ChevronRight className="size-4 text-slate-500" />
       </div>
     </Link>
   );
