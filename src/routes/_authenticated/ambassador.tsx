@@ -45,7 +45,9 @@ const MILESTONES = [
 
 const TELEGRAM_BOT_USERNAME = "Taskoraplusbot";
 const REFERRAL_IMAGE =
-  "https://images.unsplash.com/photo-1758525226768-2d1b900ba2c0?auto=format&fit=crop&fm=jpg&q=80&w=1600";
+  "https://images.unsplash.com/photo-1758525226768-2d1b900ba2c0?auto=format&fit=crop&fm=jpg&q=90&w=1800";
+const MILESTONE_IMAGE =
+  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&fm=jpg&q=90&w=1600";
 
 function ReferralScreen() {
   const { dash } = Route.useLoaderData();
@@ -96,34 +98,34 @@ function ReferralScreen() {
   return (
     <Screen>
       <div className="space-y-4 pb-2">
-        <section className="relative isolate overflow-hidden rounded-[30px] border border-cyan-400/25 bg-[#061329] shadow-[0_20px_70px_rgba(0,104,255,0.18)]">
+        <section className="relative isolate overflow-hidden rounded-[30px] border border-cyan-400/30 bg-[#061329] shadow-[0_20px_70px_rgba(0,104,255,0.2)]">
           <img
             src={REFERRAL_IMAGE}
-            alt="Friends sharing TASKORA with a smartphone"
-            className="absolute inset-0 -z-20 h-full w-full object-cover opacity-25"
+            alt="Friends sharing something on a smartphone"
+            className="absolute inset-0 z-0 h-full w-full object-cover object-center opacity-60"
             loading="eager"
+            referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_75%_35%,rgba(0,194,255,0.38),transparent_36%),linear-gradient(100deg,#020817_8%,rgba(2,8,23,0.92)_45%,rgba(4,22,52,0.5)_100%)]" />
-          <div className="absolute -right-16 -top-20 -z-10 size-56 rounded-full border border-cyan-300/20 bg-cyan-400/10 blur-2xl" />
-
-          <div className="p-5 sm:p-6">
+          <div className="absolute inset-0 z-0 bg-[linear-gradient(90deg,rgba(2,8,23,0.96)_0%,rgba(2,8,23,0.86)_38%,rgba(2,8,23,0.35)_100%)]" />
+          <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_78%_38%,rgba(0,194,255,0.4),transparent_34%)]" />
+          <div className="relative z-10 p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <span className="inline-flex size-9 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-400/10 shadow-[0_0_22px_rgba(0,195,255,0.18)]">
                 <Zap className="size-4 text-cyan-300" />
               </span>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">TASKORA</p>
-                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/35">Referral</p>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/50">Referral</p>
               </div>
             </div>
 
-            <h1 className="mt-5 max-w-[300px] text-[30px] font-black leading-[0.98] tracking-[-0.04em] text-white">
+            <h1 className="mt-5 max-w-[310px] text-[30px] font-black leading-[0.98] tracking-[-0.04em] text-white">
               Refer friends.
               <span className="block bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 bg-clip-text text-transparent">
                 Earn 10% in USD.
               </span>
             </h1>
-            <p className="mt-3 max-w-[330px] text-xs leading-5 text-white/65">
+            <p className="mt-3 max-w-[340px] text-xs leading-5 text-white/75">
               Get a 10% USD commission from every qualifying task reward your referrals complete.
             </p>
 
@@ -133,10 +135,10 @@ function ReferralScreen() {
                 { icon: Clipboard, label: "They", value: "Complete" },
                 { icon: WalletCards, label: "You get", value: "10% USD" },
               ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="rounded-2xl border border-white/10 bg-black/20 px-2 py-3 text-center backdrop-blur-sm">
+                <div key={label} className="rounded-2xl border border-white/15 bg-black/35 px-2 py-3 text-center backdrop-blur-md">
                   <Icon className="mx-auto size-4 text-cyan-300" />
-                  <p className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-white/35">{label}</p>
-                  <p className="mt-0.5 text-[10px] font-bold text-white/85">{value}</p>
+                  <p className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-white/45">{label}</p>
+                  <p className="mt-0.5 text-[10px] font-bold text-white">{value}</p>
                 </div>
               ))}
             </div>
@@ -239,69 +241,81 @@ function ReferralScreen() {
           </section>
         </div>
 
-        <section className="rounded-[26px] border border-cyan-400/20 bg-[#061329] p-4 shadow-[0_16px_55px_rgba(0,83,255,0.08)]">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10">
-                <Trophy className="size-5 text-cyan-300" />
+        <section className="relative isolate overflow-hidden rounded-[26px] border border-cyan-400/20 bg-[#061329] shadow-[0_16px_55px_rgba(0,83,255,0.08)]">
+          <div className="relative h-32 overflow-hidden sm:h-40">
+            <img
+              src={MILESTONE_IMAGE}
+              alt="Friends celebrating together"
+              className="absolute inset-0 h-full w-full object-cover opacity-55"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#061329]/25 via-[#061329]/60 to-[#061329]" />
+            <div className="absolute inset-x-4 bottom-4 flex items-end justify-between gap-3 sm:inset-x-5">
+              <div className="flex items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/25 bg-[#061329]/80 backdrop-blur-md">
+                  <Trophy className="size-5 text-cyan-300" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-white">Referral Milestones</h2>
+                  <p className="mt-1 text-[10px] leading-4 text-white/55">Reach each milestone to unlock Task Points.</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-base font-black text-white">Referral Milestones</h2>
-                <p className="mt-1 text-[10px] leading-4 text-white/40">Reach each milestone to unlock Task Points.</p>
-              </div>
+              <span className="hidden shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-cyan-300 sm:inline-flex">
+                Task Points
+              </span>
             </div>
-            <span className="hidden shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-cyan-300 sm:inline-flex">
-              Task Points
-            </span>
           </div>
 
-          {nextMilestone ? (
-            <div className="mt-4 rounded-2xl border border-white/8 bg-white/3 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">Next milestone</p>
-                  <p className="mt-1 text-sm font-black text-white">{nextMilestone.name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-cyan-300">+{nextMilestone.points.toLocaleString()}</p>
-                  <p className="text-[9px] text-white/30">Task Points</p>
-                </div>
-              </div>
-              <p className="mt-2 text-[10px] text-white/35">
-                {nextMilestone.need.toLocaleString()} successful referrals · {nextMilestone.need - referrals} remaining
-              </p>
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {MILESTONES.map((milestone) => {
-              const complete = referrals >= milestone.need;
-              const isNext = nextMilestone?.need === milestone.need;
-              return (
-                <div
-                  key={milestone.need}
-                  className={`relative overflow-hidden rounded-2xl border p-3 text-center transition ${
-                    isNext
-                      ? "border-cyan-300/60 bg-cyan-300/8 shadow-[0_0_24px_rgba(34,211,238,0.1)]"
-                      : complete
-                        ? "border-emerald-300/20 bg-emerald-300/5"
-                        : "border-white/8 bg-white/2"
-                  }`}
-                >
-                  {complete ? (
-                    <span className="absolute right-2 top-2 inline-flex size-4 items-center justify-center rounded-full bg-emerald-400/15">
-                      <Check className="size-2.5 text-emerald-300" />
-                    </span>
-                  ) : null}
-                  <div className={`mx-auto flex size-10 items-center justify-center rounded-full border ${complete ? "border-emerald-300/30 bg-emerald-300/10" : "border-cyan-300/15 bg-cyan-300/5"}`}>
-                    <Trophy className={`size-4 ${complete ? "text-emerald-300" : "text-cyan-300/70"}`} />
+          <div className="p-4">
+            {nextMilestone ? (
+              <div className="rounded-2xl border border-white/8 bg-white/3 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">Next milestone</p>
+                    <p className="mt-1 text-sm font-black text-white">{nextMilestone.name}</p>
                   </div>
-                  <p className="mt-2 truncate text-[10px] font-black text-white">{milestone.name}</p>
-                  <p className="mt-0.5 text-[11px] font-black text-cyan-300">{milestone.need.toLocaleString()}</p>
-                  <p className="mt-1 text-[8px] text-white/30">+{milestone.points.toLocaleString()} TP</p>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-cyan-300">+{nextMilestone.points.toLocaleString()}</p>
+                    <p className="text-[9px] text-white/30">Task Points</p>
+                  </div>
                 </div>
-              );
-            })}
+                <p className="mt-2 text-[10px] text-white/35">
+                  {nextMilestone.need.toLocaleString()} successful referrals · {nextMilestone.need - referrals} remaining
+                </p>
+              </div>
+            ) : null}
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {MILESTONES.map((milestone) => {
+                const complete = referrals >= milestone.need;
+                const isNext = nextMilestone?.need === milestone.need;
+                return (
+                  <div
+                    key={milestone.need}
+                    className={`relative overflow-hidden rounded-2xl border p-3 text-center transition ${
+                      isNext
+                        ? "border-cyan-300/60 bg-cyan-300/8 shadow-[0_0_24px_rgba(34,211,238,0.1)]"
+                        : complete
+                          ? "border-emerald-300/20 bg-emerald-300/5"
+                          : "border-white/8 bg-white/2"
+                    }`}
+                  >
+                    {complete ? (
+                      <span className="absolute right-2 top-2 inline-flex size-4 items-center justify-center rounded-full bg-emerald-400/15">
+                        <Check className="size-2.5 text-emerald-300" />
+                      </span>
+                    ) : null}
+                    <div className={`mx-auto flex size-10 items-center justify-center rounded-full border ${complete ? "border-emerald-300/30 bg-emerald-300/10" : "border-cyan-300/15 bg-cyan-300/5"}`}>
+                      <Trophy className={`size-4 ${complete ? "text-emerald-300" : "text-cyan-300/70"}`} />
+                    </div>
+                    <p className="mt-2 truncate text-[10px] font-black text-white">{milestone.name}</p>
+                    <p className="mt-0.5 text-[11px] font-black text-cyan-300">{milestone.need.toLocaleString()}</p>
+                    <p className="mt-1 text-[8px] text-white/30">+{milestone.points.toLocaleString()} TP</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </section>
       </div>
