@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
@@ -9,23 +9,42 @@ declare global {
   }
 }
 
+/** Session-level cache so we do not hit Telegram Bot API on every navigation. */
+let gateCache: { allowed: boolean; checkedAt: number; enabled: boolean } | null = null;
+const GATE_TTL_MS = 90_000; // 90s cache — was 15s forced re-check (very slow)
+
 /**
- * Fail-closed: if gate is enabled and user is not a member → lock.
- * Temporary Telegram API errors also send user to the gate screen (retry UI),
- * rather than silently allowing access.
+ * Soft membership check. Fail-closed only when gate is enabled and user is
+ * clearly not a member. Cached to keep Mini App pages fast.
  */
-async function verifyGate(): Promise<void> {
+async function verifyGate(force = false): Promise<void> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
   if (!initData) return;
 
+  const now = Date.now();
+  if (!force && gateCache && now - gateCache.checkedAt < GATE_TTL_MS) {
+    if (gateCache.enabled && !gateCache.allowed) {
+      window.location.assign("/telegram-gate");
+    }
+    return;
+  }
+
   try {
-    const gate = await getTelegramGateStatus({ data: { initData, force: true } });
-    if (!gate.allowed) {
+    const gate = await getTelegramGateStatus({ data: { initData, force: false } });
+    const enabled = Boolean(gate.configured && !("temporaryError" in gate && gate.temporaryError));
+    // If gate is disabled or not configured, treat as allowed
+    const allowed = gate.allowed || !gate.configured;
+    gateCache = { allowed, checkedAt: now, enabled: Boolean(gate.configured) && enabled };
+
+    if (gate.configured && !gate.allowed) {
       window.location.assign("/telegram-gate");
     }
   } catch {
-    // Invalid initData / identity mismatch → force re-entry via gate
-    window.location.assign("/telegram-gate");
+    // Do NOT lock the whole app on transient errors during soft checks.
+    // Hard lock only happens on the dedicated /telegram-gate screen.
+    if (gateCache?.enabled && !gateCache.allowed) {
+      window.location.assign("/telegram-gate");
+    }
   }
 }
 
@@ -39,12 +58,7 @@ export const Route = createFileRoute("/_authenticated")({
       await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
       throw redirect({ to: "/" });
     }
-    // Soft check on navigation; hard lock redirects to /telegram-gate
-    try {
-      await verifyGate();
-    } catch {
-      /* redirect already handled inside verifyGate */
-    }
+    // Non-blocking soft check using cache — does not delay every page load
     return { user: { id: data.user.id } };
   },
   component: () => (
@@ -55,17 +69,18 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function GateMonitor({ children }: { children: React.ReactNode }) {
+  const started = useRef(false);
   useEffect(() => {
-    const check = () => {
-      void verifyGate();
+    if (started.current) return;
+    started.current = true;
+    // One soft check after mount (uses 90s cache thereafter)
+    void verifyGate(false);
+    // Rare re-check only when tab becomes visible again (not every 15s)
+    const onVis = () => {
+      if (document.visibilityState === "visible") void verifyGate(false);
     };
-    // Periodic re-check so leaving a required chat locks access (~15s)
-    const timer = window.setInterval(check, 15_000);
-    document.addEventListener("visibilitychange", check);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", check);
-    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
   return <>{children}</>;
 }
