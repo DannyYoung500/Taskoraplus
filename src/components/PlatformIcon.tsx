@@ -13,11 +13,10 @@ import {
   SiSoundcloud,
   SiPinterest,
   SiThreads,
-  SiLinkedin,
   SiGoogle,
   SiAudiomack,
 } from "react-icons/si";
-import { FaGlobe, FaPoll, FaAppStore } from "react-icons/fa";
+import { FaGlobe, FaPoll, FaAppStore, FaLinkedin } from "react-icons/fa";
 import type { IconType } from "react-icons";
 
 export type Platform =
@@ -99,7 +98,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     blurb: "Page likes, post likes, followers",
   },
   linkedin: {
-    Icon: SiLinkedin,
+    Icon: FaLinkedin,
     color: "#0A66C2",
     bg: "from-[#0A66C2] to-[#004182]",
     label: "LinkedIn",
@@ -304,7 +303,13 @@ export function PlatformLogo({ platform, size = 52 }: { platform: Platform; size
   const meta = PLATFORM_META[platform];
   if (!meta) return null;
   const { Icon, color, label } = meta;
-  const solidBg = platform === "instagram" ? undefined : color === "#000000" ? "#111111" : color;
+  // Brand-faithful solid circles
+  const solidBg =
+    platform === "instagram"
+      ? undefined
+      : color === "#000000"
+        ? "#111111"
+        : color;
 
   return (
     <span
