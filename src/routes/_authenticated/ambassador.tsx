@@ -20,10 +20,17 @@ const TIERS = [
   { name: "Elite", need: "100 invites", rate: "18%" },
 ];
 
+const TELEGRAM_BOT_USERNAME = "Taskoraplusbot";
+const TELEGRAM_MINI_APP_SHORT_NAME = "taskora";
+
 function AmbassadorScreen() {
   const { dash } = Route.useLoaderData();
   const code = dash?.profile?.referral_code ?? "—";
+  const telegramId = dash?.telegramId ?? null;
   const referrals = dash?.referrals ?? 0;
+  const referralLink = telegramId
+    ? `https://t.me/${TELEGRAM_BOT_USERNAME}/${TELEGRAM_MINI_APP_SHORT_NAME}?startapp=${encodeURIComponent(String(telegramId))}`
+    : "";
   const [inviteCode, setInviteCode] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -56,30 +63,38 @@ function AmbassadorScreen() {
       </section>
 
       <Card className="mt-4 p-4">
-        <p className="text-xs text-white/45">Your invite code</p>
+        <p className="text-xs text-white/45">Your referral link</p>
         <div className="mt-2 flex items-center gap-2">
           <code className="flex-1 truncate rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold tracking-wide">
-            {code}
+            {referralLink || "Telegram session required"}
           </code>
           <button
             type="button"
-            aria-label="Copy invite code"
-            onClick={() => navigator.clipboard?.writeText(code)}
-            className="inline-flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
+            aria-label="Copy referral link"
+            disabled={!referralLink}
+            onClick={() => {
+              if (referralLink) void navigator.clipboard?.writeText(referralLink);
+            }}
+            className="inline-flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 disabled:opacity-40"
           >
             <Copy className="size-4 text-amber-300" />
           </button>
         </div>
+        <p className="mt-2 text-[11px] text-white/35">
+          Your Telegram user ID is used as the referral start parameter.
+        </p>
         <GoldButton
           className="mt-3"
+          disabled={!referralLink}
           onClick={() => {
-            const text = `Join TASKORA with my code ${code}`;
-            const url = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/Taskoraplusbot")}&text=${encodeURIComponent(text)}`;
+            if (!referralLink) return;
+            const text = "Join me on TASKORA and earn rewards.";
+            const url = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`;
             window.open(url, "_blank");
           }}
         >
           <span className="inline-flex items-center justify-center gap-2">
-            <Share2 className="size-4" /> Share on Telegram
+            <Share2 className="size-4" /> Share referral link
           </span>
         </GoldButton>
       </Card>
