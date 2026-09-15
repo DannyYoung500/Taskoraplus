@@ -128,6 +128,19 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    const preventContextMenu = (event: Event) => event.preventDefault();
+    const preventDragStart = (event: Event) => event.preventDefault();
+
+    document.addEventListener("contextmenu", preventContextMenu);
+    document.addEventListener("dragstart", preventDragStart);
+
+    return () => {
+      document.removeEventListener("contextmenu", preventContextMenu);
+      document.removeEventListener("dragstart", preventDragStart);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
