@@ -76,12 +76,14 @@ function WalletScreen() {
   const { dash, error: loadError } = Route.useLoaderData();
   const [tab, setTab] = useState<"deposit" | "withdraw" | "activity">("deposit");
 
+  // Withdraw state
   const [wMethod, setWMethod] = useState<string>(WITHDRAW_METHODS[0]!.id);
   const [wAddress, setWAddress] = useState("");
   const [wAmount, setWAmount] = useState("");
   const [wBusy, setWBusy] = useState(false);
   const [wMsg, setWMsg] = useState<string | null>(null);
 
+  // Deposit state
   const [dMethod, setDMethod] = useState<(typeof DEPOSIT_METHODS)[number]>(DEPOSIT_METHODS[0]!);
   const [dAmount, setDAmount] = useState("");
   const [dTxHash, setDTxHash] = useState("");
@@ -145,6 +147,7 @@ function WalletScreen() {
 
   return (
     <Screen className="!bg-[#05070c]">
+      {/* Balance hero */}
       <section className="relative mb-5 overflow-hidden rounded-3xl border border-sky-400/20 bg-gradient-to-br from-[#0c1a2e] via-[#121f33] to-[#0a1220] p-5 shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_0%,rgba(56,189,248,0.18),transparent_55%)]" />
         <div className="relative flex items-start justify-between">
@@ -173,6 +176,7 @@ function WalletScreen() {
         </div>
       </section>
 
+      {/* Tabs */}
       <div className="mb-4 flex gap-1 rounded-2xl border border-white/8 bg-[#12141c] p-1">
         {(
           [
@@ -196,12 +200,35 @@ function WalletScreen() {
         ))}
       </div>
 
+      {/* DEPOSIT */}
       {tab === "deposit" ? (
         <section className="space-y-3">
-          <p className="text-xs text-white/45">
-            Send crypto to the address below, then submit amount + optional TX hash for faster
-            confirmation.
-          </p>
+          {/* How it works */}
+          <div className="rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 p-3.5">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-300/80">
+              How to deposit
+            </p>
+            <ol className="space-y-1.5 text-[11px] leading-snug text-white/70">
+              <li className="flex gap-2">
+                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-[10px] font-bold text-emerald-300">
+                  1
+                </span>
+                Choose network & copy the address below
+              </li>
+              <li className="flex gap-2">
+                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-[10px] font-bold text-emerald-300">
+                  2
+                </span>
+                Send crypto from your wallet (min $5)
+              </li>
+              <li className="flex gap-2">
+                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-[10px] font-bold text-emerald-300">
+                  3
+                </span>
+                Submit amount + TX hash for instant review
+              </li>
+            </ol>
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             {DEPOSIT_METHODS.map((m) => (
@@ -211,12 +238,12 @@ function WalletScreen() {
                 onClick={() => setDMethod(m)}
                 className={`flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-left transition ${
                   dMethod.id === m.id
-                    ? "border-sky-400/50 bg-sky-400/10"
+                    ? "border-sky-400/50 bg-sky-400/10 shadow-[0_0_20px_rgba(56,189,248,0.12)]"
                     : "border-white/8 bg-[#12141c]"
                 }`}
               >
                 <span
-                  className="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-white"
+                  className="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-md"
                   style={{ backgroundColor: m.color }}
                 >
                   {m.icon}
@@ -234,19 +261,21 @@ function WalletScreen() {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
                 Deposit address · {dMethod.network}
               </p>
-              <QrCode className="size-4 text-white/25" />
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/40">
+                <QrCode className="size-3" /> QR ready
+              </span>
             </div>
-            <p className="break-all rounded-xl bg-black/40 px-3 py-3 font-mono text-[11px] leading-relaxed text-sky-100/90">
+            <p className="break-all rounded-xl border border-sky-400/15 bg-black/50 px-3 py-3.5 font-mono text-[11px] leading-relaxed text-sky-100/95">
               {dMethod.address}
             </p>
             <button
               type="button"
               onClick={() => void copyAddress()}
-              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 py-2.5 text-xs font-bold text-sky-200"
+              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 py-3 text-xs font-bold text-sky-200 transition active:scale-[0.98]"
             >
               {copied ? (
                 <>
-                  <Check className="size-3.5" /> Copied
+                  <Check className="size-3.5" /> Address copied
                 </>
               ) : (
                 <>
@@ -254,44 +283,57 @@ function WalletScreen() {
                 </>
               )}
             </button>
-            <p className="mt-2 text-center text-[10px] text-amber-200/70">
-              Send only {dMethod.label} on {dMethod.network}. Wrong network = lost funds.
-            </p>
+            <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-center">
+              <p className="text-[11px] font-semibold text-amber-200">
+                ⚠ Send only {dMethod.label} on {dMethod.network}
+              </p>
+              <p className="mt-0.5 text-[10px] text-amber-200/70">
+                Wrong network or asset = permanent loss. Double-check before sending.
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-2 rounded-2xl border border-white/10 bg-[#12141c] p-4">
+          <div className="space-y-2.5 rounded-2xl border border-white/10 bg-[#12141c] p-4">
             <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/40">
-              Amount sent (USD)
+              Amount sent (USD) · min $5
             </label>
             <input
               value={dAmount}
               onChange={(e) => setDAmount(e.target.value)}
               placeholder="e.g. 25.00"
               inputMode="decimal"
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:border-sky-400/40"
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3.5 text-sm outline-none focus:border-sky-400/40"
             />
             <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/40">
-              Transaction hash (optional)
+              Transaction hash / TX ID (recommended)
             </label>
             <input
               value={dTxHash}
               onChange={(e) => setDTxHash(e.target.value)}
-              placeholder="TX ID / hash for faster review"
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:border-sky-400/40"
+              placeholder="Paste TX hash for faster confirmation"
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3.5 text-sm outline-none focus:border-sky-400/40"
             />
             <button
               type="button"
               disabled={dBusy}
               onClick={() => void onDeposit()}
-              className="mt-1 w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 py-3.5 text-sm font-bold text-[#0a0c12] disabled:opacity-50"
+              className="mt-1 w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 py-3.5 text-sm font-bold text-[#0a0c12] shadow-lg shadow-emerald-500/20 disabled:opacity-50"
             >
               {dBusy ? "Submitting…" : "Submit deposit for confirmation"}
             </button>
-            {dMsg ? <p className="text-center text-xs text-amber-200/90">{dMsg}</p> : null}
+            {dMsg ? (
+              <p className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-center text-xs text-amber-200/90">
+                {dMsg}
+              </p>
+            ) : null}
+            <p className="text-center text-[10px] text-white/35">
+              Credits appear after owner confirms on-chain. Usually under 30 min.
+            </p>
           </div>
         </section>
       ) : null}
 
+      {/* WITHDRAW */}
       {tab === "withdraw" ? (
         <section className="space-y-3">
           <p className="text-xs text-white/45">
@@ -346,6 +388,7 @@ function WalletScreen() {
         </section>
       ) : null}
 
+      {/* ACTIVITY */}
       {tab === "activity" ? (
         <section>
           <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/8 bg-[#12141c]">
