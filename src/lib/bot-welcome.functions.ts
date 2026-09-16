@@ -1,11 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwner, audit, admin } from "@/lib/owner-guard.server";
 import { validateBotWelcomePhoto } from "@/lib/bot-welcome-photo";
 
+/** Dynamic import keeps owner-guard.server out of the client graph. */
+async function admin() {
+  const m = await import("@/lib/owner-guard.server");
+  return m.admin();
+}
+
+async function audit(params: Parameters<typeof import("@/lib/owner-guard.server").audit>[0]) {
+  const m = await import("@/lib/owner-guard.server");
+  return m.audit(params);
+}
+
 async function guard(userId: string) {
-  await assertOwner(userId);
-  return admin();
+  const m = await import("@/lib/owner-guard.server");
+  await m.assertOwner(userId);
+  return m.admin();
 }
 
 export type WelcomeButton = {
@@ -16,7 +27,22 @@ export type WelcomeButton = {
   path?: string;
 };
 
-const DEFAULT_MESSAGE = `✨ WELCOME TO TASKORA\n\nHey @username 👋\nYour premium Telegram earning hub is ready.\n\n🎯 COMPLETE — Find verified tasks and earn real rewards.\n🎮 PLAY — Explore supported games and earn from eligible activity.\n▶️ WATCH & EARN — Watch eligible content and earn USDT.\n👥 REFER — Invite friends and earn eligible referral commission.\n💰 WALLET — Track your balance, earnings and withdrawals.\n⭐ LEVEL UP — Build Task Points and climb the leaderboard.\n\n🔐 Secure • Telegram-native • Built for earning\n\nReady to get started?\nOpen TASKORA below. 🚀`;
+const DEFAULT_MESSAGE = `✨ WELCOME TO TASKORA
+
+Hey @username 👋
+Your premium Telegram earning hub is ready.
+
+🎯 COMPLETE — Find verified tasks and earn real rewards.
+🎮 PLAY — Explore supported games and earn from eligible activity.
+▶️ WATCH & EARN — Watch eligible content and earn USDT.
+👥 REFER — Invite friends and earn eligible referral commission.
+💰 WALLET — Track your balance, earnings and withdrawals.
+⭐ LEVEL UP — Build Task Points and climb the leaderboard.
+
+🔐 Secure • Telegram-native • Built for earning
+
+Ready to get started?
+Open TASKORA below. 🚀`;
 
 const DEFAULT_BUTTONS: WelcomeButton[] = [
   { id: "open", label: "🚀 OPEN TASKORA", type: "web_app", path: "/" },
@@ -146,9 +172,19 @@ export async function sendWelcomeToChat(opts: {
   const reply_markup = buildInlineKeyboard(buttons, mini, community);
 
   if (photoFileId || photoUrl) {
-    await tg("sendPhoto", { chat_id: opts.chatId, photo: photoFileId || photoUrl, caption: text.slice(0, 1024), reply_markup });
+    await tg("sendPhoto", {
+      chat_id: opts.chatId,
+      photo: photoFileId || photoUrl,
+      caption: text.slice(0, 1024),
+      reply_markup,
+    });
   } else {
-    await tg("sendMessage", { chat_id: opts.chatId, text: text.slice(0, 4096), reply_markup, disable_web_page_preview: true });
+    await tg("sendMessage", {
+      chat_id: opts.chatId,
+      text: text.slice(0, 4096),
+      reply_markup,
+      disable_web_page_preview: true,
+    });
   }
 }
 
@@ -166,12 +202,22 @@ export const ownerGetBotWelcome = createServerFn({ method: "POST" })
       message_text: (row.message_text as string) || DEFAULT_MESSAGE,
       buttons: normalizeButtons(row.buttons),
       community_url: (row.community_url as string) || "https://t.me/Taskoraplus",
-      mini_app_url: (row.mini_app_url as string | null) || process.env["MINI_APP_URL"] || process.env["VITE_MINI_APP_URL"] || null,
+      mini_app_url:
+        (row.mini_app_url as string | null) ||
+        process.env["MINI_APP_URL"] ||
+        process.env["VITE_MINI_APP_URL"] ||
+        null,
       draft_photo_url: (row.draft_photo_url as string | null) ?? (row.photo_url as string | null) ?? null,
-      draft_message_text: (row.draft_message_text as string) || (row.message_text as string) || DEFAULT_MESSAGE,
+      draft_message_text:
+        (row.draft_message_text as string) || (row.message_text as string) || DEFAULT_MESSAGE,
       draft_buttons: normalizeButtons(row.draft_buttons ?? row.buttons),
-      draft_community_url: (row.draft_community_url as string) || (row.community_url as string) || "https://t.me/Taskoraplus",
-      draft_mini_app_url: (row.draft_mini_app_url as string | null) || (row.mini_app_url as string | null) || process.env["MINI_APP_URL"] || null,
+      draft_community_url:
+        (row.draft_community_url as string) || (row.community_url as string) || "https://t.me/Taskoraplus",
+      draft_mini_app_url:
+        (row.draft_mini_app_url as string | null) ||
+        (row.mini_app_url as string | null) ||
+        process.env["MINI_APP_URL"] ||
+        null,
       previous_message_text: (row.previous_message_text as string | null) ?? null,
       published_at: (row.published_at as string | null) ?? null,
       updated_at: (row.updated_at as string) || new Date().toISOString(),
@@ -228,7 +274,17 @@ export const ownerUploadBotWelcomePhoto = createServerFn({ method: "POST" })
 
 export const ownerSaveBotWelcomeDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => d as { message_text?: string; buttons?: WelcomeButton[]; photo_url?: string | null; community_url?: string; mini_app_url?: string | null; enabled?: boolean })
+  .inputValidator(
+    (d: unknown) =>
+      d as {
+        message_text?: string;
+        buttons?: WelcomeButton[];
+        photo_url?: string | null;
+        community_url?: string;
+        mini_app_url?: string | null;
+        enabled?: boolean;
+      },
+  )
   .handler(async ({ data, context }) => {
     const db = await guard(context.userId);
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -240,7 +296,12 @@ export const ownerSaveBotWelcomeDraft = createServerFn({ method: "POST" })
     if (data.enabled != null) payload.enabled = Boolean(data.enabled);
     const { error } = await db.from("bot_welcome_settings").upsert({ id: true, ...payload });
     if (error) throw new Error(error.message);
-    await audit({ adminId: context.userId, action: "bot_welcome.draft_saved", targetType: "bot_welcome", targetId: "true" });
+    await audit({
+      adminId: context.userId,
+      action: "bot_welcome.draft_saved",
+      targetType: "bot_welcome",
+      targetId: "true",
+    });
     return { ok: true };
   });
 
@@ -249,16 +310,42 @@ export const ownerPublishBotWelcome = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => d)
   .handler(async ({ context }) => {
     const db = await guard(context.userId);
-    const { data: cur, error: readErr } = await db.from("bot_welcome_settings").select("*").eq("id", true).maybeSingle();
+    const { data: cur, error: readErr } = await db
+      .from("bot_welcome_settings")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle();
     if (readErr) throw new Error(readErr.message);
-    const draftMsg = (cur?.draft_message_text as string) || (cur?.message_text as string) || DEFAULT_MESSAGE;
+    const draftMsg =
+      (cur?.draft_message_text as string) || (cur?.message_text as string) || DEFAULT_MESSAGE;
     const draftBtns = normalizeButtons(cur?.draft_buttons ?? cur?.buttons ?? DEFAULT_BUTTONS);
     const draftPhoto = (cur?.draft_photo_url as string | null) ?? null;
-    const draftCommunity = (cur?.draft_community_url as string) || (cur?.community_url as string) || "https://t.me/Taskoraplus";
-    const draftMini = (cur?.draft_mini_app_url as string | null) ?? (cur?.mini_app_url as string | null) ?? null;
-    const { error } = await db.from("bot_welcome_settings").upsert({ id: true, previous_photo_url: cur?.photo_url ?? null, previous_message_text: cur?.message_text ?? null, previous_buttons: cur?.buttons ?? null, previous_community_url: cur?.community_url ?? null, previous_mini_app_url: cur?.mini_app_url ?? null, message_text: draftMsg, buttons: draftBtns, photo_url: draftPhoto, community_url: draftCommunity, mini_app_url: draftMini, published_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    const draftCommunity =
+      (cur?.draft_community_url as string) || (cur?.community_url as string) || "https://t.me/Taskoraplus";
+    const draftMini =
+      (cur?.draft_mini_app_url as string | null) ?? (cur?.mini_app_url as string | null) ?? null;
+    const { error } = await db.from("bot_welcome_settings").upsert({
+      id: true,
+      previous_photo_url: cur?.photo_url ?? null,
+      previous_message_text: cur?.message_text ?? null,
+      previous_buttons: cur?.buttons ?? null,
+      previous_community_url: cur?.community_url ?? null,
+      previous_mini_app_url: cur?.mini_app_url ?? null,
+      message_text: draftMsg,
+      buttons: draftBtns,
+      photo_url: draftPhoto,
+      community_url: draftCommunity,
+      mini_app_url: draftMini,
+      published_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
     if (error) throw new Error(error.message);
-    await audit({ adminId: context.userId, action: "bot_welcome.published", targetType: "bot_welcome", targetId: "true" });
+    await audit({
+      adminId: context.userId,
+      action: "bot_welcome.published",
+      targetType: "bot_welcome",
+      targetId: "true",
+    });
     return { ok: true, published_at: new Date().toISOString() };
   });
 
@@ -267,12 +354,29 @@ export const ownerRestoreBotWelcome = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => d)
   .handler(async ({ context }) => {
     const db = await guard(context.userId);
-    const { data: cur, error: readErr } = await db.from("bot_welcome_settings").select("*").eq("id", true).maybeSingle();
+    const { data: cur, error: readErr } = await db
+      .from("bot_welcome_settings")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle();
     if (readErr) throw new Error(readErr.message);
     if (!cur?.previous_message_text) throw new Error("No previous version to restore.");
-    const { error } = await db.from("bot_welcome_settings").upsert({ id: true, draft_message_text: cur.previous_message_text, draft_buttons: cur.previous_buttons, draft_photo_url: cur.previous_photo_url, draft_community_url: cur.previous_community_url, draft_mini_app_url: cur.previous_mini_app_url, updated_at: new Date().toISOString() });
+    const { error } = await db.from("bot_welcome_settings").upsert({
+      id: true,
+      draft_message_text: cur.previous_message_text,
+      draft_buttons: cur.previous_buttons,
+      draft_photo_url: cur.previous_photo_url,
+      draft_community_url: cur.previous_community_url,
+      draft_mini_app_url: cur.previous_mini_app_url,
+      updated_at: new Date().toISOString(),
+    });
     if (error) throw new Error(error.message);
-    await audit({ adminId: context.userId, action: "bot_welcome.restored_to_draft", targetType: "bot_welcome", targetId: "true" });
+    await audit({
+      adminId: context.userId,
+      action: "bot_welcome.restored_to_draft",
+      targetType: "bot_welcome",
+      targetId: "true",
+    });
     return { ok: true };
   });
 
@@ -281,15 +385,30 @@ export const ownerPreviewBotWelcome = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => d)
   .handler(async ({ context }) => {
     const db = await guard(context.userId);
-    const { data: profile } = await db.from("profiles").select("telegram_id, username, display_name").eq("id", context.userId).maybeSingle();
-    if (!profile?.telegram_id) throw new Error("Your profile has no telegram_id — open the Mini App once first.");
-    await sendWelcomeToChat({ chatId: profile.telegram_id, username: profile.username, firstName: profile.display_name, useDraft: true });
+    const { data: profile } = await db
+      .from("profiles")
+      .select("telegram_id, username, display_name")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (!profile?.telegram_id) {
+      throw new Error("Your profile has no telegram_id — open the Mini App once first.");
+    }
+    await sendWelcomeToChat({
+      chatId: profile.telegram_id,
+      username: profile.username,
+      firstName: profile.display_name,
+      useDraft: true,
+    });
     return { ok: true };
   });
 
 export type TelegramUpdate = {
   update_id?: number;
-  message?: { text?: string; chat?: { id: number }; from?: { id: number; username?: string; first_name?: string } };
+  message?: {
+    text?: string;
+    chat?: { id: number };
+    from?: { id: number; username?: string; first_name?: string };
+  };
   callback_query?: unknown;
   chat_member?: unknown;
   my_chat_member?: unknown;
@@ -299,6 +418,11 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
   const msg = update.message;
   if (!msg?.text || !msg.chat?.id) return { handled: false };
   if (!msg.text.trim().startsWith("/start")) return { handled: false };
-  await sendWelcomeToChat({ chatId: msg.chat.id, username: msg.from?.username, firstName: msg.from?.first_name, useDraft: false });
+  await sendWelcomeToChat({
+    chatId: msg.chat.id,
+    username: msg.from?.username,
+    firstName: msg.from?.first_name,
+    useDraft: false,
+  });
   return { handled: true };
 }
