@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Screen } from "@/components/Screen";
 import { getDashboard } from "@/lib/taskora.functions";
+import { formatUsd } from "@/lib/taskora-display";
 import {
   requestWithdrawalGuarded,
   requestDepositGuarded,
@@ -124,7 +125,7 @@ function WalletScreen() {
         },
       });
       setDMsg(
-        `Deposit #${String(row.id).slice(0, 8)} submitted · $${Number(row.amount).toFixed(2)} pending confirmation.`,
+        `Deposit #${String(row.id).slice(0, 8)} submitted · ${formatUsd(row.amount)} pending confirmation.`,
       );
       setDAmount("");
       setDTxHash("");
@@ -156,10 +157,10 @@ function WalletScreen() {
               Available balance
             </p>
             <p className="mt-1 text-4xl font-extrabold tracking-tight text-white">
-              ${balance.toFixed(2)}
+              {formatUsd(balance)}
             </p>
             <p className="mt-1.5 text-xs text-white/45">
-              Pending rewards · ${pending.toFixed(2)}
+              Pending rewards · {formatUsd(pending)}
             </p>
           </div>
           <span className="inline-flex size-11 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-300 ring-1 ring-sky-400/30">
@@ -219,7 +220,7 @@ function WalletScreen() {
                 <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-[10px] font-bold text-emerald-300">
                   2
                 </span>
-                Send crypto from your wallet (min $5)
+                Send crypto from your wallet (min $5.0000)
               </li>
               <li className="flex gap-2">
                 <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-[10px] font-bold text-emerald-300">
@@ -295,12 +296,12 @@ function WalletScreen() {
 
           <div className="space-y-2.5 rounded-2xl border border-white/10 bg-[#12141c] p-4">
             <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/40">
-              Amount sent (USD) · min $5
+              Amount sent (USD) · min $5.0000
             </label>
             <input
               value={dAmount}
               onChange={(e) => setDAmount(e.target.value)}
-              placeholder="e.g. 25.00"
+              placeholder="e.g. 25.0000"
               inputMode="decimal"
               className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3.5 text-sm outline-none focus:border-sky-400/40"
             />
@@ -337,7 +338,7 @@ function WalletScreen() {
       {tab === "withdraw" ? (
         <section className="space-y-3">
           <p className="text-xs text-white/45">
-            Min $10 · processed by owner after review · first withdrawals may need extra checks.
+            Min $10.0000 · processed by owner after review · first withdrawals may need extra checks.
           </p>
           <div className="grid grid-cols-2 gap-2">
             {WITHDRAW_METHODS.map((m) => (
@@ -421,7 +422,7 @@ function WalletScreen() {
                         amt < 0 ? "text-red-300" : "text-emerald-300"
                       }`}
                     >
-                      {amt < 0 ? "−" : "+"}${Math.abs(amt).toFixed(2)}
+                      {amt < 0 ? "−" : "+"}{formatUsd(Math.abs(amt))}
                     </p>
                   </div>
                 );
