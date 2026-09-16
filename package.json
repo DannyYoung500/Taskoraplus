@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test:advertise": "node --test --experimental-strip-types src/lib/advertise-economy.test.ts",
-    "test:bot-welcome": "node --test --experimental-strip-types src/lib/bot-welcome-photo.test.ts"
+    "test:bot-welcome": "node --test --experimental-strip-types src/lib/bot-welcome-photo.test.ts",
+    "test:task-actions": "node --test --experimental-strip-types src/lib/task-actions.test.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"
