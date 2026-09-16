@@ -15,6 +15,7 @@ import {
 import { listTasks, getDashboard, dailyCheckin } from "@/lib/taskora.functions";
 import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
 
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
@@ -22,15 +23,18 @@ export const Route = createFileRoute("/_authenticated/home")({
       listTasks().catch(() => []),
       getDashboard().catch(() => null),
     ]);
-    return { tasks: tasks.slice(0, 8), dash };
+    return { tasks: tasks.filter((task) => !isDemoTaskTitle(task.title)).slice(0, 8), dash };
   },
   component: HomePage,
 });
 
 function HomePage() {
   const { tasks, dash } = Route.useLoaderData();
-  const balance = Number(dash?.balance ?? 0);
-  const pending = Number(dash?.pending ?? 0);
+  const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
+  const balance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const pending = (dash?.submissions ?? [])
+    .filter((submission) => submission.status === "pending" && !isDemoTaskTitle(submission.tasks?.title))
+    .reduce((sum, submission) => sum + Number(submission.tasks?.reward ?? 0), 0);
   const name = dash?.profile?.display_name ?? "Tasker";
   const isOwner = Boolean(dash?.isOwner);
   const photo = (dash?.profile as { photo_url?: string | null } | null)?.photo_url ?? null;
@@ -110,16 +114,16 @@ function HomePage() {
           <div>
             <p className="text-xs text-slate-400">Total Balance</p>
             <p className="mt-1 text-4xl font-extrabold tracking-tight text-blue-300">
-              ${balance.toFixed(2)}
+              {formatUsd(balance)}
             </p>
             <p className="mt-2 text-xs text-slate-400">
-              Available <span className="text-slate-200">${balance.toFixed(2)}</span>
+              Available <span className="text-slate-200">{formatUsd(balance)}</span>
             </p>
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-400">Pending</p>
             <Link to="/wallet" className="mt-1 block text-lg font-bold text-white">
-              ${pending.toFixed(2)} ›
+              {formatUsd(pending)} ›
             </Link>
           </div>
         </div>
@@ -216,7 +220,7 @@ function HomePage() {
                   <p className="text-[11px] text-slate-400">{t.platform}</p>
                 </div>
                 <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-blue-300">
-                  +${Number(t.reward).toFixed(2)}
+                  +{formatUsd(t.reward)}
                 </span>
               </Link>
             ),
