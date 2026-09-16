@@ -19,6 +19,8 @@ async function log(
 /**
  * Ban / suspend / activate a user. Verifies the row actually changed.
  * Requires service role (admin client) + ALL_FIXES_RUN_ONCE.sql policies.
+ * Owners (TASKORA_OWNER_TELEGRAM_IDS or user_roles.owner) cannot be banned/suspended.
+ * Setting status to active = Unban / Unsuspend.
  */
 export const ownerSetUserStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -34,11 +36,28 @@ export const ownerSetUserStatus = createServerFn({ method: "POST" })
 
     const { data: prev, error: prevErr } = await db
       .from("profiles")
-      .select("id, status, display_name")
+      .select("id, status, display_name, telegram_id")
       .eq("id", data.userId)
       .maybeSingle();
     if (prevErr) throw new Error(prevErr.message);
     if (!prev) throw new Error("User not found.");
+
+    // Owners can never be banned or suspended
+    if (data.status === "banned" || data.status === "suspended") {
+      const { isOwnerTelegramId } = await import("@/lib/owner");
+      if (isOwnerTelegramId(prev.telegram_id ?? null)) {
+        throw new Error("Cannot ban or suspend an owner account.");
+      }
+      const { data: roleRow } = await db
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.userId)
+        .eq("role", "owner")
+        .maybeSingle();
+      if (roleRow) {
+        throw new Error("Cannot ban or suspend an owner account.");
+      }
+    }
 
     const { data: updated, error } = await db
       .from("profiles")
