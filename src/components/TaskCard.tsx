@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Clock3, ChevronRight } from "lucide-react";
 import { PlatformBadge, type Platform } from "@/components/PlatformIcon";
+import { normalizeTaskAction, taskActionLabel } from "@/lib/task-actions";
 
 export type TaskCardTask = {
   id: string;
@@ -9,6 +10,7 @@ export type TaskCardTask = {
   advertiser: string;
   reward: number | string;
   seconds: number;
+  taskType?: string | null;
 };
 
 export function TaskCard({
@@ -18,6 +20,7 @@ export function TaskCard({
   task: TaskCardTask;
   status?: "pending" | "verified" | "rejected" | null;
 }) {
+  const action = normalizeTaskAction(task.taskType);
   return (
     <Link
       to="/tasks/$taskId"
@@ -29,6 +32,11 @@ export function TaskCard({
         <p className="truncate text-sm font-semibold leading-tight text-white">{task.title}</p>
         <div className="mt-1.5 flex items-center gap-2 text-[11px] text-slate-400">
           <span className="truncate">{task.advertiser}</span>
+          {action ? (
+            <span className="rounded-full bg-amber-300/10 px-2 py-0.5 font-semibold text-amber-200">
+              {taskActionLabel(action)}
+            </span>
+          ) : null}
           <span className="inline-flex items-center gap-1">
             <Clock3 className="size-3" />
             {task.seconds}s
