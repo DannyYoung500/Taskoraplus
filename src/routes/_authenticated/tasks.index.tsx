@@ -4,6 +4,7 @@ import { Screen, ScreenTitle } from "@/components/Screen";
 import { TaskCard } from "@/components/TaskCard";
 import { CATEGORIES } from "@/lib/taskora-data";
 import type { Platform } from "@/components/PlatformIcon";
+import { normalizeTaskAction } from "@/lib/task-actions";
 import { listTasks } from "@/lib/taskora.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks/")({
@@ -36,6 +37,10 @@ function TasksScreen() {
       advertiser: t.advertiser,
       reward: Number(t.reward),
       seconds: t.seconds,
+      taskType: normalizeTaskAction(
+        (t as unknown as { task_type?: string | null }).task_type ??
+          ((t.steps ?? []).find((step) => /complete:/i.test(step))?.split(":").slice(1).join(":") ?? null),
+      ),
     }));
 
   return (
