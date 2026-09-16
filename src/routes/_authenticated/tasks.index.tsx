@@ -6,11 +6,12 @@ import { CATEGORIES } from "@/lib/taskora-data";
 import type { Platform } from "@/components/PlatformIcon";
 import { normalizeTaskAction } from "@/lib/task-actions";
 import { listTasks } from "@/lib/taskora.functions";
+import { isDemoTaskTitle } from "@/lib/taskora-display";
 
 export const Route = createFileRoute("/_authenticated/tasks/")({
   loader: async () => {
     const rows = await listTasks().catch(() => []);
-    return { rows };
+    return { rows: rows.filter((task) => !isDemoTaskTitle(task.title)) };
   },
   head: () => ({
     meta: [
