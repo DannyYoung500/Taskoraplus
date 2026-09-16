@@ -5,6 +5,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
 import { CONNECTABLE_PLATFORMS } from "@/lib/taskora-data";
+import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   loader: async () => {
@@ -35,7 +36,9 @@ function ProfileScreen() {
   const level = profile?.level ?? "Starter Tasker";
   const photo = profile?.photo_url ?? null;
   const verified = dash?.verifiedCount ?? 0;
-  const lifetime = Number(dash?.lifetime ?? 0);
+  const lifetime = (dash?.transactions ?? [])
+    .filter((tx) => !isDemoTransactionLabel(tx.label) && Number(tx.amount) > 0)
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
   const streak = profile?.streak ?? 0;
   const isOwner = Boolean(dash?.isOwner);
 
@@ -76,7 +79,7 @@ function ProfileScreen() {
 
       <section className="mt-4 grid grid-cols-3 gap-2.5 text-center">
         <Stat value={`${verified}`} label="Verified" />
-        <Stat value={`$${lifetime.toFixed(0)}`} label="Lifetime" />
+        <Stat value={formatUsd(lifetime)} label="Lifetime" />
         <Stat value={`${streak}d`} label="Streak" />
       </section>
 
