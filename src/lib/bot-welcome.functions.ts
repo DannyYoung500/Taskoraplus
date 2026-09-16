@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertOwner, audit, admin } from "@/lib/owner-guard.server";
+import { validateBotWelcomePhoto } from "@/lib/bot-welcome-photo";
 
 async function guard(userId: string) {
   await assertOwner(userId);
@@ -176,6 +177,53 @@ export const ownerGetBotWelcome = createServerFn({ method: "POST" })
       updated_at: (row.updated_at as string) || new Date().toISOString(),
       defaults: { message: DEFAULT_MESSAGE, buttons: DEFAULT_BUTTONS },
     };
+  });
+
+export const ownerUploadBotWelcomePhoto = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => d as { data_url: string })
+  .handler(async ({ data, context }) => {
+    const db = await guard(context.userId);
+    const photo = validateBotWelcomePhoto(data.data_url);
+    const bytes = Uint8Array.from(atob(photo.base64), (char) => char.charCodeAt(0));
+    const path = `welcome/${Date.now()}-${crypto.randomUUID()}.${photo.contentType === "image/png" ? "png" : "jpg"}`;
+
+    const { data: bucket } = await db.storage.getBucket("bot-welcome");
+    if (!bucket) {
+      const { error: createError } = await db.storage.createBucket("bot-welcome", {
+        public: true,
+        allowedMimeTypes: ["image/jpeg", "image/png"],
+        fileSizeLimit: "5MB",
+      });
+      if (createError && !createError.message.toLowerCase().includes("already exists")) {
+        throw new Error(`Could not create welcome photo storage: ${createError.message}`);
+      }
+    }
+
+    const { error: uploadError } = await db.storage.from("bot-welcome").upload(path, bytes, {
+      contentType: photo.contentType,
+      cacheControl: "31536000",
+      upsert: false,
+    });
+    if (uploadError) throw new Error(`Welcome photo upload failed: ${uploadError.message}`);
+
+    const { data: publicUrl } = db.storage.from("bot-welcome").getPublicUrl(path);
+    const { error: saveError } = await db.from("bot_welcome_settings").upsert({
+      id: true,
+      draft_photo_url: publicUrl.publicUrl,
+      draft_photo_file_id: null,
+      updated_at: new Date().toISOString(),
+    });
+    if (saveError) throw new Error(saveError.message);
+
+    await audit({
+      adminId: context.userId,
+      action: "bot_welcome.photo_uploaded",
+      targetType: "bot_welcome",
+      targetId: "true",
+      metadata: { path, bytes: photo.bytes, content_type: photo.contentType },
+    });
+    return { ok: true, photo_url: publicUrl.publicUrl };
   });
 
 export const ownerSaveBotWelcomeDraft = createServerFn({ method: "POST" })
