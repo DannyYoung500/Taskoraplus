@@ -33,5 +33,5 @@ export function isDemoTransactionLabel(label: string | null | undefined) {
 
 export function formatUsd(value: number | string | null | undefined) {
   const amount = Number(value ?? 0);
-  return `$${(Number.isFinite(amount) ? amount : 0).toFixed(3)}`;
+  return `$${(Number.isFinite(amount) ? amount : 0).toFixed(4)}`;
 }
