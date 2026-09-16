@@ -1,8 +1,8 @@
-/** TASKORA brand — premium navy blue (Telegram-native) */
-export const TASKORA_LOGO = "/file_00000000f8ec8246a98cce68ff972640.png";
+/** TASKORA brand — premium Telegram-native identity */
+export const TASKORA_LOGO = "/file_00000000ed3c81f4aa87692163117fac.png";
 
-/** Premium /start welcome graphic (robot mascot + neon city). */
-export const TASKORA_WELCOME_IMAGE = "/taskora-welcome.png";
+/** Premium /start welcome graphic (robot mascot). */
+export const TASKORA_WELCOME_IMAGE = "/file_00000000ed3c81f4aa87692163117fac.png";
 
 export const TASKORA_NAME = "TASKORA";
 export const TASKORA_TAGLINE = "Complete · Earn · Level Up";
