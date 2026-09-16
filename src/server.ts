@@ -47,6 +47,54 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      // Telegram bot webhook — handled before the SPA/SSR entry
+      if (url.pathname === "/api/telegram-webhook") {
+        if (request.method === "GET") {
+          return new Response(JSON.stringify({ ok: true, service: "taskora-telegram-webhook" }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (request.method === "POST") {
+          try {
+            const secret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+            if (secret) {
+              const hdr = request.headers.get("x-telegram-bot-api-secret-token");
+              if (hdr !== secret) {
+                return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+                  status: 401,
+                  headers: { "content-type": "application/json" },
+                });
+              }
+            }
+            const update = (await request.json()) as {
+              message?: {
+                text?: string;
+                chat?: { id: number };
+                from?: { id: number; username?: string; first_name?: string };
+              };
+            };
+            const { handleTelegramUpdate } = await import("./lib/bot-welcome.functions");
+            const result = await handleTelegramUpdate(update);
+            return new Response(JSON.stringify({ ok: true, ...result }), {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            });
+          } catch (e) {
+            console.error("[telegram-webhook]", e);
+            return new Response(
+              JSON.stringify({
+                ok: false,
+                error: e instanceof Error ? e.message : "error",
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          }
+        }
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
