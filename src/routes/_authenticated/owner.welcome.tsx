@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronLeft, Save, Send, Eye, RotateCcw, Plus, Trash2, GripVertical } from "lucide-react";
+import { ChevronLeft, Save, Send, Eye, RotateCcw, Plus, Trash2, GripVertical, Upload, ImagePlus, X } from "lucide-react";
 import { TASKORA_LOGO } from "@/lib/brand";
 import {
   ownerGetBotWelcome,
@@ -8,6 +8,7 @@ import {
   ownerPublishBotWelcome,
   ownerRestoreBotWelcome,
   ownerPreviewBotWelcome,
+  ownerUploadBotWelcomePhoto,
   type WelcomeButton,
 } from "@/lib/bot-welcome.functions";
 
@@ -28,6 +29,7 @@ function OwnerWelcomePage() {
   const [buttons, setButtons] = useState<WelcomeButton[]>([]);
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [hasPrevious, setHasPrevious] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     setLoading(true);
@@ -76,6 +78,36 @@ function OwnerWelcomePage() {
       setMsg(e instanceof Error ? e.message : "Save failed");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function uploadPhoto(file: File) {
+    if (!file.type.match(/^image\/(jpeg|png)$/)) {
+      setMsg("Choose a JPEG or PNG image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMsg("Welcome photo must be 5 MB or smaller.");
+      return;
+    }
+
+    setBusy("upload");
+    setMsg(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Could not read the selected image."));
+        reader.readAsDataURL(file);
+      });
+      const result = await ownerUploadBotWelcomePhoto({ data: { data_url: dataUrl } });
+      setPhotoUrl(result.photo_url);
+      setMsg("Welcome photo uploaded to TASKORA storage. Save or publish it when ready.");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Photo upload failed");
+    } finally {
+      setBusy(null);
+      if (photoInputRef.current) photoInputRef.current.value = "";
     }
   }
 
@@ -155,16 +187,66 @@ function OwnerWelcomePage() {
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="size-5 accent-blue-500" />
       </label>
 
-      <section className="mb-3 space-y-2 rounded-2xl border border-slate-500/15 bg-[#121f33] p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Welcome photo URL</p>
-        <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://… (your brand graphic)" className="w-full rounded-xl border border-slate-500/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-blue-400/40" />
-        {photoUrl ? <img src={photoUrl} alt="" className="mt-2 max-h-40 w-full rounded-xl object-cover" /> : null}
+      <section className="mb-3 rounded-2xl border border-slate-500/15 bg-[#121f33] p-4">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Welcome photo</p>
+            <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Upload the image users should receive with /start. JPEG or PNG · max 5 MB.</p>
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadPhoto(file);
+            }}
+          />
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => photoInputRef.current?.click()}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-400 to-blue-500 px-3 py-2 text-[11px] font-bold text-[#07101d] disabled:opacity-50"
+          >
+            <Upload className="size-3.5" /> {busy === "upload" ? "Uploading…" : "Upload"}
+          </button>
+        </div>
+        {photoUrl ? (
+          <div className="relative overflow-hidden rounded-xl border border-slate-500/20 bg-black/30">
+            <img src={photoUrl} alt="Current TASKORA welcome" className="max-h-56 w-full object-cover" />
+            <button
+              type="button"
+              disabled={!!busy}
+              onClick={() => setPhotoUrl("")}
+              className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/70 p-1.5 text-white disabled:opacity-50"
+              aria-label="Remove welcome photo"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => photoInputRef.current?.click()}
+            className="flex w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-500/25 bg-black/20 py-7 text-slate-500 disabled:opacity-50"
+          >
+            <ImagePlus className="size-6" />
+            <span className="text-[11px] font-semibold">No welcome image selected</span>
+            <span className="text-[10px]">Tap to upload your TASKORA artwork</span>
+          </button>
+        )}
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-slate-500">Advanced · image URL</summary>
+          <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://… (optional external image)" className="mt-2 w-full rounded-xl border border-slate-500/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-blue-400/40" />
+        </details>
       </section>
 
       <section className="mb-3 space-y-2 rounded-2xl border border-slate-500/15 bg-[#121f33] p-4">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Message · use @username</p>
         <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={12} className="w-full rounded-xl border border-slate-500/20 bg-black/30 px-3 py-2.5 font-mono text-[12px] leading-relaxed outline-none focus:border-blue-400/40" />
-        <p className="text-[10px] text-amber-200/70">Task Points ≠ cash. Keep withdrawable balance separate.</p>
+        <p className="text-[10px] text-amber-200/70">Keep the welcome focused: what TASKORA offers, how to start, and where rewards are managed.</p>
       </section>
 
       <section className="mb-3 space-y-2 rounded-2xl border border-slate-500/15 bg-[#121f33] p-4">
@@ -223,7 +305,7 @@ function OwnerWelcomePage() {
       <p className="mt-4 text-center text-[10px] leading-relaxed text-slate-500">
         Webhook: <code className="text-slate-400">POST /api/telegram-webhook</code>
         <br />
-        Run <code className="text-slate-400">BOT_WELCOME_RUN_ONCE.sql</code> in Supabase once.
+        Uploads are stored in Supabase Storage and only owner/admin actions can change the welcome draft.
       </p>
     </main>
   );
