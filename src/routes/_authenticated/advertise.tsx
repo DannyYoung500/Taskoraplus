@@ -1,175 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Clock, ExternalLink, Sparkles } from "lucide-react";
 import { PlatformLogo } from "@/components/PlatformIcon";
 import { ADVERTISE_PLATFORMS, ADVERTISE_SERVICES, calculateAdvertiseOrder, type AdvertiseService } from "@/lib/advertise-economy";
-import { createAdvertiseCampaign } from "@/lib/advertise.functions";
+import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
 
-export const Route = createFileRoute("/_authenticated/advertise")({
-  head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }),
-  component: AdvertisePage,
-});
-
-const LABELS: Record<string, string> = {
-  instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", x: "X", facebook: "Facebook",
-  linkedin: "LinkedIn", threads: "Threads", telegram: "Telegram", whatsapp: "WhatsApp", discord: "Discord",
-  spotify: "Spotify", soundcloud: "SoundCloud", audiomack: "Audiomack", app_review: "App Reviews",
-  google: "Google", website: "Website", survey: "Survey", pinterest: "Pinterest", reddit: "Reddit", twitch: "Twitch",
-};
-
-function money(value: number) {
-  return `$${value.toFixed(value < 0.01 ? 6 : 3)}`;
+export const Route = createFileRoute("/_authenticated/advertise")({ head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }), component: AdvertisePage });
+const LABELS: Record<string,string> = {instagram:"Instagram",youtube:"YouTube",tiktok:"TikTok",x:"X",facebook:"Facebook",linkedin:"LinkedIn",threads:"Threads",telegram:"Telegram",whatsapp:"WhatsApp",discord:"Discord",spotify:"Spotify",soundcloud:"SoundCloud",audiomack:"Audiomack",app_review:"App Reviews",google:"Google",website:"Website",survey:"Survey",pinterest:"Pinterest",reddit:"Reddit",twitch:"Twitch"};
+function money(value:number){return `$${value.toFixed(value<.01?6:3)}`;}
+function AdvertisePage(){
+  const [catalog,setCatalog]=useState<AdvertiseService[]>(ADVERTISE_SERVICES); const [platform,setPlatform]=useState(ADVERTISE_PLATFORMS[0]); const [selectedId,setSelectedId]=useState("ig_followers");
+  const [quantity,setQuantity]=useState("100"); const [watchSeconds,setWatchSeconds]=useState("60"); const [title,setTitle]=useState(""); const [link,setLink]=useState(""); const [busy,setBusy]=useState(false); const [message,setMessage]=useState("");
+  useEffect(()=>{void listAdvertiseServices().then((rows)=>{if(rows.length){const mapped=rows.map((r)=>({serviceId:r.service_id,platform:r.platform,serviceName:r.service_name,taskType:r.task_type,minQuantity:Number(r.min_quantity),maxQuantity:Number(r.max_quantity),customerUnitPrice:Number(r.customer_unit_price),taskerUnitReward:Number(r.tasker_unit_reward),taskoraUnitMargin:Number(r.taskora_unit_margin),pricingModel:r.pricing_model as "unit"|"watch_second"}));setCatalog(mapped);setSelectedId(mapped[0]?.serviceId??"ig_followers");setPlatform(mapped[0]?.platform??"instagram");}}).catch(()=>{});},[]);
+  const platforms=useMemo(()=>[...new Set(catalog.map(s=>s.platform))], [catalog]); const services=useMemo(()=>catalog.filter(s=>s.platform===platform),[catalog,platform]); const selected=catalog.find(s=>s.serviceId===selectedId)??services[0];
+  const pricing=selected?calculateAdvertiseOrder(selected,Number(quantity)||0,Number(watchSeconds)||0):null;
+  function selectPlatform(next:string){const first=catalog.find(s=>s.platform===next);setPlatform(next);if(first){setSelectedId(first.serviceId);setQuantity(String(first.minQuantity));if(first.pricingModel==="watch_second")setWatchSeconds("60");}setMessage("");}
+  function selectService(s:AdvertiseService){setSelectedId(s.serviceId);setQuantity(String(s.minQuantity));if(s.pricingModel==="watch_second")setWatchSeconds("60");setMessage("");}
+  async function publish(){if(!selected)return;const n=Number(quantity),sec=Number(watchSeconds);if(!Number.isInteger(n)||n<selected.minQuantity||n>selected.maxQuantity){setMessage(`Quantity must be ${selected.minQuantity.toLocaleString()}–${selected.maxQuantity.toLocaleString()}.`);return;}if(selected.pricingModel==="watch_second"&&(sec<1||sec>3600)){setMessage("Watch duration must be 1–3,600 seconds.");return;}if(!/^https?:\/\//i.test(link.trim())){setMessage("Enter a valid target URL.");return;}setBusy(true);setMessage("");try{const r=await createAdvertiseCampaign({data:{serviceId:selected.serviceId,title,link,quantity:n,watchSeconds:selected.pricingModel==="watch_second"?sec:undefined}});setMessage(`Campaign ${r.campaign.id} created as DRAFT. Owner activation is required before workers can receive it.`);}catch(e){setMessage(e instanceof Error?e.message:"Could not create campaign.");}finally{setBusy(false);}}
+  return <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
+    <div className="mb-4 flex items-center gap-2"><button type="button" onClick={()=>history.back()} className="rounded-full border border-white/10 p-2 text-white/60"><ArrowLeft className="size-4"/></button><div className="flex-1"><p className="text-[10px] font-bold uppercase tracking-[.22em] text-amber-300">Marketplace</p><h1 className="text-xl font-extrabold">Advertise</h1></div><Sparkles className="size-5 text-amber-300"/></div>
+    <section className="rounded-3xl border border-amber-300/15 bg-gradient-to-br from-[#19150b] to-[#0d1119] p-5"><p className="text-sm font-bold">Organic Boost marketplace</p><p className="mt-1 text-[11px] leading-5 text-white/45">Choose a service, set quantity and see the exact USD price. Owner-controlled pricing is loaded from the economy manager.</p><div className="mt-3 flex gap-2 text-[10px] text-white/45"><span className="rounded-full border border-white/10 px-2 py-1">USD</span><span className="rounded-full border border-white/10 px-2 py-1">70% tasker</span><span className="rounded-full border border-white/10 px-2 py-1">30% TASKORA</span></div></section>
+    <div className="mt-4 flex gap-2 overflow-x-auto pb-1">{platforms.map(p=><button key={p} type="button" onClick={()=>selectPlatform(p)} className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-bold ${platform===p?"border-amber-300/40 bg-amber-300/10 text-amber-200":"border-white/10 bg-[#12141c] text-white/50"}`}><PlatformLogo platform={p as never} size={22}/>{LABELS[p]??p}</button>)}</div>
+    <section className="mt-4 rounded-3xl border border-white/10 bg-[#12141c] p-4"><p className="mb-2 text-[10px] font-bold uppercase tracking-[.2em] text-white/35">Services</p><div className="space-y-2">{services.map(s=><button key={s.serviceId} type="button" onClick={()=>selectService(s)} className={`w-full rounded-2xl border p-3 text-left ${selected?.serviceId===s.serviceId?"border-amber-300/35 bg-amber-300/5":"border-white/8 bg-black/15"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{s.serviceName}</p><p className="mt-1 text-[10px] text-white/40">Min {s.minQuantity.toLocaleString()} · Max {s.maxQuantity.toLocaleString()}</p></div><span className="text-xs font-bold text-amber-300">{money(s.customerUnitPrice)}{s.pricingModel==="watch_second"?"/sec":"/unit"}</span></div></button>)}</div></section>
+    {selected?<section className="mt-4 rounded-3xl border border-white/10 bg-[#12141c] p-4"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-bold">Campaign details</p><p className="text-[10px] text-white/35">{selected.serviceName}</p></div><Clock className="size-4 text-white/35"/></div><Field label="Campaign title (optional)" value={title} onChange={setTitle} placeholder="My campaign"/><Field label="Target URL" value={link} onChange={setLink} placeholder="https://youtube.com/..."/>{selected.pricingModel==="watch_second"?<Field label="Watch duration per viewer (seconds)" type="number" value={watchSeconds} onChange={setWatchSeconds} placeholder="60"/>:null}<Field label={selected.pricingModel==="watch_second"?"Number of viewers":"Quantity"} type="number" value={quantity} onChange={setQuantity} placeholder={String(selected.minQuantity)}/><div className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/5 p-3"><Row label="Customer total" value={money(pricing?.customerTotal??0)}/><Row label="Tasker budget" value={money(pricing?.taskerBudget??0)}/><Row label="TASKORA margin" value={money(pricing?.taskoraMargin??0)}/>{selected.pricingModel==="watch_second"?<p className="mt-2 text-[10px] text-white/35">YouTube Watch: $0.00010 per verified second · tasker $0.00007 · TASKORA $0.00003.</p>:null}</div><button type="button" disabled={busy} onClick={()=>void publish()} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#ffe08a] via-[#f5c542] to-[#c9961a] py-3 text-sm font-extrabold text-[#05070c] disabled:opacity-50">{busy?"Creating…":"CREATE CAMPAIGN"}<ExternalLink className="size-4"/></button>{message?<p className="mt-3 text-center text-[11px] text-white/55">{message}</p>:null}</section>:null}
+    <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-white/30"><CheckCircle2 className="size-3"/> Pricing is controlled by the Owner Economy Manager.</div>
+  </main>;
 }
-
-function AdvertisePage() {
-  const [platform, setPlatform] = useState(ADVERTISE_PLATFORMS[0]);
-  const [selectedId, setSelectedId] = useState("ig_followers");
-  const [quantity, setQuantity] = useState("100");
-  const [watchSeconds, setWatchSeconds] = useState("60");
-  const [title, setTitle] = useState("");
-  const [link, setLink] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-
-  const services = useMemo(() => ADVERTISE_SERVICES.filter((s) => s.platform === platform), [platform]);
-  const selected = ADVERTISE_SERVICES.find((s) => s.serviceId === selectedId) ?? services[0];
-  const qty = Number(quantity) || 0;
-  const secs = Number(watchSeconds) || 0;
-  const pricing = selected ? calculateAdvertiseOrder(selected, qty, secs) : null;
-
-  function selectPlatform(next: string) {
-    const first = ADVERTISE_SERVICES.find((s) => s.platform === next);
-    setPlatform(next);
-    if (first) {
-      setSelectedId(first.serviceId);
-      setQuantity(String(first.minQuantity));
-      setWatchSeconds(first.pricingModel === "watch_second" ? "60" : "60");
-    }
-    setMessage("");
-  }
-
-  function selectService(service: AdvertiseService) {
-    setSelectedId(service.serviceId);
-    setQuantity(String(service.minQuantity));
-    if (service.pricingModel === "watch_second") setWatchSeconds("60");
-    setMessage("");
-  }
-
-  async function publish() {
-    if (!selected) return;
-    const n = Number(quantity);
-    if (!Number.isInteger(n) || n < selected.minQuantity || n > selected.maxQuantity) {
-      setMessage(`Quantity must be ${selected.minQuantity.toLocaleString()}–${selected.maxQuantity.toLocaleString()}.`);
-      return;
-    }
-    if (!/^https?:\/\//i.test(link.trim())) {
-      setMessage("Enter a valid target URL.");
-      return;
-    }
-    setBusy(true);
-    setMessage("");
-    try {
-      const result = await createAdvertiseCampaign({
-        data: {
-          serviceId: selected.serviceId,
-          title,
-          link,
-          quantity: n,
-          watchSeconds: selected.pricingModel === "watch_second" ? secs : undefined,
-        },
-      });
-      setMessage(`Campaign ${result.campaign.id} created as DRAFT. Owner activation is required before workers can receive it.`);
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not create campaign.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
-      <div className="mb-4 flex items-center gap-2">
-        <button type="button" onClick={() => history.back()} className="rounded-full border border-white/10 p-2 text-white/60">
-          <ArrowLeft className="size-4" />
-        </button>
-        <div className="flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300">Marketplace</p>
-          <h1 className="text-xl font-extrabold">Advertise</h1>
-        </div>
-        <Sparkles className="size-5 text-amber-300" />
-      </div>
-
-      <section className="rounded-3xl border border-amber-300/15 bg-gradient-to-br from-[#19150b] to-[#0d1119] p-5">
-        <p className="text-sm font-bold">Organic Boost marketplace</p>
-        <p className="mt-1 text-[11px] leading-5 text-white/45">Choose a service, set the quantity, and see the exact customer price before creating your campaign.</p>
-        <div className="mt-3 flex gap-2 text-[10px] text-white/45">
-          <span className="rounded-full border border-white/10 px-2 py-1">USD pricing</span>
-          <span className="rounded-full border border-white/10 px-2 py-1">70% tasker</span>
-          <span className="rounded-full border border-white/10 px-2 py-1">30% TASKORA</span>
-        </div>
-      </section>
-
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-        {ADVERTISE_PLATFORMS.map((p) => (
-          <button key={p} type="button" onClick={() => selectPlatform(p)} className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-bold ${platform === p ? "border-amber-300/40 bg-amber-300/10 text-amber-200" : "border-white/10 bg-[#12141c] text-white/50"}`}>
-            <PlatformLogo platform={p as never} className="size-4" />
-            {LABELS[p] ?? p}
-          </button>
-        ))}
-      </div>
-
-      <section className="mt-4 rounded-3xl border border-white/10 bg-[#12141c] p-4">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Services</p>
-        <div className="space-y-2">
-          {services.map((service) => (
-            <button key={service.serviceId} type="button" onClick={() => selectService(service)} className={`w-full rounded-2xl border p-3 text-left ${selected?.serviceId === service.serviceId ? "border-amber-300/35 bg-amber-300/5" : "border-white/8 bg-black/15"}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold">{service.serviceName}</p>
-                  <p className="mt-1 text-[10px] text-white/40">Min {service.minQuantity.toLocaleString()} · Max {service.maxQuantity.toLocaleString()}</p>
-                </div>
-                <span className="text-xs font-bold text-amber-300">{money(service.customerUnitPrice)}{service.pricingModel === "watch_second" ? "/sec" : "/unit"}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {selected ? (
-        <section className="mt-4 rounded-3xl border border-white/10 bg-[#12141c] p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold">Campaign details</p>
-              <p className="text-[10px] text-white/35">{selected.serviceName}</p>
-            </div>
-            <Clock className="size-4 text-white/35" />
-          </div>
-          <Field label="Campaign title (optional)" value={title} onChange={setTitle} placeholder="My campaign" />
-          <Field label="Target URL" value={link} onChange={setLink} placeholder="https://youtube.com/..." />
-          {selected.pricingModel === "watch_second" ? (
-            <Field label="Watch duration per viewer (seconds)" type="number" value={watchSeconds} onChange={setWatchSeconds} placeholder="60" />
-          ) : null}
-          <Field label={selected.pricingModel === "watch_second" ? "Number of viewers" : "Quantity"} type="number" value={quantity} onChange={setQuantity} placeholder={String(selected.minQuantity)} />
-
-          <div className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/5 p-3">
-            <div className="flex items-center justify-between text-xs"><span className="text-white/45">Customer total</span><strong className="text-amber-200">{money(pricing?.customerTotal ?? 0)}</strong></div>
-            <div className="mt-1 flex items-center justify-between text-[10px]"><span className="text-white/35">Tasker budget</span><span className="text-white/60">{money(pricing?.taskerBudget ?? 0)}</span></div>
-            <div className="mt-1 flex items-center justify-between text-[10px]"><span className="text-white/35">TASKORA margin</span><span className="text-emerald-300">{money(pricing?.taskoraMargin ?? 0)}</span></div>
-            {selected.pricingModel === "watch_second" ? <p className="mt-2 text-[10px] text-white/35">YouTube Watch: $0.00010 per verified second · tasker $0.00007 · TASKORA $0.00003.</p> : null}
-          </div>
-
-          <button type="button" disabled={busy} onClick={() => void publish()} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#ffe08a] via-[#f5c542] to-[#c9961a] py-3 text-sm font-extrabold text-[#05070c] disabled:opacity-50">
-            {busy ? "Creating…" : "CREATE CAMPAIGN"}<ExternalLink className="size-4" />
-          </button>
-          {message ? <p className="mt-3 text-center text-[11px] text-white/55">{message}</p> : null}
-        </section>
-      ) : null}
-
-      <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-white/30"><CheckCircle2 className="size-3" /> Pricing is controlled by the Owner Economy Manager.</div>
-    </main>
-  );
-}
-
-function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string }) {
-  return <label className="mt-3 block text-[10px] font-semibold text-white/45">{label}<input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none" /></label>;
-}
+function Row({label,value}:{label:string;value:string}){return <div className="mt-1 flex items-center justify-between text-xs first:mt-0"><span className="text-white/45">{label}</span><strong className="text-amber-200">{value}</strong></div>}
+function Field({label,value,onChange,placeholder,type="text"}:{label:string;value:string;onChange:(v:string)=>void;placeholder:string;type?:string}){return <label className="mt-3 block text-[10px] font-semibold text-white/45">{label}<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none"/></label>}
