@@ -27,7 +27,7 @@ import {
   Search,
   X,
   Menu,
-  SlidersHorizontal,
+  ThreadHorizontal,
   MessageSquareHeart,
   Flag,
 } from "lucide-react";
@@ -62,7 +62,8 @@ const SECTIONS: { label: string; items: Item[] }[] = [
       { to: "/owner/withdrawals", title: "Withdrawals", Icon: Wallet },
       { to: "/owner/deposits", title: "Deposits", Icon: ArrowDownCircle },
       { to: "/owner/ledger", title: "Ledger", Icon: BookOpen },
-      { to: "/owner/settings", title: "Economy · Gate", Icon: Coins },
+      { to: "/owner/settings", title: "Economy · Gate · Webhook", Icon: Coins },
+      { to: "/owner/economy", title: "Platform Prices", Icon: Coins },
       { to: "/owner/fraud", title: "Fraud & Risk", Icon: ShieldAlert },
       { to: "/owner/payment-settings", title: "Payment Settings", Icon: CreditCard },
     ],
