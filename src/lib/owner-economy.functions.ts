@@ -54,6 +54,32 @@ function assertValidHttpsWebhook(url: string): string {
   return u.replace(/\/$/, "");
 }
 
+/** Telegram secret_token: only A-Z a-z 0-9 _ - , length 1–256 */
+function sanitizeSecretToken(raw: string): string {
+  const cleaned = raw.trim().replace(/[^A-Za-z0-9_-]/g, "");
+  if (cleaned.length < 1 || cleaned.length > 256) return "";
+  return cleaned;
+}
+
+async function callSetWebhook(
+  token: string,
+  webhookUrl: string,
+  secret: string,
+): Promise<{ ok: boolean; description?: string; error_code?: number }> {
+  const params = new URLSearchParams();
+  params.set("url", webhookUrl);
+  params.set("drop_pending_updates", "true");
+  params.set("allowed_updates", JSON.stringify(["message", "callback_query"]));
+  if (secret) params.set("secret_token", secret);
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+  return (await res.json()) as { ok: boolean; description?: string; error_code?: number };
+}
+
 export const ownerGetWebhookInfo = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -110,36 +136,51 @@ export const ownerRegisterWebhook = createServerFn({ method: "POST" })
     let webhookUrl = (data.url ?? "").trim() || resolveSuggestedWebhookUrl();
     webhookUrl = assertValidHttpsWebhook(webhookUrl);
 
-    let secret =
-      (data.secret ?? "").trim() || process.env["TELEGRAM_WEBHOOK_SECRET"] || "";
-    if (secret && (secret.length < 1 || secret.length > 256)) {
-      secret = "";
+    let probeNote = "";
+    try {
+      const probe = await fetch(webhookUrl, {
+        method: "GET",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!probe.ok) {
+        probeNote = ` Endpoint returned HTTP ${probe.status}.`;
+      }
+    } catch (e) {
+      probeNote = ` Endpoint not reachable yet (${e instanceof Error ? e.message : "network"}).`;
     }
 
-    const body: Record<string, unknown> = {
-      url: webhookUrl,
-      allowed_updates: ["message", "callback_query"],
-      drop_pending_updates: true,
-    };
-    if (secret) body.secret_token = secret;
+    let secret = sanitizeSecretToken(
+      (data.secret ?? "").trim() || process.env["TELEGRAM_WEBHOOK_SECRET"] || "",
+    );
 
-    const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }).then((r) => r.json());
+    let res = await callSetWebhook(token, webhookUrl, secret);
+
+    if (!res?.ok && secret && /secret|bad request|token/i.test(String(res?.description ?? ""))) {
+      secret = "";
+      res = await callSetWebhook(token, webhookUrl, "");
+    }
+
+    if (!res?.ok) {
+      const params = new URLSearchParams();
+      params.set("url", webhookUrl);
+      params.set("drop_pending_updates", "true");
+      res = (await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      }).then((r) => r.json())) as typeof res;
+    }
 
     if (!res?.ok) {
       const desc = String(res?.description || "Telegram setWebhook failed");
-      if (/https/i.test(desc)) {
-        throw new Error(
-          `${desc} — use https://taskoraplus.app/api/telegram-webhook (public HTTPS domain).`,
-        );
-      }
-      if (/certificate|ssl/i.test(desc)) {
-        throw new Error(`${desc} — domain needs a valid public SSL certificate.`);
-      }
-      throw new Error(desc);
+      const hint = /https|url/i.test(desc)
+        ? " Use a public https:// domain ending in /api/telegram-webhook."
+        : /certificate|ssl/i.test(desc)
+          ? " Domain SSL must be valid (Vercel is fine)."
+          : /secret/i.test(desc)
+            ? " TELEGRAM_WEBHOOK_SECRET may only use letters, numbers, underscore and hyphen."
+            : "";
+      throw new Error(`${desc}.${hint}${probeNote}`.trim());
     }
 
     await log(context.userId, "telegram.webhook.register", {
@@ -147,7 +188,12 @@ export const ownerRegisterWebhook = createServerFn({ method: "POST" })
       next: { url: webhookUrl, hasSecret: Boolean(secret) },
     });
 
-    return { ok: true as const, url: webhookUrl, description: res.description ?? "Webhook set" };
+    return {
+      ok: true as const,
+      url: webhookUrl,
+      description: res.description ?? "Webhook set",
+      probeNote: probeNote || null,
+    };
   });
 
 export const ownerDeleteWebhook = createServerFn({ method: "POST" })
@@ -159,8 +205,8 @@ export const ownerDeleteWebhook = createServerFn({ method: "POST" })
 
     const res = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ drop_pending_updates: false }),
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ drop_pending_updates: "false" }).toString(),
     }).then((r) => r.json());
 
     if (!res?.ok) {
