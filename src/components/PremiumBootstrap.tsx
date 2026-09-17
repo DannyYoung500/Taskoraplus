@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { loginWithTelegram } from "@/lib/taskora.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO, TASKORA_WELCOME_IMAGE, BLUE_GRAD } from "@/lib/brand";
 
 declare global {
   interface Window {
@@ -34,11 +34,10 @@ const STAGES: { title: string; detail: string }[] = [
   { title: "FINAL ACCOUNT INITIALIZATION", detail: "Finalizing your secure TASKORA session..." },
 ];
 
-/** Faster stages — total ~4–5s max if auth is quick (was ~10s+) */
-const STAGE_MS = 380;
-const FINAL_HOLD_MS = 700;
-const WELCOME_MS = 700;
-const MIN_TOTAL_MS = 2800;
+const STAGE_MS = 320;
+const FINAL_HOLD_MS = 600;
+const WELCOME_MS = 650;
+const MIN_TOTAL_MS = 2400;
 
 export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string }) {
   const navigate = useNavigate();
@@ -47,9 +46,16 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   const [phase, setPhase] = useState<"loading" | "welcome" | "error" | "need-telegram">("loading");
   const [error, setError] = useState<string | null>(null);
   const [welcomeName, setWelcomeName] = useState("Tasker");
+  const [goOwner, setGoOwner] = useState(false);
+  const [logoSrc, setLogoSrc] = useState(TASKORA_LOGO);
   const started = useRef(false);
   const authPromise = useRef<Promise<void> | null>(null);
-  const authResult = useRef<{ ok: boolean; firstName?: string; error?: string }>({ ok: false });
+  const authResult = useRef<{
+    ok: boolean;
+    firstName?: string;
+    isOwner?: boolean;
+    error?: string;
+  }>({ ok: false });
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -94,7 +100,11 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
           throw new Error("Session identity mismatch. Please Retry.");
         }
 
-        authResult.current = { ok: true, firstName: result.firstName };
+        authResult.current = {
+          ok: true,
+          firstName: result.firstName ?? undefined,
+          isOwner: Boolean(result.isOwner),
+        };
       } catch (e) {
         const msg = e instanceof Error ? e.message : "TASKORA could not authenticate with Telegram.";
         authResult.current = {
@@ -119,11 +129,10 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         const endPct = ((i + 1) / STAGES.length) * 100;
         setProgress(startPct);
         const hold = i === STAGES.length - 1 ? FINAL_HOLD_MS : STAGE_MS;
-        const steps = Math.max(4, Math.floor(hold / 60));
+        const steps = Math.max(3, Math.floor(hold / 50));
         for (let s = 1; s <= steps; s++) {
           await new Promise((r) => window.setTimeout(r, hold / steps));
           setProgress(startPct + ((endPct - startPct) * s) / steps);
-          // If auth already finished and we're past mid stages, skip ahead
           if (authResult.current.ok && i >= 5) break;
         }
         if (authResult.current.ok && i >= 6) {
@@ -137,7 +146,6 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       setStageIndex(STAGES.length - 1);
       await authPromise.current;
 
-      // Respect minimum feel without forcing 10s
       const elapsed = Date.now() - t0;
       if (elapsed < MIN_TOTAL_MS) {
         await new Promise((r) => window.setTimeout(r, MIN_TOTAL_MS - elapsed));
@@ -150,9 +158,11 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       }
 
       if (authResult.current.firstName) setWelcomeName(authResult.current.firstName);
+      setGoOwner(Boolean(authResult.current.isOwner));
       setPhase("welcome");
+      const dest = authResult.current.isOwner ? "/owner" : redirectTo;
       window.setTimeout(() => {
-        navigate({ to: redirectTo, replace: true });
+        navigate({ to: dest, replace: true });
       }, WELCOME_MS);
     }
 
@@ -175,15 +185,20 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         <div className="relative mb-5">
           <div className="absolute -inset-5 rounded-full bg-blue-500/25 blur-2xl" />
           <img
-            src={TASKORA_LOGO}
+            src={logoSrc}
             alt="TASKORA"
             className="relative size-40 rounded-full object-cover shadow-[0_0_48px_rgba(59,130,246,0.45)] ring-2 ring-blue-400/40"
+            onError={() => {
+              if (logoSrc !== TASKORA_WELCOME_IMAGE) setLogoSrc(TASKORA_WELCOME_IMAGE);
+            }}
           />
         </div>
 
         <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-blue-300/80">TASKORA</p>
         <h1 className="mt-2 text-center text-2xl font-bold tracking-tight text-white">
-          {phase === "welcome" ? `Welcome, ${welcomeName}` : "Verified Tasks. Real Rewards."}
+          {phase === "welcome"
+            ? `Welcome, ${welcomeName}${goOwner ? " · Owner" : ""}`
+            : "Verified Tasks. Real Rewards."}
         </h1>
         <p className="mt-1 text-center text-xs text-slate-400">@Taskoraplusbot</p>
 
@@ -206,7 +221,9 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
               />
             </div>
             {phase === "welcome" ? (
-              <p className="mt-4 text-center text-sm text-slate-300">Opening TASKORA…</p>
+              <p className="mt-4 text-center text-sm text-slate-300">
+                {goOwner ? "Opening Owner Control…" : "Opening TASKORA…"}
+              </p>
             ) : (
               <p className="mt-3 text-center text-[10px] text-slate-500">Please wait — finishing setup</p>
             )}
