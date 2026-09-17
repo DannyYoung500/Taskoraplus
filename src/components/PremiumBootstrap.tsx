@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { loginWithTelegram } from "@/lib/taskora.functions";
+import { getAccountAccess, getMaintenanceMode } from "@/lib/account-access.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { TASKORA_LOGO, TASKORA_WELCOME_IMAGE, BLUE_GRAD } from "@/lib/brand";
 
@@ -50,12 +51,9 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   const [logoSrc, setLogoSrc] = useState(TASKORA_LOGO);
   const started = useRef(false);
   const authPromise = useRef<Promise<void> | null>(null);
-  const authResult = useRef<{
-    ok: boolean;
-    firstName?: string;
-    isOwner?: boolean;
-    error?: string;
-  }>({ ok: false });
+  const authResult = useRef<{ ok: boolean; firstName?: string; isOwner?: boolean; error?: string }>({
+    ok: false,
+  });
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -159,10 +157,34 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
 
       if (authResult.current.firstName) setWelcomeName(authResult.current.firstName);
       setGoOwner(Boolean(authResult.current.isOwner));
+
+      try {
+        const maint = await getMaintenanceMode();
+        if (maint.enabled && !authResult.current.isOwner) {
+          navigate({ to: "/maintenance", replace: true });
+          return;
+        }
+        const access = await getAccountAccess();
+        if (access.state === "banned") {
+          navigate({ to: "/banned", replace: true });
+          return;
+        }
+        if (access.state === "suspended") {
+          navigate({ to: "/suspended", replace: true });
+          return;
+        }
+        if (access.state === "maintenance") {
+          navigate({ to: "/maintenance", replace: true });
+          return;
+        }
+      } catch {
+        /* soft-fail */
+      }
+
       setPhase("welcome");
       const dest = authResult.current.isOwner ? "/owner" : redirectTo;
       window.setTimeout(() => {
-        navigate({ to: dest, replace: true });
+        navigate({ to: dest as "/home", replace: true });
       }, WELCOME_MS);
     }
 
