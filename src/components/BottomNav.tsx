@@ -9,9 +9,21 @@ const ITEMS = [
   { to: "/profile", label: "Profile", Icon: User },
 ] as const;
 
+/** Fullscreen lock screens — no bottom nav (user cannot escape via Home). */
+const HIDE_EXACT = new Set([
+  "/",
+  "/banned",
+  "/suspended",
+  "/maintenance",
+  "/telegram-gate",
+]);
+
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  if (pathname === "/" || pathname.startsWith("/auth")) return null;
+
+  if (HIDE_EXACT.has(pathname) || pathname.startsWith("/auth")) {
+    return null;
+  }
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#0a0c12]/95 backdrop-blur-xl">

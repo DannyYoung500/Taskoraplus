@@ -21,15 +21,50 @@ async function log(
   await audit({ adminId, action, ...rest });
 }
 
+function resolveSuggestedWebhookUrl(): string {
+  const base =
+    process.env["MINI_APP_URL"] ||
+    process.env["PUBLIC_APP_URL"] ||
+    (process.env["VERCEL_PROJECT_PRODUCTION_URL"]
+      ? `https://${process.env["VERCEL_PROJECT_PRODUCTION_URL"]}`
+      : "") ||
+    (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : "") ||
+    "https://taskoraplus.app";
+  return `${String(base).replace(/\/$/, "")}/api/telegram-webhook`;
+}
+
+function assertValidHttpsWebhook(url: string): string {
+  const u = url.trim();
+  if (!u) throw new Error("Webhook URL is empty.");
+  if (!u.startsWith("https://")) {
+    throw new Error("Telegram requires an HTTPS URL (https://…).");
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(u);
+  } catch {
+    throw new Error("Webhook URL is not a valid URL.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("Webhook URL must use https://");
+  }
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname)) {
+    throw new Error("Use a domain name, not a raw IP address.");
+  }
+  return u.replace(/\/$/, "");
+}
+
 export const ownerGetWebhookInfo = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await guard(context.userId);
+    const suggestedUrl = resolveSuggestedWebhookUrl();
     const token = process.env["TELEGRAM_BOT_TOKEN"];
     if (!token) {
       return {
         configured: false as const,
         url: null as string | null,
+        suggestedUrl,
         pending: 0,
         lastError: null as string | null,
         botUsername: null as string | null,
@@ -45,15 +80,17 @@ export const ownerGetWebhookInfo = createServerFn({ method: "GET" })
       return {
         configured: true as const,
         url: (info.url as string) || null,
+        suggestedUrl,
         pending: Number(info.pending_update_count ?? 0),
         lastError: (info.last_error_message as string) || null,
         botUsername: meRes?.result?.username ?? null,
-        error: meRes?.ok ? null : (meRes?.description as string) ?? "Telegram API error",
+        error: meRes?.ok ? null : ((meRes?.description as string) ?? "Telegram API error"),
       };
     } catch (e) {
       return {
         configured: true as const,
         url: null,
+        suggestedUrl,
         pending: 0,
         lastError: null,
         botUsername: null,
@@ -70,30 +107,19 @@ export const ownerRegisterWebhook = createServerFn({ method: "POST" })
     const token = process.env["TELEGRAM_BOT_TOKEN"];
     if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured on the server.");
 
-    let webhookUrl = (data.url ?? "").trim();
-    if (!webhookUrl) {
-      const base =
-        process.env["MINI_APP_URL"] ||
-        process.env["PUBLIC_APP_URL"] ||
-        (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : "");
-      if (!base) {
-        throw new Error(
-          "Provide a webhook URL, or set MINI_APP_URL / PUBLIC_APP_URL on the server.",
-        );
-      }
-      webhookUrl = `${base.replace(/\/$/, "")}/api/telegram-webhook`;
-    }
-    if (!webhookUrl.startsWith("https://")) {
-      throw new Error("Webhook URL must be HTTPS.");
-    }
+    let webhookUrl = (data.url ?? "").trim() || resolveSuggestedWebhookUrl();
+    webhookUrl = assertValidHttpsWebhook(webhookUrl);
 
-    const secret =
-      (data.secret ?? "").trim() || process.env["TELEGRAM_WEBHOOK_SECRET"] || undefined;
+    let secret =
+      (data.secret ?? "").trim() || process.env["TELEGRAM_WEBHOOK_SECRET"] || "";
+    if (secret && (secret.length < 1 || secret.length > 256)) {
+      secret = "";
+    }
 
     const body: Record<string, unknown> = {
       url: webhookUrl,
       allowed_updates: ["message", "callback_query"],
-      drop_pending_updates: false,
+      drop_pending_updates: true,
     };
     if (secret) body.secret_token = secret;
 
@@ -104,7 +130,16 @@ export const ownerRegisterWebhook = createServerFn({ method: "POST" })
     }).then((r) => r.json());
 
     if (!res?.ok) {
-      throw new Error(res?.description || "Telegram setWebhook failed");
+      const desc = String(res?.description || "Telegram setWebhook failed");
+      if (/https/i.test(desc)) {
+        throw new Error(
+          `${desc} — use https://taskoraplus.app/api/telegram-webhook (public HTTPS domain).`,
+        );
+      }
+      if (/certificate|ssl/i.test(desc)) {
+        throw new Error(`${desc} — domain needs a valid public SSL certificate.`);
+      }
+      throw new Error(desc);
     }
 
     await log(context.userId, "telegram.webhook.register", {
@@ -205,9 +240,15 @@ export const ownerSaveEconomy = createServerFn({ method: "POST" })
         0,
         Number(data.first_withdrawal_max_usd ?? current.first_withdrawal_max_usd),
       ),
-      platform_fee_pct: Math.min(50, Math.max(0, Number(data.platform_fee_pct ?? current.platform_fee_pct))),
+      platform_fee_pct: Math.min(
+        50,
+        Math.max(0, Number(data.platform_fee_pct ?? current.platform_fee_pct)),
+      ),
       referral_pct: Math.min(50, Math.max(0, Number(data.referral_pct ?? current.referral_pct))),
-      feature_boost_fee_usd: Math.max(0, Number(data.feature_boost_fee_usd ?? current.feature_boost_fee_usd)),
+      feature_boost_fee_usd: Math.max(
+        0,
+        Number(data.feature_boost_fee_usd ?? current.feature_boost_fee_usd),
+      ),
       dual_approval_enabled: data.dual_approval_enabled ?? current.dual_approval_enabled,
       dual_approval_threshold_usd: Math.max(
         0,
