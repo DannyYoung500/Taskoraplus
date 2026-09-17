@@ -121,8 +121,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     bg: "from-[#229ED9] to-[#1a7fb0]",
     label: "Telegram",
     category: "messaging",
-    services: 2,
-    blurb: "Channel members & group growth",
+    services: 4,
+    blurb: "Members, views, reactions & bots",
   },
   whatsapp: {
     Icon: SiWhatsapp,
@@ -131,7 +131,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     label: "WhatsApp",
     category: "messaging",
     services: 2,
-    blurb: "Channel & group growth services",
+    blurb: "Channel members & engagement",
   },
   discord: {
     Icon: SiDiscord,
@@ -139,8 +139,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     bg: "from-[#5865F2] to-[#404EED]",
     label: "Discord",
     category: "messaging",
-    services: 2,
-    blurb: "Server members & engagement",
+    services: 3,
+    blurb: "Members, reactions & boosts",
   },
   spotify: {
     Icon: SiSpotify,
@@ -148,8 +148,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     bg: "from-[#1DB954] to-[#191414]",
     label: "Spotify",
     category: "music",
-    services: 4,
-    blurb: "Plays, followers & playlist promo",
+    services: 3,
+    blurb: "Plays, followers & saves",
   },
   soundcloud: {
     Icon: SiSoundcloud,
@@ -158,7 +158,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     label: "SoundCloud",
     category: "music",
     services: 3,
-    blurb: "Plays, followers & likes",
+    blurb: "Plays, likes & followers",
   },
   audiomack: {
     Icon: SiAudiomack,
@@ -166,52 +166,52 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     bg: "from-[#FFA200] to-[#cc8200]",
     label: "Audiomack",
     category: "music",
-    services: 3,
-    blurb: "Plays, followers & music promo",
+    services: 2,
+    blurb: "Plays & followers",
   },
   app_review: {
     Icon: FaAppStore,
-    color: "#F5A623",
-    bg: "from-[#F5A623] to-[#d4890a]",
+    color: "#0D96F6",
+    bg: "from-[#0D96F6] to-[#0070c9]",
     label: "App Review",
     category: "reviews",
-    services: 3,
-    blurb: "iOS & Android ratings & reviews",
+    services: 2,
+    blurb: "App Store & Play ratings",
   },
   google: {
     Icon: SiGoogle,
     color: "#4285F4",
-    bg: "from-[#4285F4] via-[#34A853] to-[#FBBC05]",
-    label: "Google Business",
+    bg: "from-[#4285F4] to-[#34A853]",
+    label: "Google",
     category: "reviews",
     services: 2,
-    blurb: "Reviews & local SEO services",
+    blurb: "Reviews & maps engagement",
   },
   website: {
     Icon: FaGlobe,
-    color: "#7C3AED",
-    bg: "from-[#7C3AED] to-[#5B21B6]",
+    color: "#3B82F6",
+    bg: "from-[#3B82F6] to-[#1D4ED8]",
     label: "Website",
     category: "other",
-    services: 3,
-    blurb: "Traffic, sign-ups & link clicks",
+    services: 2,
+    blurb: "Visits & form completions",
   },
   survey: {
     Icon: FaPoll,
-    color: "#A855F7",
-    bg: "from-[#A855F7] to-[#7E22CE]",
+    color: "#8B5CF6",
+    bg: "from-[#8B5CF6] to-[#6D28D9]",
     label: "Survey",
     category: "other",
     services: 2,
-    blurb: "Survey responses & poll votes",
+    blurb: "Completed survey responses",
   },
   pinterest: {
     Icon: SiPinterest,
     color: "#E60023",
     bg: "from-[#E60023] to-[#ad001a]",
     label: "Pinterest",
-    category: "other",
-    services: 2,
+    category: "social",
+    services: 3,
     blurb: "Followers, saves & engagement",
   },
   reddit: {
@@ -220,8 +220,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     bg: "from-[#FF4500] to-[#cc3700]",
     label: "Reddit",
     category: "social",
-    services: 2,
-    blurb: "Upvotes, comments & followers",
+    services: 3,
+    blurb: "Upvotes, members & comments",
   },
   twitch: {
     Icon: SiTwitch,
@@ -298,18 +298,11 @@ export function PlatformBadge({ platform, size = 48 }: { platform: Platform; siz
   );
 }
 
-/** Official-style circular logo for advertise grid (EarnIT-style). */
 export function PlatformLogo({ platform, size = 52 }: { platform: Platform; size?: number }) {
   const meta = PLATFORM_META[platform];
   if (!meta) return null;
   const { Icon, color, label } = meta;
-  // Brand-faithful solid circles
-  const solidBg =
-    platform === "instagram"
-      ? undefined
-      : color === "#000000"
-        ? "#111111"
-        : color;
+  const solidBg = platform === "instagram" ? undefined : color === "#000000" ? "#111111" : color;
 
   return (
     <span
