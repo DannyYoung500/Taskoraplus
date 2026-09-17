@@ -1,5 +1,4 @@
-// Public TanStack Start + Nitro config (no private Lovable packages).
-// Works on Vercel, local, and other Nitro targets.
+// Public TanStack Start + Nitro config for Vercel.
 import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
@@ -7,8 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 
-// Map server-only Supabase env → VITE_* so the browser client and server
-// always target the same project (avoids JWT kid mismatches on Vercel).
+// Map server-only Supabase env → VITE_* so browser + server use same project.
 if (process.env["SUPABASE_URL"]) {
   process.env["VITE_SUPABASE_URL"] = process.env["SUPABASE_URL"];
 }
@@ -27,10 +25,7 @@ export default defineConfig({
     tanstackStart({
       srcDirectory: "src",
     }),
-    // Nitro auto-detects Vercel in CI; override with SERVER_PRESET if needed.
-    nitro({
-      preset: process.env.SERVER_PRESET || undefined,
-    }),
+    nitro(),
     viteReact(),
   ],
 });
