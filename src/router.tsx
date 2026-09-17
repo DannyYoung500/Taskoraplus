@@ -10,7 +10,6 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    // Avoid /owner vs /owner/ 404s inside Telegram Mini App
     trailingSlash: "never",
   });
 
