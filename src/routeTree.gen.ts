@@ -1,12 +1,15 @@
 /* eslint-disable */
 // @ts-nocheck
 // noinspection JSUnusedGlobalSymbols
-// TASKORA route tree — single clean deploy
+// TASKORA route tree — includes ban/suspend/maintenance
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as TelegramGateRouteImport } from './routes/telegram-gate'
+import { Route as BannedRouteImport } from './routes/banned'
+import { Route as SuspendedRouteImport } from './routes/suspended'
+import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedAdvertiseRouteImport } from './routes/_authenticated/advertise'
 import { Route as AuthenticatedAmbassadorRouteImport } from './routes/_authenticated/ambassador'
@@ -48,6 +51,9 @@ import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenti
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const AuthRoute = AuthRouteImport.update({ id: '/auth', path: '/auth', getParentRoute: () => rootRouteImport } as any)
 const TelegramGateRoute = TelegramGateRouteImport.update({ id: '/telegram-gate', path: '/telegram-gate', getParentRoute: () => rootRouteImport } as any)
+const BannedRoute = BannedRouteImport.update({ id: '/banned', path: '/banned', getParentRoute: () => rootRouteImport } as any)
+const SuspendedRoute = SuspendedRouteImport.update({ id: '/suspended', path: '/suspended', getParentRoute: () => rootRouteImport } as any)
+const MaintenanceRoute = MaintenanceRouteImport.update({ id: '/maintenance', path: '/maintenance', getParentRoute: () => rootRouteImport } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({ id: '/_authenticated', getParentRoute: () => rootRouteImport } as any)
 
 const AuthenticatedAdvertiseRoute = AuthenticatedAdvertiseRouteImport.update({ id: '/_authenticated/advertise', path: '/advertise', getParentRoute: () => AuthenticatedRouteRoute } as any)
@@ -91,6 +97,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/telegram-gate': typeof TelegramGateRoute
+  '/banned': typeof BannedRoute
+  '/suspended': typeof SuspendedRoute
+  '/maintenance': typeof MaintenanceRoute
   '/advertise': typeof AuthenticatedAdvertiseRoute
   '/ambassador': typeof AuthenticatedAmbassadorRoute
   '/connected': typeof AuthenticatedConnectedRoute
@@ -133,6 +142,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/telegram-gate': typeof TelegramGateRoute
+  '/banned': typeof BannedRoute
+  '/suspended': typeof SuspendedRoute
+  '/maintenance': typeof MaintenanceRoute
   '/advertise': typeof AuthenticatedAdvertiseRoute
   '/ambassador': typeof AuthenticatedAmbassadorRoute
   '/connected': typeof AuthenticatedConnectedRoute
@@ -216,6 +228,9 @@ const rootRouteChildren = {
   IndexRoute,
   AuthRoute,
   TelegramGateRoute,
+  BannedRoute,
+  SuspendedRoute,
+  MaintenanceRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
 }
 
