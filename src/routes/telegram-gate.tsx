@@ -63,7 +63,6 @@ function TelegramGateScreen() {
 
   useEffect(() => {
     void check(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function check(force = true) {
@@ -178,17 +177,9 @@ function TelegramGateScreen() {
 
   return (
     <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden bg-[#0b0e1a] text-white">
-      <header className="flex items-center justify-between px-4 pt-3 pb-2">
-        <button
-          type="button"
-          onClick={() => window.history.back()}
-          className="flex size-9 items-center justify-center rounded-full text-white/70"
-          aria-label="Close"
-        >
-          ✕
-        </button>
-        <p className="text-sm font-semibold tracking-wide">TASKORA</p>
-        <span className="size-9" />
+      {/* Header — no cancel/close; gate is mandatory */}
+      <header className="flex items-center justify-center px-4 pt-4 pb-2">
+        <p className="text-sm font-semibold tracking-[0.2em] text-white/90">TASKORA</p>
       </header>
 
       <div className="flex flex-1 flex-col items-center px-5 pb-8 pt-4">
@@ -263,9 +254,7 @@ function TelegramGateScreen() {
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-semibold leading-tight">
-                      {c.name}
-                    </p>
+                    <p className="truncate text-[15px] font-semibold leading-tight">{c.name}</p>
                     {handle ? (
                       <p className="mt-0.5 truncate text-[12px] text-white/40">{handle}</p>
                     ) : (
@@ -311,9 +300,7 @@ function TelegramGateScreen() {
               ) : (
                 <>
                   <CheckCircle2 className="size-5" />
-                  {allJoined
-                    ? "CONTINUE"
-                    : settings?.checkButtonText ?? "CONTINUE"}
+                  {allJoined ? "CONTINUE" : settings?.checkButtonText ?? "CONTINUE"}
                 </>
               )}
             </button>
