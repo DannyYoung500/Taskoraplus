@@ -1,5 +1,7 @@
 /** Official TASKORA brand mark used across Mini App surfaces. */
-export const TASKORA_LOGO_SRC = "/file_00000000f8ec8246a98cce68ff972640.png";
+import { TASKORA_LOGO } from "@/lib/brand";
+
+export const TASKORA_LOGO_SRC = TASKORA_LOGO;
 
 type Props = {
   size?: number;
