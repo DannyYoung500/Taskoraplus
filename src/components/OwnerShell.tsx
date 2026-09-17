@@ -27,7 +27,7 @@ import {
   Search,
   X,
   Menu,
-  ThreadHorizontal,
+  SlidersHorizontal,
   MessageSquareHeart,
   Flag,
 } from "lucide-react";
@@ -35,7 +35,6 @@ import { TASKORA_LOGO } from "@/lib/brand";
 
 type Item = { to: string; title: string; Icon: typeof Users };
 
-/** Only routes that exist and have real handlers — no placeholders. */
 const SECTIONS: { label: string; items: Item[] }[] = [
   {
     label: "Overview",
