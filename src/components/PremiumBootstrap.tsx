@@ -182,7 +182,8 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       }
 
       setPhase("welcome");
-      const dest = authResult.current.isOwner ? "/owner" : redirectTo;
+      // Everyone (including owner) opens Home. Owner console is opened from Profile / link.
+      const dest = redirectTo;
       window.setTimeout(() => {
         navigate({ to: dest as "/home", replace: true });
       }, WELCOME_MS);
@@ -243,9 +244,7 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
               />
             </div>
             {phase === "welcome" ? (
-              <p className="mt-4 text-center text-sm text-slate-300">
-                {goOwner ? "Opening Owner Control…" : "Opening TASKORA…"}
-              </p>
+              <p className="mt-4 text-center text-sm text-slate-300">Opening TASKORA…</p>
             ) : (
               <p className="mt-3 text-center text-[10px] text-slate-500">Please wait — finishing setup</p>
             )}
