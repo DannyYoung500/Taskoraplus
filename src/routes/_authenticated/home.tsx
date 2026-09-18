@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/home")({
 function HomePage() {
   const { tasks, dash } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
-  const balance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);\n  const balance = Math.abs(rawBalance) < 0.00005 ? 0 : rawBalance;
   const pending = (dash?.submissions ?? [])
     .filter((submission) => submission.status === "pending" && !isDemoTaskTitle(submission.tasks?.title))
     .reduce((sum, submission) => sum + Number(submission.tasks?.reward ?? 0), 0);
