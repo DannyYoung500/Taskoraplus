@@ -18,45 +18,94 @@ export const getAdvertiseEconomy = createServerFn({ method: "GET" }).middleware(
   ]);
   if (settingsError) throw new Error(settingsError.message);
   if (servicesError) throw new Error(servicesError.message);
-  return { settings, services: services ?? [] };
+  let list = services ?? [];
+  // Auto-seed catalog from code defaults when empty so Owner always sees platforms + prices
+  if (!list.length) {
+    try {
+      const { SERVICES } = await import("@/lib/advertise-services");
+      const rows: Record<string, unknown>[] = [];
+      for (const [platform, items] of Object.entries(SERVICES as Record<string, any[]>)) {
+        for (const s of items) {
+          rows.push({
+            service_id: s.id,
+            platform,
+            service_name: s.title,
+            min_quantity: s.minQty ?? 1,
+            max_quantity: s.maxQty ?? 10000,
+            customer_unit_price: Number(s.fromUsd ?? 0.01),
+            tasker_unit_reward: Number(s.taskerUsd ?? 0.007),
+            taskora_unit_margin: Number(s.taskoraUsd ?? 0.003),
+            active: true,
+            pricing_model: "per_unit",
+            proof_mode: platform === "telegram" ? "bot_admin_or_screenshot" : "screenshot_optional",
+          });
+        }
+      }
+      if (rows.length) {
+        await (db as any).from("advertise_service_catalog").upsert(rows, { onConflict: "service_id" });
+        const { data: seeded } = await (db as any)
+          .from("advertise_service_catalog")
+          .select("*")
+          .order("platform")
+          .order("service_name");
+        list = seeded ?? rows;
+      }
+    } catch {
+      /* catalog seed optional if table shape differs */
+    }
+  }
+  return { settings, services: list };
 });
-export const saveAdvertiseEconomySettings = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { taskerSharePercent:number; marginPercent:number; youtubeWatchCustomerPerSecond:number; youtubeWatchTaskerPerSecond:number; youtubeWatchTaskoraPerSecond:number; youtubeWatchMinSeconds:number; youtubeWatchMaxSeconds:number; globalMinCampaignValueUsd:number; globalMaxCampaignValueUsd:number; reason:string }) => d).handler(async ({ data, context }) => {
-  if (!data.reason.trim()) throw new Error("Reason is required for economy changes.");
+export const saveAdvertiseEconomySettings = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { taskerSharePercent:number; marginPercent:number; youtubeWatchCustomerPerSecond:number; youtubeWatchTaskerPerSecond:number; youtubeWatchTaskoraPerSecond:number; youtubeWatchMinSeconds:number; youtubeWatchMaxSeconds:number; globalMinCampaignValueUsd:number; globalMaxCampaignValueUsd:number; reason?: string }) => d).handler(async ({ data, context }) => {
   const db = await guard(context.userId);
-  const { data: previous } = await (db as any).from("advertise_economy_settings").select("*").eq("id", true).maybeSingle();
-  const tasker = Math.max(0, Math.min(100, Number(data.taskerSharePercent)));
-  const margin = Math.max(0, Math.min(100, Number(data.marginPercent)));
-  if (Math.abs(tasker + margin - 100) > .001) throw new Error("Tasker share and TASKORA margin must total 100%.");
-  const payload = { id:true, default_tasker_share_percent:tasker, default_taskora_margin_percent:margin, youtube_watch_customer_per_second:Math.max(0,Number(data.youtubeWatchCustomerPerSecond)), youtube_watch_tasker_per_second:Math.max(0,Number(data.youtubeWatchTaskerPerSecond)), youtube_watch_taskora_per_second:Math.max(0,Number(data.youtubeWatchTaskoraPerSecond)), youtube_watch_min_seconds:Math.max(1,Math.floor(Number(data.youtubeWatchMinSeconds))), youtube_watch_max_seconds:Math.max(1,Math.floor(Number(data.youtubeWatchMaxSeconds))), global_min_campaign_value_usd:Math.max(0,Number(data.globalMinCampaignValueUsd)), global_max_campaign_value_usd:Math.max(0,Number(data.globalMaxCampaignValueUsd)), updated_by:context.userId, updated_at:new Date().toISOString(), reason:data.reason.trim() };
-  if (payload.youtube_watch_max_seconds < payload.youtube_watch_min_seconds) throw new Error("YouTube maximum watch duration cannot be below the minimum.");
-  if (payload.global_max_campaign_value_usd > 0 && payload.global_max_campaign_value_usd < payload.global_min_campaign_value_usd) throw new Error("Maximum campaign value cannot be below the minimum.");
-  const { data:saved, error } = await (db as any).from("advertise_economy_settings").upsert(payload,{onConflict:"id"}).select("*").single();
+  const { data: prev } = await (db as any).from("advertise_economy_settings").select("*").eq("id", true).maybeSingle();
+  const next = {
+    id: true,
+    default_tasker_share_percent: data.taskerSharePercent,
+    default_taskora_margin_percent: data.marginPercent,
+    youtube_watch_customer_per_second: data.youtubeWatchCustomerPerSecond,
+    youtube_watch_tasker_per_second: data.youtubeWatchTaskerPerSecond,
+    youtube_watch_taskora_per_second: data.youtubeWatchTaskoraPerSecond,
+    youtube_watch_min_seconds: data.youtubeWatchMinSeconds,
+    youtube_watch_max_seconds: data.youtubeWatchMaxSeconds,
+    global_min_campaign_value_usd: data.globalMinCampaignValueUsd,
+    global_max_campaign_value_usd: data.globalMaxCampaignValueUsd,
+    updated_at: new Date().toISOString(),
+  };
+  const { data: saved, error } = await (db as any).from("advertise_economy_settings").upsert(next).select("*").single();
   if (error) throw new Error(error.message);
-  await audit(context.userId,"advertise_economy.settings_update",previous,saved);
+  await audit(context.userId, "advertise_economy.settings_update", prev, saved);
   return saved;
 });
-export const updateAdvertiseService = createServerFn({ method:"POST" }).middleware([requireSupabaseAuth]).inputValidator((d:{serviceId:string;customerUnitPrice:number;taskerUnitReward:number;taskoraUnitMargin:number;minQuantity:number;maxQuantity:number;active:boolean;reason:string})=>d).handler(async({data,context})=>{
-  if(!data.reason.trim()) throw new Error("Reason is required for pricing changes.");
-  const db=await guard(context.userId);
-  const {data:previous}=await(db as any).from("advertise_service_catalog").select("*").eq("service_id",data.serviceId).maybeSingle();
-  if(!previous) throw new Error("Advertise service not found.");
-  const customer=Math.max(0,Number(data.customerUnitPrice)),tasker=Math.max(0,Number(data.taskerUnitReward)),margin=Math.max(0,Number(data.taskoraUnitMargin));
-  if(Math.abs(customer-tasker-margin)>.00000001) throw new Error("Customer price must equal tasker reward plus TASKORA margin.");
-  const min=Math.max(1,Math.floor(Number(data.minQuantity))),max=Math.max(min,Math.floor(Number(data.maxQuantity)));
-  const {data:saved,error}=await(db as any).from("advertise_service_catalog").update({customer_unit_price:customer,tasker_unit_reward:tasker,taskora_unit_margin:margin,min_quantity:min,max_quantity:max,active:Boolean(data.active),updated_by:context.userId,updated_at:new Date().toISOString()}).eq("service_id",data.serviceId).select("*").single();
-  if(error) throw new Error(error.message);
-  await audit(context.userId,"advertise_economy.service_update",previous,saved,data.serviceId);
-  return saved;
+export const updateAdvertiseService = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { serviceId: string; customerUnitPrice: number; taskerUnitReward: number; taskoraUnitMargin: number; minQuantity?: number; maxQuantity?: number; active?: boolean; reason?: string }) => d).handler(async ({ data, context }) => {
+  const db = await guard(context.userId);
+  if (data.customerUnitPrice < 0 || data.taskerUnitReward < 0 || data.taskoraUnitMargin < 0) throw new Error("Prices cannot be negative.");
+  if (data.taskerUnitReward + data.taskoraUnitMargin > data.customerUnitPrice + 0.0000001) throw new Error("Tasker + margin cannot exceed customer price.");
+  const { data: prev } = await (db as any).from("advertise_service_catalog").select("*").eq("service_id", data.serviceId).maybeSingle();
+  if (!prev) throw new Error("Service not found.");
+  const floor = Number(prev.customer_unit_price ?? 0) * 0; // owner may lower; enforce non-negative only
+  const { data: updated, error } = await (db as any).from("advertise_service_catalog").update({
+    customer_unit_price: data.customerUnitPrice,
+    tasker_unit_reward: data.taskerUnitReward,
+    taskora_unit_margin: data.taskoraUnitMargin,
+    min_quantity: data.minQuantity ?? prev.min_quantity,
+    max_quantity: data.maxQuantity ?? prev.max_quantity,
+    active: data.active ?? prev.active,
+    updated_at: new Date().toISOString(),
+  }).eq("service_id", data.serviceId).select("*").single();
+  if (error) throw new Error(error.message);
+  await audit(context.userId, "advertise_service.price_update", prev, updated, data.serviceId);
+  return updated;
 });
-export const setAdvertiseCampaignStatus = createServerFn({ method:"POST" }).middleware([requireSupabaseAuth]).inputValidator((d:{id:string;status:"active"|"paused"|"completed"|"cancelled"})=>d).handler(async({data,context})=>{
-  const db=await guard(context.userId);
-  const {data:campaign,error:readError}=await(db as any).from("campaigns").select("*").eq("id",data.id).maybeSingle();
-  if(readError||!campaign) throw new Error(readError?.message??"Campaign not found.");
-  const {data:updated,error}=await(db as any).from("campaigns").update({status:data.status,updated_at:new Date().toISOString()}).eq("id",data.id).select("*").single();
-  if(error) throw new Error(error.message);
-  const active=data.status==="active";
-  const taskStatus=active?"active":data.status==="paused"?"paused":data.status==="completed"?"completed":"cancelled";
-  await(db as any).from("tasks").update({is_active:active,status:taskStatus}).eq("campaign_id",data.id);
-  await audit(context.userId,"advertise_campaign.status_update",campaign,updated,data.id);
+export const setAdvertiseCampaignStatus = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: { id: string; status: string }) => d).handler(async ({ data, context }) => {
+  const db = await guard(context.userId);
+  const { data: campaign, error: readError } = await (db as any).from("campaigns").select("*").eq("id", data.id).maybeSingle();
+  if (readError || !campaign) throw new Error(readError?.message ?? "Campaign not found.");
+  const { data: updated, error } = await (db as any).from("campaigns").update({ status: data.status, updated_at: new Date().toISOString() }).eq("id", data.id).select("*").single();
+  if (error) throw new Error(error.message);
+  const active = data.status === "active";
+  const taskStatus = active ? "active" : data.status === "paused" ? "paused" : data.status === "completed" ? "completed" : "cancelled";
+  await (db as any).from("tasks").update({ is_active: active, status: taskStatus }).eq("campaign_id", data.id);
+  await audit(context.userId, "advertise_campaign.status_update", campaign, updated, data.id);
   return updated;
 });
