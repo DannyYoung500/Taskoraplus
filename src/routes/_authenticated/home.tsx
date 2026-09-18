@@ -219,7 +219,7 @@ function HomePage() {
             <p className="text-[10px] font-bold text-cyan-300">{level}</p>
           </div>
         </div>
-      </section>
+      </Link>
 
       <div className="mb-4 grid grid-cols-2 gap-2">
         <Link
