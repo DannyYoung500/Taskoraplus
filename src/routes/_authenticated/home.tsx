@@ -4,18 +4,12 @@ import {
   ClipboardCheck,
   PlayCircle,
   Users,
-  Trophy,
   Bell,
   Megaphone,
   Crown,
-  Gift,
   ChevronRight,
   CalendarCheck,
   WalletCards,
-  CircleDollarSign,
-  Sparkles,
-  ArrowUpRight,
-  Info,
   Gamepad2,
   Flame,
   Star,
@@ -273,7 +267,7 @@ function HomePage() {
             <p className="text-[10px] text-slate-500">Complete daily tasks and earn more Task Points!</p>
           </div>
           <Link to="/tasks" className="text-[11px] font-bold text-cyan-300">
-            View All >
+            View All →
           </Link>
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -330,7 +324,7 @@ function HomePage() {
             <p className="text-[10px] text-slate-500">High earning tasks, complete now!</p>
           </div>
           <Link to="/tasks" className="text-[11px] font-bold text-cyan-300">
-            View All >
+            View All →
           </Link>
         </div>
         <div className="space-y-2">
@@ -359,7 +353,7 @@ function HomePage() {
                   className="inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-[11px] font-black text-white"
                   style={{ background: BLUE_GRAD }}
                 >
-                  Start >
+                  Start →
                 </span>
               </Link>
             ))
