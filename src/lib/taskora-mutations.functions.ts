@@ -1,21 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/** Inline rules — do not import *.server modules at top level (breaks client bundle). */
-const RULES = {
-  minWithdrawalUsd: 10,
-  newAccountWithdrawHoldHours: 24,
-  maxSubmissionsPerHour: 12,
-  submissionWindowMs: 60 * 60 * 1000,
-} as const;
+import { RULES, hoursSince } from "@/lib/platform-rules";
 
-function hoursSince(iso: string | null | undefined): number {
-  if (!iso) return 9999;
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return 9999;
-  return (Date.now() - t) / (1000 * 60 * 60);
-}
-
+/** Submission with velocity limit + slot check. Prefer this over raw insert paths. */
 export const submitTaskGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -69,6 +57,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     return { status: "pending" as const };
   });
 
+/** Withdrawal with min amount, 24h new-account hold, shared-address detection. */
 export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { method: string; address: string; amount: number }) => d)
@@ -76,11 +65,27 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     const { userId } = context;
     const address = data.address.trim();
     if (!address) throw new Error("Enter your wallet address.");
-    if (!(data.amount >= RULES.minWithdrawalUsd)) {
-      throw new Error(`Minimum withdrawal is $${RULES.minWithdrawalUsd.toFixed(2)}.`);
-    }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let minWd = RULES.minWithdrawalUsd;
+    let payoutsPaused = false;
+    try {
+      const { data: econ } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "economy")
+        .maybeSingle();
+      const v = (econ?.value ?? {}) as Record<string, unknown>;
+      minWd = Math.max(0, Number(v.min_withdrawal_usd ?? RULES.minWithdrawalUsd));
+      payoutsPaused = Boolean(v.payouts_paused);
+    } catch {
+      /* defaults */
+    }
+    if (payoutsPaused) throw new Error("Withdrawals are temporarily paused by the owner.");
+    if (!(data.amount >= minWd)) {
+      throw new Error(`Minimum withdrawal is $${minWd.toFixed(2)}.`);
+    }
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -88,8 +93,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       .eq("id", userId)
       .maybeSingle();
 
-    const status = (profile as { status?: string } | null)?.status;
-    if (status && status !== "active") {
+    if (profile && (profile as { status?: string }).status && (profile as { status?: string }).status !== "active") {
       throw new Error("Account is not allowed to withdraw.");
     }
 
@@ -101,6 +105,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       );
     }
 
+    // Shared payout address across different users
     const { data: others } = await supabaseAdmin
       .from("withdrawals")
       .select("user_id")
@@ -131,6 +136,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
 
 /** Create a pending crypto deposit intent (owner confirms or webhook completes). */
 export const requestDepositGuarded = createServerFn({ method: "POST" })
