@@ -5,17 +5,16 @@ import {
   Crown,
   LifeBuoy,
   Link2,
-  LogOut,
   Shield,
   Trophy,
   WalletCards,
+  Star,
   Users,
 } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
-import { TASKORA_LOGO } from "@/lib/brand";
+import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   loader: async () => {
@@ -54,14 +53,12 @@ function ProfileScreen() {
   const isOwner = Boolean(dash?.isOwner);
 
   const txs = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
-  const balance = Math.max(0, txs.reduce((s, t) => s + Number(t.amount), 0));
+  const balance = Math.max(
+    0,
+    txs.reduce((s, t) => s + Number(t.amount), 0),
+  );
   const lifetime = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
   const verified = Number(dash?.verifiedCount ?? 0);
-
-  async function signOut() {
-    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-    window.location.href = "/";
-  }
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#030814] px-3.5 pb-28 pt-3 text-white">
@@ -108,11 +105,15 @@ function ProfileScreen() {
             </span>
           </div>
           {isOwner ? (
-            <Link to="/owner" className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-2 text-amber-200">
+            <Link
+              to="/owner"
+              className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-2 text-amber-200"
+            >
               <Crown className="size-5" />
             </Link>
           ) : null}
         </div>
+
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Stat label="Balance" value={formatUsd(balance)} />
           <Stat label="Task Points" value={taskPoints.toLocaleString()} />
@@ -121,14 +122,20 @@ function ProfileScreen() {
       </section>
 
       <section className="mb-3 grid grid-cols-2 gap-2">
-        <Link to="/wallet" className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5">
+        <Link
+          to="/wallet"
+          className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5"
+        >
           <WalletCards className="size-5 text-cyan-300" />
           <div>
             <p className="text-xs font-black">Wallet</p>
             <p className="text-[10px] text-slate-500">Deposit · withdraw</p>
           </div>
         </Link>
-        <Link to="/leaderboard" className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5">
+        <Link
+          to="/leaderboard"
+          className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5"
+        >
           <Trophy className="size-5 text-amber-300" />
           <div>
             <p className="text-xs font-black">Rank</p>
@@ -162,14 +169,6 @@ function ProfileScreen() {
         <Shield className="size-4 shrink-0" />
         Telegram-native session · ledger balances · no demo balances
       </div>
-
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 py-3 text-sm font-bold text-red-200"
-      >
-        <LogOut className="size-4" /> Sign out
-      </button>
     </main>
   );
 }
