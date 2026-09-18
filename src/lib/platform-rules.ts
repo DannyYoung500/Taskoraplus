@@ -1,10 +1,10 @@
 /**
- * Operational rules for TASKORA.
+ * Server-only operational rules for TASKORA.
  * Tunable constants — later move to owner_settings table.
  */
 
 export const RULES = {
-  minWithdrawalUsd: 10,
+  minWithdrawalUsd: 3,
   /** Hours after account creation before first withdrawal is allowed */
   newAccountWithdrawHoldHours: 24,
   /** Max task submissions per user in a rolling window */
