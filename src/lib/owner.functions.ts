@@ -471,21 +471,17 @@ export const ownerReviewSubmission = createServerFn({ method: "POST" })
         });
         const { data: profile } = await db
           .from("profiles")
-          .select("referred_by, xp")
+          .select("referred_by")
           .eq("id", submission.user_id)
           .maybeSingle();
         if (profile?.referred_by) {
           await db.from("transactions").insert({
             user_id: profile.referred_by,
             label: "Referral share",
-            amount: Number((reward * 0.08).toFixed(2)),
+            amount: Number((reward * 0.10).toFixed(2)),
             kind: "referral",
           });
         }
-        await db
-          .from("profiles")
-          .update({ xp: Number(profile?.xp ?? 0) + 10 })
-          .eq("id", submission.user_id);
       }
     }
 
@@ -804,7 +800,7 @@ export const ownerUpdateFraud = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/* ----------------------------------------------------- REFERRALS / XP / RANKS */
+/* ---------------------------------------------- REFERRALS / TASK POINTS / RANKS */
 
 export const ownerReferrals = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

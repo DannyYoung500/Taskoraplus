@@ -40,7 +40,7 @@ function HomePage() {
   const { tasks, dash } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
   const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
-  const balance = rawBalance <= 0.00005 ? 0 : rawBalance;
+  const balance = rawBalance <= 0.00005 ? 0 : Math.max(0, rawBalance);
   const pending = (dash?.submissions ?? [])
     .filter((submission) => submission.status === "pending" && !isDemoTaskTitle(submission.tasks?.title))
     .reduce((sum, submission) => sum + Number(submission.tasks?.reward ?? 0), 0);
@@ -99,9 +99,6 @@ function HomePage() {
             }}
           >
             TASKORA
-          </p>
-          <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Earn · Play · Grow
           </p>
         </div>
 
@@ -212,10 +209,10 @@ function HomePage() {
                 <Info className="size-3.5" />
               </span>
             </div>
-            <p className="mt-0.5 text-[10px] text-slate-400">Non-withdrawable points from eligible activity</p>
+            <p className="mt-0.5 text-[10px] text-slate-400">Earned from daily check-ins and successful referrals · not withdrawable</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black text-yellow-200">{displayTaskPoints.toLocaleString()}</p>
+            <p className="text-2xl font-black text-yellow-200">{displayTaskPoints.toLocaleString()}</p>\n            <p className="text-[9px] font-semibold text-slate-500">Task Points</p>
             <p className="text-[10px] font-bold text-cyan-300">{level}</p>
           </div>
         </div>

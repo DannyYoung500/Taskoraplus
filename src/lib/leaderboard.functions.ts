@@ -9,7 +9,7 @@ export type LeaderboardRow = {
   /** Telegram profile photo URL stored on profiles.photo_url */
   photo_url: string | null;
   telegram_id: number | null;
-  earned: number;
+  task_points: number;
   referrals: number;
 };
 

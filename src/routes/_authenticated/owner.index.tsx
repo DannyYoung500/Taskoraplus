@@ -34,8 +34,8 @@ export const Route = createFileRoute("/_authenticated/owner/")({
     try {
       const [overview, submissions, withdrawals] = await Promise.all([
         ownerOverview(),
-        ownerListSubmissions({ status: "pending" }),
-        ownerWithdrawals({ status: "pending" }),
+        ownerListSubmissions({ data: { status: "pending" } }),
+        ownerWithdrawals({ data: { status: "pending" } }),
       ]);
       return { overview, submissions, withdrawals, error: null as string | null };
     } catch (e) {
@@ -158,7 +158,6 @@ function OwnerHub() {
               <TaskoraLogo size={48} />
               <div className="min-w-0">
                 <p className="text-lg font-black tracking-tight text-white">TASKORA</p>
-                <p className="text-[8px] font-bold uppercase tracking-[0.28em] text-cyan-300/70">Earn · Play · Grow</p>
               </div>
             </div>
             <div className="hidden h-9 w-px bg-white/10 lg:block" />

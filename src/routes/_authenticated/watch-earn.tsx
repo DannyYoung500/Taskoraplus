@@ -100,7 +100,7 @@ function WatchEarnPage() {
             <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">✦</div>
             <div className="min-w-0">
               <p className="text-xs font-black text-white">Task Points stay separate</p>
-              <p className="mt-0.5 text-[10px] leading-4 text-slate-500">Daily check-in and referrals earn Task Points. Watching videos earns USDT.</p>
+              <p className="mt-0.5 text-[10px] leading-4 text-slate-500">Daily check-ins and successful referrals earn Task Points. Watching verified videos earns USDT.</p>
             </div>
           </div>
         </section>
