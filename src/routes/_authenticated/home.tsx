@@ -63,7 +63,8 @@ function HomePage() {
   const level = profile?.level_num ? `Level ${profile.level_num}` : profile?.level ?? "Level 1";
   const isOwner = Boolean(dash?.isOwner);
 
-  const [checkMsg, setCheckMsg] = useState<string | null>(null);\n  const [displayTaskPoints, setDisplayTaskPoints] = useState(taskPoints);
+  const [checkMsg, setCheckMsg] = useState<string | null>(null);
+  const [displayTaskPoints, setDisplayTaskPoints] = useState(taskPoints);
   const [checkBusy, setCheckBusy] = useState(false);
 
   async function onCheckin() {
@@ -71,7 +72,8 @@ function HomePage() {
     setCheckMsg(null);
     try {
       const r = await dailyCheckin();
-      if (!r.already) setDisplayTaskPoints(Number(r.taskPointTotal ?? displayTaskPoints + Number(r.taskPoints ?? 0)));\n      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · +${r.taskPoints ?? 0} Task Points`);
+      if (!r.already) setDisplayTaskPoints(Number(r.taskPointTotal ?? displayTaskPoints + Number(r.taskPoints ?? 0)));
+      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · +${r.taskPoints ?? 0} Task Points`);
     } catch (e) {
       setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
     } finally {
