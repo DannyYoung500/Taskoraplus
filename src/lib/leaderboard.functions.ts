@@ -6,14 +6,15 @@ export type LeaderboardRow = {
   rank: number;
   display_name: string;
   username: string | null;
-  /** Telegram profile photo URL stored on profiles.photo_url */
   photo_url: string | null;
   telegram_id: number | null;
   task_points: number;
   referrals: number;
+  /** Sum of positive ledger amounts (real USDT credits) */
+  usdt_earned: number;
 };
 
-/** Top earners — only active (not banned/suspended) users. */
+/** Top earners — only active users. Task Points + real USDT ledger totals. */
 export const getLeaderboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<LeaderboardRow[]> => {
@@ -22,12 +23,27 @@ export const getLeaderboard = createServerFn({ method: "GET" })
       .from("profiles")
       .select("id, display_name, username, photo_url, telegram_id, status, task_points, referred_by")
       .order("task_points", { ascending: false })
-      .limit(50);
+      .limit(80);
     if (error) throw new Error(error.message);
 
     const active = (profiles ?? []).filter(
       (p) => String((p as { status?: string }).status ?? "active") === "active",
     );
+    const ids = active.map((p) => p.id);
+
+    const usdtMap = new Map<string, number>();
+    if (ids.length) {
+      const { data: txs } = await supabaseAdmin
+        .from("transactions")
+        .select("user_id, amount")
+        .in("user_id", ids)
+        .gt("amount", 0);
+      for (const t of txs ?? []) {
+        const uid = String((t as { user_id: string }).user_id);
+        usdtMap.set(uid, (usdtMap.get(uid) ?? 0) + Number((t as { amount: number }).amount));
+      }
+    }
+
     const refCounts = new Map<string, number>();
     for (const p of profiles ?? []) {
       const ref = (p as { referred_by?: string | null }).referred_by;
@@ -43,5 +59,6 @@ export const getLeaderboard = createServerFn({ method: "GET" })
       telegram_id: (p as { telegram_id?: number | null }).telegram_id ?? null,
       task_points: Number((p as { task_points?: number | null }).task_points ?? 0),
       referrals: refCounts.get(p.id) ?? 0,
+      usdt_earned: Number((usdtMap.get(p.id) ?? 0).toFixed(4)),
     }));
   });
