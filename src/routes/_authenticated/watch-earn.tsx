@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/watch-earn")({
   component: WatchEarnPage,
 });
 
-function money(value: number) { return formatUsd(value); }
+function money(value: number) { return formatUsd(Math.max(0, value)); }
 
 function WatchEarnPage() {
   const { videos, dashboard } = Route.useLoaderData();
@@ -73,7 +73,7 @@ function WatchEarnPage() {
           <img src={TASKORA_LOGO} alt="" className="size-10 rounded-2xl object-cover ring-1 ring-blue-400/30" />
           <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[0.24em] text-blue-300">TASKORA</p><h1 className="text-lg font-extrabold tracking-tight">Watch & Earn</h1></div>
           {dashboard?.isOwner ? <Link to="/owner/videos" className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-2.5 py-2 text-[10px] font-bold text-blue-300">Manage</Link> : null}
-          <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-right"><p className="text-[9px] uppercase tracking-wide text-slate-500">Wallet</p><p className="text-xs font-bold text-blue-300">{formatUsd(Number(dashboard?.balance ?? 0))}</p></div>
+          <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-right"><p className="text-[9px] uppercase tracking-wide text-slate-500">Wallet</p><p className="text-xs font-bold text-blue-300">{formatUsd(Math.max(0, Number(dashboard?.balance ?? 0)))}</p></div>
         </div>
       </header>
 

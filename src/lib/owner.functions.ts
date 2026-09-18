@@ -839,7 +839,7 @@ export const ownerLeaderboards = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const db = await guard(context.userId);
     const [profiles, txs, subs] = await Promise.all([
-      db.from("profiles").select("id, display_name, username, xp, level"),
+      db.from("profiles").select("id, display_name, username, task_points, level"),
       db.from("transactions").select("user_id, amount, created_at").gt("amount", 0),
       db.from("submissions").select("user_id, created_at").eq("status", "verified"),
     ]);
@@ -864,7 +864,7 @@ export const ownerLeaderboards = createServerFn({ method: "GET" })
           name: name(id),
           earnings: earn.get(id) ?? 0,
           completions: done.get(id) ?? 0,
-          xp: people.find((p) => p.id === id)?.xp ?? 0,
+          task_points: Number((people.find((p) => p.id === id) as { task_points?: number } | undefined)?.task_points ?? 0),
         }))
         .sort((a, b) => b.earnings - a.earnings)
         .slice(0, 25);

@@ -98,7 +98,7 @@ function LeaderboardPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-extrabold tracking-tight">Leaderboard</h1>
           <p className="text-[11px] text-white/45">
-            Top earners · live USDT · updates every 45s
+            Top Task Points · non-withdrawable · updates every 45s
           </p>
         </div>
         <button
@@ -124,7 +124,7 @@ function LeaderboardPage() {
 
       {rows.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-[#121f33] p-8 text-center text-sm text-white/45">
-          No rankings yet. Complete tasks to climb the board.
+          No rankings yet. Earn Task Points to climb the board.
         </div>
       ) : (
         <>
@@ -175,7 +175,7 @@ function LeaderboardPage() {
                   </p>
                 </div>
                 <span className="text-sm font-bold tabular-nums text-emerald-300">
-                  {formatUsdt(r.earned)}
+                  {r.task_points.toLocaleString()} pts
                 </span>
               </div>
             ))}
@@ -233,7 +233,7 @@ function PodiumSlot({
       <p className="mt-0.5 text-[10px] text-white/40">
         {row.referrals > 0 ? `${row.referrals} referrals` : "—"}
       </p>
-      <p className="mt-1 text-xs font-extrabold text-emerald-300">{formatUsdt(row.earned)}</p>
+      <p className="mt-1 text-xs font-extrabold text-emerald-300">{row.task_points.toLocaleString()} pts</p>
       <div
         className={`mt-2 flex w-full ${height} flex-col items-center justify-start rounded-t-2xl border border-white/10 bg-black/25 pt-2`}
       >

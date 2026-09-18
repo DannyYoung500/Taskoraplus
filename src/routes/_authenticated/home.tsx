@@ -40,7 +40,7 @@ function HomePage() {
   const { tasks, dash } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
   const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
-  const balance = Math.abs(rawBalance) < 0.00005 ? 0 : rawBalance;
+  const balance = rawBalance <= 0.00005 ? 0 : rawBalance;
   const pending = (dash?.submissions ?? [])
     .filter((submission) => submission.status === "pending" && !isDemoTaskTitle(submission.tasks?.title))
     .reduce((sum, submission) => sum + Number(submission.tasks?.reward ?? 0), 0);
@@ -63,7 +63,7 @@ function HomePage() {
   const level = profile?.level_num ? `Level ${profile.level_num}` : profile?.level ?? "Level 1";
   const isOwner = Boolean(dash?.isOwner);
 
-  const [checkMsg, setCheckMsg] = useState<string | null>(null);
+  const [checkMsg, setCheckMsg] = useState<string | null>(null);\n  const [displayTaskPoints, setDisplayTaskPoints] = useState(taskPoints);
   const [checkBusy, setCheckBusy] = useState(false);
 
   async function onCheckin() {
@@ -71,7 +71,7 @@ function HomePage() {
     setCheckMsg(null);
     try {
       const r = await dailyCheckin();
-      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · +${r.taskPoints ?? 0} Task Points`);
+      if (!r.already) setDisplayTaskPoints(Number(r.taskPointTotal ?? displayTaskPoints + Number(r.taskPoints ?? 0)));\n      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · +${r.taskPoints ?? 0} Task Points`);
     } catch (e) {
       setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
     } finally {
@@ -198,7 +198,7 @@ function HomePage() {
         <Quick to="/leaderboard" label="Rank" sub="Leaderboard" Icon={Trophy} />
       </section>
 
-      <section className="mb-4 rounded-[24px] border border-yellow-400/35 bg-[radial-gradient(circle_at_10%_50%,rgba(250,204,21,0.13),transparent_35%),linear-gradient(110deg,#111c2b,#091626)] p-4 shadow-[0_0_35px_rgba(250,204,21,0.07)]">
+      <Link to="/leaderboard" className="mb-4 block rounded-[24px] border border-yellow-400/35 bg-[radial-gradient(circle_at_10%_50%,rgba(250,204,21,0.13),transparent_35%),linear-gradient(110deg,#111c2b,#091626)] p-4 shadow-[0_0_35px_rgba(250,204,21,0.07)]">
         <div className="flex items-center gap-3">
           <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-yellow-300/40 bg-yellow-400/10 text-yellow-200 shadow-[0_0_22px_rgba(250,204,21,0.18)]">
             <CircleDollarSign className="size-7" />
@@ -213,7 +213,7 @@ function HomePage() {
             <p className="mt-0.5 text-[10px] text-slate-400">Non-withdrawable points from eligible activity</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black text-yellow-200">{taskPoints.toLocaleString()}</p>
+            <p className="text-2xl font-black text-yellow-200">{displayTaskPoints.toLocaleString()}</p>
             <p className="text-[10px] font-bold text-cyan-300">{level}</p>
           </div>
         </div>

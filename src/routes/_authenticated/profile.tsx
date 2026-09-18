@@ -39,7 +39,7 @@ function ProfileScreen() {
   const lifetime = (dash?.transactions ?? [])
     .filter((tx) => !isDemoTransactionLabel(tx.label) && Number(tx.amount) > 0)
     .reduce((sum, tx) => sum + Number(tx.amount), 0);
-  const streak = profile?.streak ?? 0;
+  const streak = profile?.streak ?? 0;\n  const taskPoints = Number((profile as { task_points?: number | null } | null)?.task_points ?? 0);
   const isOwner = Boolean(dash?.isOwner);
 
   const byPlatform = new Map(
@@ -80,7 +80,7 @@ function ProfileScreen() {
       <section className="mt-4 grid grid-cols-3 gap-2.5 text-center">
         <Stat value={`${verified}`} label="Verified" />
         <Stat value={formatUsd(lifetime)} label="Lifetime" />
-        <Stat value={`${streak}d`} label="Streak" />
+        <Stat value={`${streak}d`} label="Streak" />\n        <Stat value={taskPoints.toLocaleString()} label="Task Points" />
       </section>
 
       {isOwner ? (
