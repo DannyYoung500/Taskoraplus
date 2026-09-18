@@ -4,6 +4,7 @@ import { CheckCircle2, Clock3, Coins, Loader2, Play, ShieldCheck, Sparkles, Vide
 import { getDashboard } from "@/lib/taskora.functions";
 import { completeWatchVideo, listWatchVideos, startWatchVideo, type WatchVideo } from "@/lib/watch-video.functions";
 import { TASKORA_LOGO } from "@/lib/brand";
+import { formatUsd } from "@/lib/taskora-display";
 
 export const Route = createFileRoute("/_authenticated/watch-earn")({
   head: () => ({ meta: [{ title: "Watch & Earn — TASKORA" }] }),
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/watch-earn")({
   component: WatchEarnPage,
 });
 
-function money(value: number) { return `$${value.toFixed(4)} USDT`; }
+function money(value: number) { return formatUsd(value); }
 
 function WatchEarnPage() {
   const { videos, dashboard } = Route.useLoaderData();
@@ -72,7 +73,7 @@ function WatchEarnPage() {
           <img src={TASKORA_LOGO} alt="" className="size-10 rounded-2xl object-cover ring-1 ring-blue-400/30" />
           <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[0.24em] text-blue-300">TASKORA</p><h1 className="text-lg font-extrabold tracking-tight">Watch & Earn</h1></div>
           {dashboard?.isOwner ? <Link to="/owner/videos" className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-2.5 py-2 text-[10px] font-bold text-blue-300">Manage</Link> : null}
-          <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-right"><p className="text-[9px] uppercase tracking-wide text-slate-500">Wallet</p><p className="text-xs font-bold text-blue-300">${Number(dashboard?.balance ?? 0).toFixed(2)}</p></div>
+          <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-right"><p className="text-[9px] uppercase tracking-wide text-slate-500">Wallet</p><p className="text-xs font-bold text-blue-300">{formatUsd(Number(dashboard?.balance ?? 0))}</p></div>
         </div>
       </header>
 
@@ -94,6 +95,16 @@ function WatchEarnPage() {
           </div>
         </section>
 
+        <section className="mx-4 mt-4 rounded-3xl border border-violet-400/15 bg-violet-500/[0.05] p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">✦</div>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-white">Task Points stay separate</p>
+              <p className="mt-0.5 text-[10px] leading-4 text-slate-500">Daily check-in and referrals earn Task Points. Watching videos earns USDT.</p>
+            </div>
+          </div>
+        </section>
+
         <section className="px-4 pt-5">
           <div className="mb-3 flex items-center gap-2"><span className="size-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,.7)]" /><h2 className="text-base font-bold">Up next</h2></div>
           {next.length ? <div className="space-y-3">{next.map((video) => <VideoRow key={video.id} video={video} onClick={() => setActiveId(video.id)} />)}</div> : <div className="rounded-3xl border border-white/7 bg-white/[0.025] p-5 text-center"><Sparkles className="mx-auto size-6 text-blue-300/60" /><p className="mt-2 text-sm font-semibold">You’re all caught up</p><p className="mt-1 text-[11px] text-slate-500">New provider videos and Owner uploads will appear here.</p></div>}
@@ -101,7 +112,7 @@ function WatchEarnPage() {
 
         <section className="mt-5 grid grid-cols-2 gap-3 px-4">
           <div className="rounded-3xl border border-blue-400/15 bg-blue-500/[0.06] p-4"><WalletCards className="size-5 text-blue-300" /><p className="mt-3 text-[10px] uppercase tracking-wide text-slate-500">This session</p><p className="mt-1 text-lg font-extrabold text-blue-300">{money(sessionEarned)}</p></div>
-          <div className="rounded-3xl border border-emerald-400/15 bg-emerald-500/[0.05] p-4"><ShieldCheck className="size-5 text-emerald-300" /><p className="mt-3 text-[10px] uppercase tracking-wide text-slate-500">Reward type</p><p className="mt-1 text-sm font-extrabold text-emerald-300">USDT first</p><p className="text-[10px] text-slate-500">Watch rewards are paid in USDT.</p></div>
+          <div className="rounded-3xl border border-emerald-400/15 bg-emerald-500/[0.05] p-4"><ShieldCheck className="size-5 text-emerald-300" /><p className="mt-3 text-[10px] uppercase tracking-wide text-slate-500">Reward type</p><p className="mt-1 text-sm font-extrabold text-emerald-300">USDT</p><p className="text-[10px] text-slate-500">Watch rewards go to your withdrawable wallet.</p></div>
         </section>
       </> : <section className="px-4 pt-10"><div className="rounded-[2rem] border border-blue-400/15 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,.2),transparent_55%)] p-7 text-center"><div className="mx-auto flex size-16 items-center justify-center rounded-3xl bg-blue-500/10 text-blue-300 ring-1 ring-blue-400/20"><Play className="size-7" /></div><h2 className="mt-5 text-xl font-extrabold">No videos available</h2><p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">External provider inventory and Owner-uploaded videos will appear here when they are active.</p><div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-500"><Clock3 className="size-3.5" /> Verified completions only <Coins className="ml-2 size-3.5" /> USDT rewards</div>{dashboard?.isOwner ? <Link to="/owner/videos" className="mx-auto mt-5 inline-flex rounded-2xl bg-blue-500/15 px-4 py-2.5 text-xs font-bold text-blue-300">Upload a TASKORA video</Link> : null}</div></section>}
     </main>
