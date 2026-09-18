@@ -424,6 +424,8 @@ function OwnerSettings() {
               value={economy.watch_earn_daily_cap_usdt}
               onChange={(v) => setEconomy({ ...economy, watch_earn_daily_cap_usdt: v })}
             />
+            <NumField label="Daily check-in Task Points" value={economy.daily_checkin_points} onChange={(v) => setEconomy({ ...economy, daily_checkin_points: v })} />
+            <NumField label="Successful referral Task Points" value={economy.referral_points} onChange={(v) => setEconomy({ ...economy, referral_points: v })} />
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-2">

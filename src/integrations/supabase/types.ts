@@ -256,7 +256,7 @@ export type Database = {
           telegram_id: number | null
           updated_at: string
           username: string | null
-          xp: number
+          task_points: number
         }
         Insert: {
           admin_notes?: string | null
@@ -274,7 +274,7 @@ export type Database = {
           telegram_id?: number | null
           updated_at?: string
           username?: string | null
-          xp?: number
+          task_points?: number
         }
         Update: {
           admin_notes?: string | null

@@ -53,6 +53,7 @@ function ReferralScreen() {
   const { dash } = Route.useLoaderData();
   const telegramId = dash?.telegramId ?? null;
   const referrals = dash?.referrals ?? 0;
+  const taskPoints = Number((dash?.profile as { task_points?: number | null } | null)?.task_points ?? 0);
   const referralLink = telegramId
     ? `https://t.me/${TELEGRAM_BOT_USERNAME}/?startapp=${encodeURIComponent(String(telegramId))}`
     : "";
@@ -122,11 +123,11 @@ function ReferralScreen() {
             <h1 className="mt-5 max-w-[310px] text-[30px] font-black leading-[0.98] tracking-[-0.04em] text-white">
               Refer friends.
               <span className="block bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 bg-clip-text text-transparent">
-                Earn 10% in USD.
+                Earn Task Points + 10% USD commission.
               </span>
             </h1>
             <p className="mt-3 max-w-[340px] text-xs leading-5 text-white/75">
-              Get a 10% USD commission from every qualifying task reward your referrals complete.
+              Earn Task Points for successful referrals, plus a 10% USD commission from qualifying task rewards your referrals complete.
             </p>
 
             <div className="mt-5 grid grid-cols-3 gap-2">
@@ -150,7 +151,7 @@ function ReferralScreen() {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">Your progress</p>
               <p className="mt-1 text-xl font-black text-white">
-                {referrals.toLocaleString()} <span className="text-xs font-semibold text-white/45">successful referrals</span>
+                {referrals.toLocaleString()} <span className="text-xs font-semibold text-white/45">successful referrals</span><span className="ml-3 text-sm font-black text-violet-300">{taskPoints.toLocaleString()} <span className="text-[10px] font-semibold text-white/35">Task Points</span></span>
               </p>
             </div>
             <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10">
@@ -234,7 +235,7 @@ function ReferralScreen() {
             </div>
             <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-violet-300/75">Task Points</p>
             <p className="mt-1 text-xl font-black text-white">Earn Task Points</p>
-            <p className="mt-2 text-[11px] leading-5 text-white/45">Reach referral milestones to unlock Task Points for your profile and leaderboard.</p>
+            <p className="mt-2 text-[11px] leading-5 text-white/45">Every successful referral earns Task Points; milestones add additional Task Points for your profile and leaderboard.</p>
             <div className="mt-3 flex items-center gap-2 border-t border-white/8 pt-3 text-[10px] text-violet-200/70">
               <Sparkles className="size-3.5 shrink-0" /> Task Points are not withdrawable.
             </div>

@@ -59,7 +59,7 @@ function WatchEarnPage() {
       const result = await completeWatchVideo({ data: { sessionId } });
       if (!result.already) {
         setSessionEarned((value) => value + Number(result.rewardUsdt ?? 0));
-        setMessage(result.rewardUsdt || result.rewardPoints ? `Reward credited: ${money(Number(result.rewardUsdt ?? 0))}${result.rewardPoints ? ` · +${result.rewardPoints} Task Points` : ""}` : "Video completed.");
+        setMessage(result.rewardUsdt ? `Reward credited: ${money(Number(result.rewardUsdt))}` : "Video completed.");
       } else setMessage("This video was already completed.");
     } catch (e) { setMessage(e instanceof Error ? e.message : "Reward verification is still pending."); }
     finally { setBusy(false); }
@@ -101,7 +101,7 @@ function WatchEarnPage() {
 
         <section className="mt-5 grid grid-cols-2 gap-3 px-4">
           <div className="rounded-3xl border border-blue-400/15 bg-blue-500/[0.06] p-4"><WalletCards className="size-5 text-blue-300" /><p className="mt-3 text-[10px] uppercase tracking-wide text-slate-500">This session</p><p className="mt-1 text-lg font-extrabold text-blue-300">{money(sessionEarned)}</p></div>
-          <div className="rounded-3xl border border-emerald-400/15 bg-emerald-500/[0.05] p-4"><ShieldCheck className="size-5 text-emerald-300" /><p className="mt-3 text-[10px] uppercase tracking-wide text-slate-500">Reward type</p><p className="mt-1 text-sm font-extrabold text-emerald-300">USDT first</p><p className="text-[10px] text-slate-500">Task Points only when Owner enables them.</p></div>
+          <div className="rounded-3xl border border-emerald-400/15 bg-emerald-500/[0.05] p-4"><ShieldCheck className="size-5 text-emerald-300" /><p className="mt-3 text-[10px] uppercase tracking-wide text-slate-500">Reward type</p><p className="mt-1 text-sm font-extrabold text-emerald-300">USDT first</p><p className="text-[10px] text-slate-500">Watch rewards are paid in USDT.</p></div>
         </section>
       </> : <section className="px-4 pt-10"><div className="rounded-[2rem] border border-blue-400/15 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,.2),transparent_55%)] p-7 text-center"><div className="mx-auto flex size-16 items-center justify-center rounded-3xl bg-blue-500/10 text-blue-300 ring-1 ring-blue-400/20"><Play className="size-7" /></div><h2 className="mt-5 text-xl font-extrabold">No videos available</h2><p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">External provider inventory and Owner-uploaded videos will appear here when they are active.</p><div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-500"><Clock3 className="size-3.5" /> Verified completions only <Coins className="ml-2 size-3.5" /> USDT rewards</div>{dashboard?.isOwner ? <Link to="/owner/videos" className="mx-auto mt-5 inline-flex rounded-2xl bg-blue-500/15 px-4 py-2.5 text-xs font-bold text-blue-300">Upload a TASKORA video</Link> : null}</div></section>}
     </main>

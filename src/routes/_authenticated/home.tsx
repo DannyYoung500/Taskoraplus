@@ -50,7 +50,7 @@ function HomePage() {
         display_name?: string | null;
         photo_url?: string | null;
         streak?: number;
-        xp?: number;
+        task_points?: number;
         level?: string | null;
         level_num?: number | null;
       }
@@ -59,7 +59,7 @@ function HomePage() {
   const name = profile?.display_name ?? "Tasker";
   const photo = profile?.photo_url ?? null;
   const streak = profile?.streak ?? 0;
-  const taskPoints = Number(profile?.xp ?? 0);
+  const taskPoints = Number(profile?.task_points ?? 0);
   const level = profile?.level_num ? `Level ${profile.level_num}` : profile?.level ?? "Level 1";
   const isOwner = Boolean(dash?.isOwner);
 
@@ -71,7 +71,7 @@ function HomePage() {
     setCheckMsg(null);
     try {
       const r = await dailyCheckin();
-      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · bonus applied`);
+      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · +${r.taskPoints ?? 0} Task Points`);
     } catch (e) {
       setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
     } finally {
@@ -194,7 +194,7 @@ function HomePage() {
       <section className="mb-4 grid grid-cols-4 gap-2">
         <Quick to="/tasks" label="Tasks" sub="Complete & earn" Icon={ClipboardCheck} />
         <Quick to="/watch-earn" label="Watch" sub="Watch & earn" Icon={PlayCircle} />
-        <Quick to="/ambassador" label="Invite" sub="XP & commission" Icon={Users} />
+        <Quick to="/ambassador" label="Invite" sub="Task Points & commission" Icon={Users} />
         <Quick to="/leaderboard" label="Rank" sub="Leaderboard" Icon={Trophy} />
       </section>
 

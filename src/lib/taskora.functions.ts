@@ -343,7 +343,7 @@ export const reviewSubmission = createServerFn({ method: "POST" })
         await supabaseAdmin.from("transactions").insert({
           user_id: profile.referred_by,
           label: "Referral share",
-          amount: Number((reward * 0.08).toFixed(2)),
+          amount: Number((reward * 0.10).toFixed(2)),
           kind: "referral",
         });
       }
@@ -413,13 +413,14 @@ export const dailyCheckin = createServerFn({ method: "POST" })
     const streak = profile.last_checkin === yesterday ? profile.streak + 1 : 1;
 
     await supabaseAdmin.from("profiles").update({ streak, last_checkin: today }).eq("id", userId);
-    await supabaseAdmin.from("transactions").insert({
-      user_id: userId,
-      label: `Daily check-in — day ${streak}`,
-      amount: 0.1,
-      kind: "bonus",
+    const { data: settingsRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "economy").maybeSingle();
+    const dailyPoints = Math.max(0, Math.floor(Number((settingsRow?.value as { daily_checkin_points?: number } | null)?.daily_checkin_points ?? 25)));
+    const { data: taskPointTotal, error: pointsError } = await (supabaseAdmin as any).rpc("award_task_points", {
+      _user_id: userId, _amount: dailyPoints, _kind: "daily_checkin",
+      _label: `Daily check-in — day ${streak}`, _reference: `checkin:${userId}:${today}`,
     });
-    return { already: false, streak };
+    if (pointsError) throw new Error(pointsError.message);
+    return { already: false, streak, taskPoints: dailyPoints, taskPointTotal: Number(taskPointTotal ?? 0) };
   });
 
 export const requestWithdrawal = createServerFn({ method: "POST" })
@@ -480,11 +481,14 @@ export const applyReferral = createServerFn({ method: "POST" })
     if (!inviter) throw new Error("That invite code doesn't exist.");
 
     await supabaseAdmin.from("profiles").update({ referred_by: inviter.id }).eq("id", userId);
-    await supabaseAdmin.from("transactions").insert([
-      { user_id: inviter.id, label: "Referral bonus", amount: 0.25, kind: "referral" },
-      { user_id: userId, label: "Welcome invite bonus", amount: 0.15, kind: "bonus" },
-    ]);
-    return { ok: true };
+    const { data: settingsRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "economy").maybeSingle();
+    const referralPoints = Math.max(0, Math.floor(Number((settingsRow?.value as { referral_points?: number } | null)?.referral_points ?? 100)));
+    const { data: taskPointTotal, error: pointsError } = await (supabaseAdmin as any).rpc("award_task_points", {
+      _user_id: inviter.id, _amount: referralPoints, _kind: "referral",
+      _label: "Successful referral", _reference: `referral:${userId}`,
+    });
+    if (pointsError) throw new Error(pointsError.message);
+    return { ok: true, taskPoints: referralPoints, taskPointTotal: Number(taskPointTotal ?? 0) };
   });
 
 export const ownerCreateTask = createServerFn({ method: "POST" })

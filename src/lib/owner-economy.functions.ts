@@ -231,6 +231,8 @@ export type EconomySettings = {
   watch_earn_enabled: boolean;
   watch_earn_rate_per_hour_usdt: number;
   watch_earn_daily_cap_usdt: number;
+  daily_checkin_points: number;
+  referral_points: number;
 };
 
 const DEFAULT_ECONOMY: EconomySettings = {
@@ -247,6 +249,8 @@ const DEFAULT_ECONOMY: EconomySettings = {
   watch_earn_enabled: true,
   watch_earn_rate_per_hour_usdt: 0.15,
   watch_earn_daily_cap_usdt: 2,
+  daily_checkin_points: 25,
+  referral_points: 100,
 };
 
 export const ownerGetEconomy = createServerFn({ method: "GET" })
@@ -311,6 +315,8 @@ export const ownerSaveEconomy = createServerFn({ method: "POST" })
         0,
         Number(data.watch_earn_daily_cap_usdt ?? current.watch_earn_daily_cap_usdt),
       ),
+      daily_checkin_points: Math.max(0, Math.floor(Number(data.daily_checkin_points ?? current.daily_checkin_points))),
+      referral_points: Math.max(0, Math.floor(Number(data.referral_points ?? current.referral_points))),
     };
     const { error } = await db.from("app_settings").upsert(
       {
