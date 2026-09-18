@@ -1,11 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Bell, Globe, LifeBuoy, ShieldCheck, ChevronRight, Link2, Crown } from "lucide-react";
-import { Screen, ScreenTitle, Card } from "@/components/Screen";
-import { PlatformIcon } from "@/components/PlatformIcon";
+import {
+  Bell,
+  ChevronRight,
+  Crown,
+  LifeBuoy,
+  Link2,
+  LogOut,
+  Shield,
+  Trophy,
+  WalletCards,
+  Users,
+} from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
-import { CONNECTABLE_PLATFORMS } from "@/lib/taskora-data";
+import { TASKORA_LOGO } from "@/lib/brand";
 import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   loader: async () => {
@@ -15,6 +25,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
     ]);
     return { dash, accounts };
   },
+  head: () => ({ meta: [{ title: "Profile — TASKORA" }] }),
   component: ProfileScreen,
 });
 
@@ -25,128 +36,177 @@ function ProfileScreen() {
         display_name?: string | null;
         username?: string | null;
         level?: string | null;
+        level_num?: number | null;
         streak?: number | null;
         photo_url?: string | null;
+        task_points?: number | null;
       }
     | null
     | undefined;
 
   const name = profile?.display_name ?? "Tasker";
   const handle = profile?.username ? `@${profile.username}` : "Telegram user";
-  const level = profile?.level ?? "Starter Tasker";
+  const levelNum = profile?.level_num ?? 1;
+  const level = profile?.level ?? `Level ${levelNum}`;
   const photo = profile?.photo_url ?? null;
-  const verified = dash?.verifiedCount ?? 0;
-  const lifetime = (dash?.transactions ?? [])
-    .filter((tx) => !isDemoTransactionLabel(tx.label) && Number(tx.amount) > 0)
-    .reduce((sum, tx) => sum + Number(tx.amount), 0);
-  const streak = profile?.streak ?? 0;
-  const taskPoints = Number((profile as { task_points?: number | null } | null)?.task_points ?? 0);
+  const streak = Number(profile?.streak ?? 0);
+  const taskPoints = Number(profile?.task_points ?? 0);
   const isOwner = Boolean(dash?.isOwner);
 
-  const byPlatform = new Map(
-    (accounts as Array<{ platform: string; handle: string; status: string }>).map((a) => [a.platform, a]),
-  );
+  const txs = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
+  const balance = Math.max(0, txs.reduce((s, t) => s + Number(t.amount), 0));
+  const lifetime = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
+  const verified = Number(dash?.verifiedCount ?? 0);
+
+  async function signOut() {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+    window.location.href = "/";
+  }
 
   return (
-    <Screen>
-      <ScreenTitle title="Profile" subtitle="Your TASKORA identity" />
-
-      <Card className="flex items-center gap-3 p-4">
-        {photo ? (
-          <img src={photo} alt="" className="size-14 rounded-2xl object-cover ring-2 ring-amber-400/35" />
-        ) : (
-          <span
-            className="inline-flex size-14 items-center justify-center rounded-2xl text-xl font-bold text-[#05070c]"
-            style={{ background: "linear-gradient(135deg,#FFE08A,#F5C542)" }}
+    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#030814] px-3.5 pb-28 pt-3 text-white">
+      <header className="mb-4 flex items-center gap-2.5">
+        <img src={TASKORA_LOGO} alt="" className="size-10 rounded-full ring-2 ring-cyan-400/40" />
+        <div className="min-w-0 flex-1">
+          <p
+            className="text-lg font-black tracking-[0.06em]"
+            style={{
+              background: "linear-gradient(90deg,#e0f2fe,#38bdf8,#2563eb)",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+            }}
           >
-            {name.charAt(0)}
-          </span>
-        )}
-        <div className="min-w-0">
-          <p className="truncate text-base font-bold">{name}</p>
-          <p className="text-xs text-white/45">{handle}</p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
-              <ShieldCheck className="size-3" /> {level}
+            Profile
+          </p>
+          <p className="text-[10px] text-slate-500">Account · security · links</p>
+        </div>
+        <Link to="/notifications" className="rounded-full border border-white/10 bg-[#0b1628] p-2.5">
+          <Bell className="size-4 text-slate-300" />
+        </Link>
+      </header>
+
+      <section
+        className="mb-3.5 overflow-hidden rounded-[22px] border border-cyan-400/30 p-4"
+        style={{
+          background:
+            "radial-gradient(circle at 90% 10%,rgba(56,189,248,0.22),transparent 40%), linear-gradient(145deg,#0a1a33,#060f1c)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          {photo ? (
+            <img src={photo} alt="" className="size-16 rounded-full object-cover ring-2 ring-cyan-400/50" />
+          ) : (
+            <span className="flex size-16 items-center justify-center rounded-full bg-cyan-500/20 text-xl font-black ring-2 ring-cyan-400/40">
+              {name.charAt(0)}
             </span>
-            {isOwner ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-semibold text-amber-200">
-                <Crown className="size-3" /> Owner
-              </span>
-            ) : null}
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-black">{name}</p>
+            <p className="text-[12px] text-slate-400">{handle}</p>
+            <span className="mt-1 inline-flex rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-200">
+              {level}
+            </span>
+          </div>
+          {isOwner ? (
+            <Link to="/owner" className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-2 text-amber-200">
+              <Crown className="size-5" />
+            </Link>
+          ) : null}
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <Stat label="Balance" value={formatUsd(balance)} />
+          <Stat label="Task Points" value={taskPoints.toLocaleString()} />
+          <Stat label="Streak" value={`${streak}d`} />
+        </div>
+      </section>
+
+      <section className="mb-3 grid grid-cols-2 gap-2">
+        <Link to="/wallet" className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5">
+          <WalletCards className="size-5 text-cyan-300" />
+          <div>
+            <p className="text-xs font-black">Wallet</p>
+            <p className="text-[10px] text-slate-500">Deposit · withdraw</p>
+          </div>
+        </Link>
+        <Link to="/leaderboard" className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5">
+          <Trophy className="size-5 text-amber-300" />
+          <div>
+            <p className="text-xs font-black">Rank</p>
+            <p className="text-[10px] text-slate-500">Leaderboard</p>
+          </div>
+        </Link>
+      </section>
+
+      <section className="mb-3 overflow-hidden rounded-2xl border border-white/8 bg-[#0b1628]">
+        <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="Task Points + commission" />
+        <Row to="/connected" icon={Link2} label="Connected accounts" sub={`${accounts.length} linked`} />
+        <Row to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
+        <Row to="/notifications" icon={Bell} label="Notifications" sub="Alerts" />
+      </section>
+
+      <section className="mb-3 rounded-2xl border border-white/8 bg-[#0b1628] p-3.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Stats</p>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <div className="rounded-xl bg-black/25 px-3 py-2">
+            <p className="text-[10px] text-slate-500">Lifetime earned</p>
+            <p className="font-black text-emerald-300">{formatUsd(lifetime)}</p>
+          </div>
+          <div className="rounded-xl bg-black/25 px-3 py-2">
+            <p className="text-[10px] text-slate-500">Tasks verified</p>
+            <p className="font-black">{verified}</p>
           </div>
         </div>
-      </Card>
-
-      <section className="mt-4 grid grid-cols-3 gap-2.5 text-center">
-        <Stat value={`${verified}`} label="Verified" />
-        <Stat value={formatUsd(lifetime)} label="Lifetime" />
-        <Stat value={`${streak}d`} label="Streak" />
-        <Stat value={taskPoints.toLocaleString()} label="Task Points" />
       </section>
 
-      {isOwner ? (
-        <Link
-          to="/owner"
-          className="mt-4 block rounded-2xl border border-amber-400/35 bg-amber-400/10 p-4 text-sm font-bold text-amber-300"
-        >
-          Owner Control Center →
-        </Link>
-      ) : null}
+      <div className="flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/5 px-3 py-2.5 text-[11px] text-emerald-200/90">
+        <Shield className="size-4 shrink-0" />
+        Telegram-native session · ledger balances · no demo balances
+      </div>
 
-      <Link to="/support" className="mt-3 block rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm font-semibold">
-        Support tickets →
-      </Link>
-
-      <section className="mt-6">
-        <h2 className="mb-3 text-base font-bold">Connected accounts</h2>
-        <Card className="divide-y divide-white/8">
-          {CONNECTABLE_PLATFORMS.map((platform) => {
-            const row = byPlatform.get(platform);
-            return (
-              <Link key={platform} to="/connected" className="flex items-center gap-3 p-3.5">
-                <PlatformIcon platform={platform} size={22} />
-                <p className="flex-1 text-sm font-medium capitalize">{row?.handle ?? platform}</p>
-                {row ? (
-                  <span className="text-[11px] font-semibold text-amber-300/80">{row.status}</span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300">
-                    <Link2 className="size-3" /> Connect
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </Card>
-      </section>
-
-      <section className="mt-6">
-        <h2 className="mb-3 text-base font-bold">Settings</h2>
-        <Card className="divide-y divide-white/8">
-          {[
-            { label: "Language", value: "English", Icon: Globe, to: "/profile" as const },
-            { label: "Notifications", value: "On", Icon: Bell, to: "/notifications" as const },
-            { label: "Security", value: "Telegram verified", Icon: ShieldCheck, to: "/profile" as const },
-            { label: "Support", value: "Open", Icon: LifeBuoy, to: "/support" as const },
-          ].map(({ label, value, Icon, to }) => (
-            <Link key={label} to={to} className="flex w-full items-center gap-3 p-3.5 text-left">
-              <Icon className="size-4 text-amber-300" />
-              <span className="flex-1 text-sm font-medium">{label}</span>
-              <span className="text-xs text-white/40">{value}</span>
-              <ChevronRight className="size-4 text-white/30" />
-            </Link>
-          ))}
-        </Card>
-      </section>
-    </Screen>
+      <button
+        type="button"
+        onClick={() => void signOut()}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 py-3 text-sm font-bold text-red-200"
+      >
+        <LogOut className="size-4" /> Sign out
+      </button>
+    </main>
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-[#12141c] p-3">
-      <p className="text-sm font-bold leading-none text-amber-300">{value}</p>
-      <p className="mt-1 text-[11px] text-white/40">{label}</p>
+    <div className="rounded-xl border border-white/8 bg-black/25 px-2 py-2 text-center">
+      <p className="text-[9px] font-semibold text-slate-500">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-black">{value}</p>
     </div>
+  );
+}
+
+function Row({
+  to,
+  icon: Icon,
+  label,
+  sub,
+}: {
+  to: string;
+  icon: typeof Trophy;
+  label: string;
+  sub: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-3 border-b border-white/5 px-3.5 py-3.5 last:border-0 active:bg-white/5"
+    >
+      <span className="inline-flex size-9 items-center justify-center rounded-xl bg-blue-500/10 text-cyan-300">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold">{label}</p>
+        <p className="text-[10px] text-slate-500">{sub}</p>
+      </div>
+      <ChevronRight className="size-4 text-slate-600" />
+    </Link>
   );
 }
