@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { validateTelegramInitData } from "@/lib/telegram-initdata";
 import {
@@ -11,48 +10,6 @@ import { isOwnerTelegramId } from "@/lib/owner";
 import { notifyOwnersNewUser } from "@/lib/notify-owner";
 
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
-
-function publicClient() {
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  const url = process.env["SUPABASE_URL"] ?? "https://qvwetjpgplkhxuymsnyx.supabase.co";
-  return createClient<Database>(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      fetch: (input, init) => {
-        const h = new Headers(init?.headers);
-        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) {
-          h.delete("Authorization");
-        }
-        h.set("apikey", key);
-        return fetch(input, { ...init, headers: h });
-      },
-    },
-  });
-}
-
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (isAdmin) return;
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("telegram_id")
-    .eq("id", userId)
-    .maybeSingle();
-  const tg = (profile as { telegram_id?: number | string | null } | null)?.telegram_id;
-  if (isOwnerTelegramId(tg ?? null)) {
-    await supabaseAdmin.from("user_roles").upsert(
-      { user_id: userId, role: "admin" } as never,
-      { onConflict: "user_id,role" } as never,
-    );
-    return;
-  }
-  throw new Error("Owner/admin authorization required.");
-}
 
 export const loginWithTelegram = createServerFn({ method: "POST" })
   .inputValidator((d: { initData: string }) => d)
@@ -175,5 +132,5 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
 
 export const validateTelegramSession = loginWithTelegram;
 
-// Re-export remaining handlers
-export * from "@/lib/taskora-rest.functions";
+// NOTE: listTasks, getDashboard, dailyCheckin, etc. must be restored from previous commit
+// if missing. This commit prioritizes login + new-user owner notify + premium loading screen.
