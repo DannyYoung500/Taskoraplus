@@ -69,7 +69,7 @@ function OwnerHealthPage() {
                     {c.status}
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-white/45">{c.detail}</p>
+                <p className="mt-1 text-xs text-white/45">{c.detail}</p>
               </div>
             ))}
           </div>
