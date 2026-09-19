@@ -1,6 +1,28 @@
 import { createServerFn } from "@tanstack/react-start";
+import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import { isOwnerTelegramId } from "@/lib/owner";
+
+export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
+
+function publicClient() {
+  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
+  const url = process.env["SUPABASE_URL"] ?? "https://qvwetjpgplkhxuymsnyx.supabase.co";
+  return createClient<Database>(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (input, init) => {
+        const h = new Headers(init?.headers);
+        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) {
+          h.delete("Authorization");
+        }
+        h.set("apikey", key);
+        return fetch(input, { ...init, headers: h });
+      },
+    },
+  });
+}
 
 async function assertAdmin(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -14,7 +36,7 @@ async function assertAdmin(userId: string) {
     .select("telegram_id")
     .eq("id", userId)
     .maybeSingle();
-  const tg = (profile as { telegram_id?: number | null } | null)?.telegram_id;
+  const tg = (profile as { telegram_id?: number | string | null } | null)?.telegram_id;
   if (isOwnerTelegramId(tg ?? null)) {
     await supabaseAdmin.from("user_roles").upsert(
       { user_id: userId, role: "admin" } as never,
@@ -25,197 +47,259 @@ async function assertAdmin(userId: string) {
   throw new Error("Owner/admin authorization required.");
 }
 
-async function loadPlatformSettings(db: any) {
-  try {
-    const { data } = await db.from("platform_settings").select("*").eq("id", true).maybeSingle();
-    return {
-      dual_approval_enabled: data?.dual_approval_enabled !== false,
-      dual_approval_threshold_usd: Number(data?.dual_approval_threshold_usd ?? 20),
-      first_withdrawal_extra_review: data?.first_withdrawal_extra_review !== false,
-      payouts_paused: Boolean(data?.payouts_paused),
-    };
-  } catch {
-    return {
-      dual_approval_enabled: true,
-      dual_approval_threshold_usd: 20,
-      first_withdrawal_extra_review: true,
-      payouts_paused: false,
-    };
-  }
-}
+export const listTasks = createServerFn({ method: "GET" }).handler(async () => {
+  const { data, error } = await publicClient()
+    .from("tasks")
+    .select("*")
+    .eq("is_active", true)
+    .order("reward", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+});
 
-export const listPendingWithdrawals = createServerFn({ method: "GET" })
+export const getTask = createServerFn({ method: "GET" })
+  .inputValidator((d: { taskId: string }) => d)
+  .handler(async ({ data }) => {
+    const { data: task, error } = await publicClient()
+      .from("tasks")
+      .select("*")
+      .eq("id", data.taskId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return task;
+  });
+
+export const getDashboard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [profileRes, txRes, subsRes, refRes, roleRes] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      supabase.from("transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      supabase.from("submissions").select("id, task_id, status, created_at, tasks(reward, title)").eq("user_id", userId),
+      supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).eq("referred_by", userId),
+      supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" }),
+    ]);
+
+    const transactions = txRes.data ?? [];
+    const submissions = (subsRes.data ?? []) as Array<{
+      id: string;
+      task_id: string;
+      status: string;
+      created_at: string;
+      tasks: { reward: number; title: string } | null;
+    }>;
+
+    const balance = transactions.reduce((s, t) => s + Number(t.amount), 0);
+    const lifetime = transactions
+      .filter((t) => Number(t.amount) > 0)
+      .reduce((s, t) => s + Number(t.amount), 0);
+    const pending = submissions
+      .filter((s) => s.status === "pending")
+      .reduce((s, row) => s + Number(row.tasks?.reward ?? 0), 0);
+
+    const tg = (profileRes.data as { telegram_id?: number | string } | null)?.telegram_id;
+    const isOwner = Boolean(roleRes.data) || isOwnerTelegramId(tg ?? null);
+
+    if (isOwner && !roleRes.data) {
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: userId, role: "admin" } as never,
+        { onConflict: "user_id,role" } as never,
+      );
+    }
+
+    return {
+      profile: profileRes.data,
+      transactions,
+      submissions,
+      balance,
+      lifetime,
+      pending,
+      verifiedCount: submissions.filter((s) => s.status === "verified").length,
+      referrals: refRes.count ?? 0,
+      isOwner,
+      telegramId: tg ?? null,
+    };
+  });
+
+export const submitTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { taskId: string; proofText?: string | undefined; proofUrl?: string | undefined }) => d,
+  )
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: task } = await supabaseAdmin
+      .from("tasks")
+      .select("*")
+      .eq("id", data.taskId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!task) throw new Error("This task is no longer available.");
+    if (task.slots_left <= 0) throw new Error("All slots for this task are taken.");
+
+    const { data: existing } = await supabaseAdmin
+      .from("submissions")
+      .select("id, status")
+      .eq("user_id", userId)
+      .eq("task_id", data.taskId)
+      .maybeSingle();
+    if (existing) throw new Error("You already submitted this task.");
+
+    const { error } = await supabaseAdmin.from("submissions").insert({
+      user_id: userId,
+      task_id: task.id,
+      status: "pending",
+      proof_text: data.proofText ?? null,
+      proof_url: data.proofUrl ?? null,
+    });
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin
+      .from("tasks")
+      .update({ slots_left: Math.max(0, task.slots_left - 1) })
+      .eq("id", task.id);
+
+    return { status: "pending" as const };
+  });
+
+export const reviewSubmission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { submissionId: string; decision: "verified" | "rejected"; reason?: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    await assertAdmin(userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: submission } = await supabaseAdmin
+      .from("submissions")
+      .select("*, tasks(id, reward, advertiser, title)")
+      .eq("id", data.submissionId)
+      .maybeSingle();
+    if (!submission) throw new Error("Submission not found.");
+    if (submission.status !== "pending") {
+      throw new Error(`Submission already ${submission.status}.`);
+    }
+
+    if (data.decision === "rejected") {
+      const { error } = await supabaseAdmin
+        .from("submissions")
+        .update({ status: "rejected" })
+        .eq("id", data.submissionId)
+        .eq("status", "pending");
+      if (error) throw new Error(error.message);
+      return { status: "rejected" as const };
+    }
+
+    const { data: updated, error: updErr } = await supabaseAdmin
+      .from("submissions")
+      .update({ status: "verified" })
+      .eq("id", data.submissionId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (updErr) throw new Error(updErr.message);
+    if (!updated) throw new Error("Submission was already processed.");
+
+    const task = submission.tasks as { reward: number; advertiser: string; title: string } | null;
+    const reward = Number(task?.reward ?? 0);
+    if (reward > 0) {
+      await supabaseAdmin.from("transactions").insert({
+        user_id: submission.user_id,
+        label: `Verified — ${task?.advertiser ?? "task"}`,
+        amount: reward,
+        kind: "reward",
+      });
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("referred_by")
+        .eq("id", submission.user_id)
+        .maybeSingle();
+      if (profile?.referred_by) {
+        await supabaseAdmin.from("transactions").insert({
+          user_id: profile.referred_by,
+          label: "Referral share",
+          amount: Number((reward * 0.10).toFixed(2)),
+          kind: "referral",
+        });
+      }
+    }
+
+    return { status: "verified" as const };
+  });
+
+export const listPendingSubmissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
-      .from("withdrawals")
-      .select("*")
+      .from("submissions")
+      .select("*, tasks(title, platform, reward, advertiser)")
       .eq("status", "pending")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    const rows = data ?? [];
-    const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))];
-    const { data: profiles } = userIds.length
-      ? await supabaseAdmin
-          .from("profiles")
-          .select("id, display_name, username, photo_url, telegram_id")
-          .in("id", userIds)
-      : { data: [] as any[] };
-    const byId = new Map((profiles ?? []).map((p: any) => [p.id, p]));
-    return rows.map((r: any) => {
-      const p = byId.get(r.user_id) as any;
-      return {
-        ...r,
-        display_name: p?.display_name ?? null,
-        username: p?.username ?? null,
-        photo_url: p?.photo_url ?? null,
-        telegram_id: p?.telegram_id ?? null,
-        approval_stage: String(r.approval_stage ?? "pending"),
-        requires_dual: Boolean(r.requires_dual),
-        is_first_withdrawal: Boolean(r.is_first_withdrawal),
-      };
-    });
+    return data ?? [];
   });
 
-export const reviewWithdrawal = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { withdrawalId: string; decision: "paid" | "rejected" }) => d)
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const settings = await loadPlatformSettings(supabaseAdmin);
-
-    if (settings.payouts_paused && data.decision === "paid") {
-      throw new Error("Payouts are paused in platform settings.");
-    }
-
-    const { data: row } = await supabaseAdmin
-      .from("withdrawals")
-      .select("*")
-      .eq("id", data.withdrawalId)
-      .maybeSingle();
-    if (!row) throw new Error("Withdrawal not found.");
-    if (row.status !== "pending") throw new Error(`Already ${row.status}.`);
-
-    const amount = Math.abs(Number(row.amount));
-    const stage = String((row as any).approval_stage ?? "pending");
-    const firstBy = (row as any).first_approved_by as string | null;
-    const requiresDual =
-      Boolean((row as any).requires_dual) ||
-      (settings.dual_approval_enabled && amount >= settings.dual_approval_threshold_usd) ||
-      (Boolean((row as any).is_first_withdrawal) && settings.first_withdrawal_extra_review);
-
-    if (data.decision === "rejected") {
-      await supabaseAdmin.from("transactions").insert({
-        user_id: row.user_id,
-        label: "Withdrawal rejected — refund",
-        amount,
-        kind: "bonus",
-      });
-      const { error } = await supabaseAdmin
-        .from("withdrawals")
-        .update({ status: "rejected", approval_stage: "rejected" } as never)
-        .eq("id", data.withdrawalId)
-        .eq("status", "pending");
-      if (error) throw new Error(error.message);
-      return { status: "rejected", stage: "rejected" };
-    }
-
-    if (requiresDual && stage === "pending") {
-      const { error } = await supabaseAdmin
-        .from("withdrawals")
-        .update({
-          approval_stage: "first_approved",
-          first_approved_by: context.userId,
-          first_approved_at: new Date().toISOString(),
-          requires_dual: true,
-        } as never)
-        .eq("id", data.withdrawalId)
-        .eq("status", "pending");
-      if (error) throw new Error(error.message);
-      return {
-        status: "pending",
-        stage: "first_approved",
-        message: "First approval recorded. Second owner must confirm.",
-      };
-    }
-
-    if (requiresDual && stage === "first_approved") {
-      if (firstBy && firstBy === context.userId) {
-        throw new Error("Second approval must be a different owner.");
-      }
-      const { error } = await supabaseAdmin
-        .from("withdrawals")
-        .update({
-          status: "paid",
-          approval_stage: "paid",
-          second_approved_by: context.userId,
-          second_approved_at: new Date().toISOString(),
-        } as never)
-        .eq("id", data.withdrawalId)
-        .eq("status", "pending");
-      if (error) throw new Error(error.message);
-      return { status: "paid", stage: "paid" };
-    }
-
-    const { error } = await supabaseAdmin
-      .from("withdrawals")
-      .update({
-        status: "paid",
-        approval_stage: "paid",
-        first_approved_by: context.userId,
-        first_approved_at: new Date().toISOString(),
-      } as never)
-      .eq("id", data.withdrawalId)
-      .eq("status", "pending");
-    if (error) throw new Error(error.message);
-    return { status: "paid", stage: "paid" };
-  });
-
-export const listGateWhitelist = createServerFn({ method: "GET" })
+export const getOwnerOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    try {
-      const { data, error } = await (supabaseAdmin as any)
-        .from("gate_whitelist")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    } catch {
-      return [];
-    }
+
+    const [users, tasks, pending, withdrawals, txs] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
+      supabaseAdmin.from("tasks").select("id", { count: "exact", head: true }).eq("is_active", true),
+      supabaseAdmin.from("submissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabaseAdmin.from("withdrawals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabaseAdmin.from("transactions").select("amount, kind"),
+    ]);
+
+    const rows = txs.data ?? [];
+    const rewardsPaid = rows
+      .filter((t) => t.kind === "reward" || t.kind === "referral" || t.kind === "bonus")
+      .reduce((s, t) => s + Number(t.amount), 0);
+
+    return {
+      totalUsers: users.count ?? 0,
+      activeTasks: tasks.count ?? 0,
+      pendingReviews: pending.count ?? 0,
+      pendingWithdrawals: withdrawals.count ?? 0,
+      rewardsPaid,
+    };
   });
 
-export const addGateWhitelist = createServerFn({ method: "POST" })
+export const dailyCheckin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { telegramId: number; note?: string }) => d)
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+  .handler(async ({ context }) => {
+    const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any).from("gate_whitelist").upsert({
-      telegram_id: data.telegramId,
-      note: data.note?.trim() || null,
-      created_by: context.userId,
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("streak, last_checkin")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!profile) throw new Error("Profile not found.");
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (profile.last_checkin === today) return { already: true, streak: profile.streak };
+
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const streak = profile.last_checkin === yesterday ? profile.streak + 1 : 1;
+
+    await supabaseAdmin.from("profiles").update({ streak, last_checkin: today }).eq("id", userId);
+    const { data: settingsRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "economy").maybeSingle();
+    const dailyPoints = Math.max(0, Math.floor(Number((settingsRow?.value as { daily_checkin_points?: number } | null)?.daily_checkin_points ?? 25)));
+    const { data: taskPointTotal, error: pointsError } = await (supabaseAdmin as any).rpc("award_task_points", {
+      _user_id: userId, _amount: dailyPoints, _kind: "daily_checkin",
+      _label: `Daily check-in — day ${streak}`, _reference: `checkin:${userId}:${today}`,
     });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-export const removeGateWhitelist = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { telegramId: number }) => d)
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any)
-      .from("gate_whitelist")
-      .delete()
-      .eq("telegram_id", data.telegramId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    if (pointsError) throw new Error(pointsError.message);
+    return { already: false, streak, taskPoints: dailyPoints, taskPointTotal: Number(taskPointTotal ?? 0) };
   });
