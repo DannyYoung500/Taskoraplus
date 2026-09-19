@@ -303,3 +303,75 @@ export const dailyCheckin = createServerFn({ method: "POST" })
     if (pointsError) throw new Error(pointsError.message);
     return { already: false, streak, taskPoints: dailyPoints, taskPointTotal: Number(taskPointTotal ?? 0) };
   });
+
+export const listPendingWithdrawals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("withdrawals")
+      .select("*, profiles:user_id(display_name, username, telegram_id, photo_url)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row: any) => ({
+      ...row,
+      photo_url: row.profiles?.photo_url ?? null,
+      display_name: row.profiles?.display_name ?? null,
+      username: row.profiles?.username ?? null,
+    }));
+  });
+
+export const reviewWithdrawal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { withdrawalId: string; decision: "paid" | "rejected"; reason?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row } = await supabaseAdmin
+      .from("withdrawals")
+      .select("*")
+      .eq("id", data.withdrawalId)
+      .maybeSingle();
+    if (!row) throw new Error("Withdrawal not found.");
+    if (row.status === "paid") throw new Error("Withdrawal is already paid.");
+    if (row.status !== "pending" && row.status !== "processing") {
+      throw new Error(`Cannot review withdrawal in status: ${row.status}`);
+    }
+
+    const nextStatus = data.decision === "paid" ? "paid" : "rejected";
+    const { error } = await supabaseAdmin
+      .from("withdrawals")
+      .update({
+        status: nextStatus as never,
+        rejection_reason: data.decision === "rejected" ? (data.reason ?? "Rejected by owner") : null,
+        processed_at: new Date().toISOString(),
+        processed_by: context.userId,
+      })
+      .eq("id", data.withdrawalId)
+      .neq("status", "paid");
+    if (error) throw new Error(error.message);
+
+    if (data.decision === "rejected") {
+      const label = `Withdrawal rejected — refund ${data.withdrawalId.slice(0, 8)}`;
+      const { data: existing } = await supabaseAdmin
+        .from("transactions")
+        .select("id")
+        .eq("user_id", row.user_id)
+        .eq("label", label)
+        .maybeSingle();
+      if (!existing) {
+        await supabaseAdmin.from("transactions").insert({
+          user_id: row.user_id,
+          label,
+          amount: Math.abs(Number(row.amount)),
+          kind: "bonus",
+        });
+      }
+    }
+
+    return { status: nextStatus };
+  });
