@@ -174,3 +174,6 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
   });
 
 export const validateTelegramSession = loginWithTelegram;
+
+// Re-export remaining handlers
+export * from "@/lib/taskora-rest.functions";
