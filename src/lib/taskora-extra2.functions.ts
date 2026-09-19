@@ -31,9 +31,35 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId } = context;
     if (!data.address.trim()) throw new Error("Enter your wallet address.");
-    if (!(data.amount >= 10)) throw new Error("Minimum withdrawal is $10.00.");
-
+    const { RULES, hoursSince } = await import("@/lib/platform-rules");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let minWd = RULES.minWithdrawalUsd;
+    try {
+      const { data: settingsRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "economy").maybeSingle();
+      const v = (settingsRow?.value ?? {}) as { min_withdrawal_usd?: number };
+      minWd = Math.max(RULES.minWithdrawalUsd, Number(v.min_withdrawal_usd ?? RULES.minWithdrawalUsd));
+    } catch {
+      /* use default */
+    }
+    if (!(data.amount >= minWd)) throw new Error(`Minimum withdrawal is $${minWd.toFixed(2)}.`);
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("created_at, status")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profile && (profile as { status?: string }).status && (profile as { status?: string }).status !== "active") {
+      throw new Error("Account is not allowed to withdraw.");
+    }
+    const ageH = hoursSince((profile as { created_at?: string } | null)?.created_at);
+    if (ageH < RULES.newAccountWithdrawHoldHours) {
+      const left = Math.ceil(RULES.newAccountWithdrawHoldHours - ageH);
+      throw new Error(
+        `New accounts wait ${RULES.newAccountWithdrawHoldHours}h before first withdrawal (~${left}h left).`,
+      );
+    }
+
     const { data: txs } = await supabaseAdmin
       .from("transactions")
       .select("amount")
@@ -84,7 +110,10 @@ export const applyReferral = createServerFn({ method: "POST" })
 
     await supabaseAdmin.from("profiles").update({ referred_by: inviter.id }).eq("id", userId);
     const { data: settingsRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "economy").maybeSingle();
-    const referralPoints = Math.max(0, Math.floor(Number((settingsRow?.value as { referral_points?: number } | null)?.referral_points ?? 100)));
+    const referralPoints = Math.max(
+      0,
+      Math.floor(Number((settingsRow?.value as { referral_points?: number } | null)?.referral_points ?? 100)),
+    );
     const { data: taskPointTotal, error: pointsError } = await (supabaseAdmin as any).rpc("award_task_points", {
       _user_id: inviter.id,
       _amount: referralPoints,
