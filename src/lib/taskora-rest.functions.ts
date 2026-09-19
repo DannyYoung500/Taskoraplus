@@ -173,6 +173,20 @@ export const reviewSubmission = createServerFn({ method: "POST" })
     await assertAdmin(userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    try {
+      const { data: maintRow } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "maintenance_switches")
+        .maybeSingle();
+      const v = (maintRow?.value ?? {}) as Record<string, unknown>;
+      if (Boolean(v.verification_paused) || Boolean(v.read_only)) {
+        throw new Error("Verification is temporarily paused by the owner.");
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("paused")) throw e;
+    }
+
     const { data: submission } = await supabaseAdmin
       .from("submissions")
       .select("*, tasks(id, reward, advertiser, title)")
@@ -222,7 +236,7 @@ export const reviewSubmission = createServerFn({ method: "POST" })
         await supabaseAdmin.from("transactions").insert({
           user_id: profile.referred_by,
           label: "Referral share",
-          amount: Number((reward * 0.10).toFixed(2)),
+          amount: Number((reward * 0.1).toFixed(2)),
           kind: "referral",
         });
       }
