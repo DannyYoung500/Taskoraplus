@@ -5,10 +5,10 @@ import {
   Loader2,
   Play,
   ShieldCheck,
-  Sparkles,
   Zap,
   Star,
   Flame,
+  Bell,
 } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import {
@@ -139,9 +139,8 @@ function WatchEarnPage() {
             Earn · Play · Grow
           </p>
         </div>
-        <Link to="/notifications" className="relative rounded-full border border-cyan-400/20 bg-[#0b1628] p-2.5">
-          <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-red-400" />
-          <Sparkles className="size-4 text-slate-300" />
+        <Link to="/notifications" className="rounded-full border border-cyan-400/20 bg-[#0b1628] p-2.5">
+          <Bell className="size-4 text-slate-300" />
         </Link>
         <Link
           to="/profile"
