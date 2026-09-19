@@ -17,18 +17,32 @@ export const Route = createFileRoute("/_authenticated/owner/withdrawals")({
   component: OwnerWithdrawals,
 });
 
+type WdRow = Awaited<ReturnType<typeof listPendingWithdrawals>>[number] & {
+  requires_dual?: boolean;
+  approval_stage?: string;
+  first_approved_by?: string | null;
+};
+
 function OwnerWithdrawals() {
   const initial = Route.useLoaderData();
-  const [rows, setRows] = useState(initial.rows);
+  const [rows, setRows] = useState((initial.rows ?? []) as WdRow[]);
   const [error, setError] = useState(initial.error);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  async function act(id: string, decision: "paid" | "rejected") {
+  async function act(id: string, decision: "paid" | "rejected" | "first_approve") {
     setBusyId(id);
     setError(null);
     try {
       await reviewWithdrawal({ data: { withdrawalId: id, decision } });
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      if (decision === "first_approve") {
+        setRows((prev) =>
+          prev.map((row) =>
+            row.id === id ? { ...row, approval_stage: "first_ok", first_approved_by: "me" } : row,
+          ),
+        );
+      } else {
+        setRows((prev) => prev.filter((row) => row.id !== id));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
     } finally {
@@ -37,38 +51,78 @@ function OwnerWithdrawals() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-6">
+    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-6 text-white">
       <h1 className="text-xl font-bold">Withdrawals</h1>
-      <p className="mt-1 text-xs text-muted-foreground">Owner review. Mark paid only after on-chain send.</p>
-      {error ? <p className="mt-3 text-xs text-warning">{error}</p> : null}
+      <p className="mt-1 text-xs text-white/45">
+        Mark paid only after on-chain send. Dual-approval rows need two different owners.
+      </p>
+      {error ? <p className="mt-3 text-xs text-amber-300">{error}</p> : null}
       <div className="mt-4 space-y-3">
         {rows.length === 0 ? (
-          <p className="card-surface p-4 text-sm text-muted-foreground">No pending withdrawals.</p>
+          <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm text-white/40">
+            No pending withdrawals.
+          </p>
         ) : (
-          rows.map((w) => (
-            <div key={w.id} className="card-surface space-y-2 p-4">
-              <p className="text-sm font-semibold">
-                ${Number(w.amount).toFixed(2)} · {w.method}
-              </p>
-              <p className="break-all text-xs text-muted-foreground">{w.address}</p>
-              <div className="flex gap-2">
-                <button
-                  disabled={busyId === w.id}
-                  onClick={() => act(w.id, "paid")}
-                  className="bg-green-grad flex-1 rounded-xl py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
-                >
-                  Mark paid
-                </button>
-                <button
-                  disabled={busyId === w.id}
-                  onClick={() => act(w.id, "rejected")}
-                  className="flex-1 rounded-xl border border-input py-2 text-xs font-semibold disabled:opacity-50"
-                >
-                  Reject
-                </button>
+          rows.map((w) => {
+            const dual = Boolean(w.requires_dual);
+            const stage = String(w.approval_stage ?? "pending");
+            const firstOk = stage === "first_ok" || stage === "ready";
+            return (
+              <div key={w.id} className="space-y-2 rounded-2xl border border-white/8 bg-[#12141c] p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold">
+                    ${Number(w.amount).toFixed(2)} · {w.method}
+                  </p>
+                  {dual ? (
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        firstOk
+                          ? "bg-emerald-500/15 text-emerald-300"
+                          : "bg-amber-500/15 text-amber-200"
+                      }`}
+                    >
+                      {firstOk ? "1/2 approved" : "DUAL required"}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-xs text-white/50">
+                  {(w as { display_name?: string }).display_name || "User"}
+                  {(w as { username?: string }).username
+                    ? ` · @${(w as { username?: string }).username}`
+                    : ""}
+                </p>
+                <p className="break-all text-[11px] text-white/35">{w.address}</p>
+                <div className="flex flex-wrap gap-2">
+                  {dual && !firstOk ? (
+                    <button
+                      type="button"
+                      disabled={busyId === w.id}
+                      onClick={() => void act(w.id, "first_approve")}
+                      className="flex-1 rounded-xl border border-amber-400/30 bg-amber-500/10 py-2 text-xs font-bold text-amber-200 disabled:opacity-50"
+                    >
+                      First approve
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={busyId === w.id || (dual && !firstOk)}
+                    onClick={() => void act(w.id, "paid")}
+                    className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    {dual ? "2nd · Mark paid" : "Mark paid"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === w.id}
+                    onClick={() => void act(w.id, "rejected")}
+                    className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-white/50 disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </main>
