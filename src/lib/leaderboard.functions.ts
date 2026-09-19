@@ -12,9 +12,11 @@ export type LeaderboardRow = {
   referrals: number;
   /** Sum of positive ledger amounts (real USDT credits) */
   usdt_earned: number;
+  /** Verified task submissions only — real completions */
+  tasks_completed: number;
 };
 
-/** Top earners — only active users. Task Points + real USDT ledger totals. */
+/** Top earners — active users only. Real USDT ledger + Task Points + verified tasks + invites. */
 export const getLeaderboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<LeaderboardRow[]> => {
@@ -23,7 +25,7 @@ export const getLeaderboard = createServerFn({ method: "GET" })
       .from("profiles")
       .select("id, display_name, username, photo_url, telegram_id, status, task_points, referred_by")
       .order("task_points", { ascending: false })
-      .limit(80);
+      .limit(100);
     if (error) throw new Error(error.message);
 
     const active = (profiles ?? []).filter(
@@ -32,15 +34,23 @@ export const getLeaderboard = createServerFn({ method: "GET" })
     const ids = active.map((p) => p.id);
 
     const usdtMap = new Map<string, number>();
+    const tasksMap = new Map<string, number>();
     if (ids.length) {
-      const { data: txs } = await supabaseAdmin
-        .from("transactions")
-        .select("user_id, amount")
-        .in("user_id", ids)
-        .gt("amount", 0);
+      const [{ data: txs }, { data: subs }] = await Promise.all([
+        supabaseAdmin.from("transactions").select("user_id, amount").in("user_id", ids).gt("amount", 0),
+        supabaseAdmin
+          .from("submissions")
+          .select("user_id")
+          .in("user_id", ids)
+          .eq("status", "verified"),
+      ]);
       for (const t of txs ?? []) {
         const uid = String((t as { user_id: string }).user_id);
         usdtMap.set(uid, (usdtMap.get(uid) ?? 0) + Number((t as { amount: number }).amount));
+      }
+      for (const s of subs ?? []) {
+        const uid = String((s as { user_id: string }).user_id);
+        tasksMap.set(uid, (tasksMap.get(uid) ?? 0) + 1);
       }
     }
 
@@ -60,5 +70,6 @@ export const getLeaderboard = createServerFn({ method: "GET" })
       task_points: Number((p as { task_points?: number | null }).task_points ?? 0),
       referrals: refCounts.get(p.id) ?? 0,
       usdt_earned: Number((usdtMap.get(p.id) ?? 0).toFixed(4)),
+      tasks_completed: tasksMap.get(p.id) ?? 0,
     }));
   });
