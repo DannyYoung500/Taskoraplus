@@ -25,28 +25,12 @@ import {
   Webhook,
   XCircle,
 } from "lucide-react";
-import { ownerListSubmissions, ownerOverview, ownerWithdrawals } from "@/lib/owner.functions";
+import { loadOwnerDashboard } from "@/lib/owner-dashboard.loader";
 import { TaskoraLogo } from "@/components/TaskoraLogo";
 import { OwnerShell } from "@/components/OwnerShell";
 
 export const Route = createFileRoute("/_authenticated/owner/")({
-  loader: async () => {
-    try {
-      const [overview, submissions, withdrawals] = await Promise.all([
-        ownerOverview(),
-        ownerListSubmissions({ data: { status: "pending" } }),
-        ownerWithdrawals({ data: { status: "pending" } }),
-      ]);
-      return { overview, submissions, withdrawals, error: null as string | null };
-    } catch (e) {
-      return {
-        overview: null,
-        submissions: [],
-        withdrawals: [],
-        error: e instanceof Error ? e.message : "Owner access required",
-      };
-    }
-  },
+  loader: async () => loadOwnerDashboard(),
   component: OwnerHub,
 });
 
@@ -311,7 +295,7 @@ function OwnerHub() {
                 <h2 className="mb-3 text-sm font-black">Platform Health</h2>
                 <p className="mb-3 flex items-center gap-2 text-[10px] font-bold text-emerald-300"><CheckCircle2 className="size-4" /> All Systems Operational</p>
                 <div className="grid grid-cols-2 gap-2 text-[9px] text-slate-400">
-                  <HealthItem label="Database" ok /><HealthItem label="API Services" ok /><HealthItem label="Telegram Bot" ok={Boolean(typeof window === "undefined" ? true : true)} /><HealthItem label="Payment Gateway" ok={false} /><HealthItem label="Provider Integrations" ok={false} /><HealthItem label="Webhooks" ok={false} />
+                  <HealthItem label="Database" ok /><HealthItem label="API Services" ok /><HealthItem label="Telegram Bot" ok /><HealthItem label="Payment Gateway" ok={false} /><HealthItem label="Provider Integrations" ok={false} /><HealthItem label="Webhooks" ok={false} />
                 </div>
                 <Link to="/owner/health" className="mt-4 block text-right text-[9px] font-bold text-cyan-300">View Details</Link>
               </div>
@@ -333,23 +317,57 @@ function OwnerHub() {
 }
 
 function Queue({ title, href, empty, columns, children }: { title: string; href: string; empty: string; columns: string[]; children: React.ReactNode }) {
+  const items = Array.isArray(children) ? children : children ? [children] : [];
   return (
-    <div className="overflow-hidden rounded-2xl border border-cyan-400/10 bg-[#08172a]">
-      <div className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3"><h2 className="text-sm font-black">{title}</h2><Link to={href as any} className="text-[9px] font-bold text-cyan-300">View All</Link></div>
-      <div className="hidden grid-cols-[1.05fr_1.5fr_.65fr_1fr_1.4fr] gap-2 border-b border-white/[0.05] px-4 py-2 text-[8px] font-bold uppercase text-slate-500 sm:grid">{columns.map((c) => <span key={c}>{c}</span>)}<span>Action</span></div>
-      <div>{children}</div>
+    <div className="rounded-2xl border border-cyan-400/10 bg-[#08172a] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-black">{title}</h2>
+        <Link to={href as any} className="text-[9px] font-bold text-cyan-300">View All</Link>
+      </div>
+      <div className="mb-2 grid grid-cols-4 gap-1 text-[8px] font-bold uppercase tracking-wider text-slate-500">
+        {columns.map((c) => <span key={c}>{c}</span>)}
+      </div>
+      <div className="space-y-2">
+        {items.length ? items : <p className="py-6 text-center text-[10px] text-slate-500">{empty}</p>}
+      </div>
     </div>
   );
 }
+
 function QueueRow({ values, actions }: { values: string[]; actions: React.ReactNode }) {
-  return <div className="grid gap-1 border-b border-white/[0.04] px-4 py-2.5 text-[9px] sm:grid-cols-[1.05fr_1.5fr_.65fr_1fr_1.4fr] sm:items-center sm:gap-2"><div className="font-semibold text-cyan-200">{values[0]}</div><div className="truncate text-slate-300">{values[1]}</div><div className="text-white">{values[2]}</div><div className="text-slate-500">{values[3]}</div><div className="flex gap-1">{actions}</div></div>;
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-xl border border-white/[0.04] bg-black/20 px-2 py-2">
+      <div className="grid grid-cols-4 gap-1 text-[9px] text-slate-300">
+        {values.map((v, i) => <span key={i} className="truncate">{v}</span>)}
+      </div>
+      <div className="flex gap-1">{actions}</div>
+    </div>
+  );
 }
+
 function Setting({ label, value, href }: { label: string; value: string; href: string }) {
-  return <Link to={href as any} className="rounded-lg border border-white/[0.04] bg-white/[0.02] p-2 hover:border-cyan-400/15"><p className="text-slate-500">{label}</p><p className="mt-0.5 font-bold text-slate-200">{value}</p></Link>;
+  return (
+    <Link to={href as any} className="rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2 hover:border-cyan-400/20">
+      <p className="text-slate-500">{label}</p>
+      <p className="mt-0.5 font-bold text-white">{value}</p>
+    </Link>
+  );
 }
-function HealthItem({ label, ok }: { label: string; ok: boolean }) {
-  return <div className="flex items-center gap-1.5"><span className={`size-1.5 rounded-full ${ok ? "bg-emerald-400" : "bg-rose-400"}`} />{label}</div>;
+
+function HealthItem({ label, ok = true }: { label: string; ok?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg bg-black/20 px-2 py-1.5">
+      <span className={ok ? "text-emerald-400" : "text-rose-400"}>{ok ? "●" : "●"}</span>
+      <span>{label}</span>
+    </div>
+  );
 }
+
 function QuickStat({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between border-b border-white/[0.04] pb-2"><span className="text-slate-500">{label}</span><span className="font-bold text-white">{value}</span></div>;
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-black/20 px-3 py-2">
+      <span className="text-slate-400">{label}</span>
+      <span className="font-bold text-white">{value}</span>
+    </div>
+  );
 }
