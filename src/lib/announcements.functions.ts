@@ -22,6 +22,23 @@ export const listActiveAnnouncements = createServerFn({ method: "GET" })
     }
   });
 
+/** Count of active announcements — header badge only when > 0. */
+export const countActiveAnnouncements = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { count, error } = await supabaseAdmin
+        .from("announcements")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", true);
+      if (error) return 0;
+      return count ?? 0;
+    } catch {
+      return 0;
+    }
+  });
+
 /** Owner broadcast — creates an active in-app announcement for all users. */
 export const ownerCreateAnnouncement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
