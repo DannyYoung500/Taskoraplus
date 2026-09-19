@@ -17,32 +17,29 @@ declare global {
         expand?: () => void;
         setHeaderColor?: (color: string) => void;
         setBackgroundColor?: (color: string) => void;
+        HapticFeedback?: {
+          impactOccurred?: (s: string) => void;
+          notificationOccurred?: (t: string) => void;
+        };
       };
     };
   }
 }
 
-const STAGES: { title: string; detail: string }[] = [
-  { title: "SECURE CONNECTION", detail: "Establishing secure connection..." },
-  { title: "ACCOUNT AUTHENTICATION", detail: "Authenticating your account..." },
-  { title: "SESSION INITIALIZATION", detail: "Initializing secure session..." },
-  { title: "PROFILE SYNCHRONIZATION", detail: "Synchronizing your profile..." },
-  { title: "ACCOUNT VERIFICATION", detail: "Verifying account status..." },
-  { title: "PLATFORM SYNCHRONIZATION", detail: "Syncing connected platforms..." },
-  { title: "WALLET INITIALIZATION", detail: "Initializing wallet..." },
-  { title: "TASK SYNCHRONIZATION", detail: "Synchronizing your available tasks..." },
-  { title: "WORKSPACE INITIALIZATION", detail: "Preparing your TASKORA workspace..." },
-  { title: "FINAL ACCOUNT INITIALIZATION", detail: "Finalizing your secure TASKORA session..." },
-];
+/** Fast premium boot — Telegram Mini App best practice: ready() first, short stages, no white screen */
+const STAGES = [
+  { title: "Connecting", detail: "Secure Telegram session" },
+  { title: "Signing in", detail: "Verifying your account" },
+  { title: "Almost ready", detail: "Opening TASKORA" },
+] as const;
 
-const STAGE_MS = 320;
-const FINAL_HOLD_MS = 600;
-const WELCOME_MS = 650;
-const MIN_TOTAL_MS = 2400;
+const STAGE_MS = 220;
+const WELCOME_MS = 450;
+const MIN_TOTAL_MS = 900;
 
 export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string }) {
   const navigate = useNavigate();
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(8);
   const [stageIndex, setStageIndex] = useState(0);
   const [phase, setPhase] = useState<"loading" | "welcome" | "error" | "need-telegram">("loading");
   const [error, setError] = useState<string | null>(null);
@@ -51,17 +48,20 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   const [logoSrc, setLogoSrc] = useState(TASKORA_LOGO);
   const started = useRef(false);
   const authPromise = useRef<Promise<void> | null>(null);
-  const authResult = useRef<{ ok: boolean; firstName?: string; isOwner?: boolean; error?: string }>({
-    ok: false,
-  });
+  const authResult = useRef<{
+    ok: boolean;
+    firstName?: string;
+    isOwner?: boolean;
+    error?: string;
+  }>({ ok: false });
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     try {
       tg?.ready?.();
       tg?.expand?.();
-      tg?.setHeaderColor?.("#0b1424");
-      tg?.setBackgroundColor?.("#0b1424");
+      tg?.setHeaderColor?.("#030814");
+      tg?.setBackgroundColor?.("#030814");
     } catch {
       /* ignore */
     }
@@ -103,6 +103,11 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
           firstName: result.firstName ?? undefined,
           isOwner: Boolean(result.isOwner),
         };
+        try {
+          window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success");
+        } catch {
+          /* ignore */
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : "TASKORA could not authenticate with Telegram.";
         authResult.current = {
@@ -123,17 +128,17 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
 
       for (let i = 0; i < STAGES.length; i++) {
         setStageIndex(i);
-        const startPct = (i / STAGES.length) * 100;
-        const endPct = ((i + 1) / STAGES.length) * 100;
+        const startPct = 8 + (i / STAGES.length) * 85;
+        const endPct = 8 + ((i + 1) / STAGES.length) * 85;
         setProgress(startPct);
-        const hold = i === STAGES.length - 1 ? FINAL_HOLD_MS : STAGE_MS;
-        const steps = Math.max(3, Math.floor(hold / 50));
+        const hold = STAGE_MS;
+        const steps = Math.max(2, Math.floor(hold / 40));
         for (let s = 1; s <= steps; s++) {
           await new Promise((r) => window.setTimeout(r, hold / steps));
           setProgress(startPct + ((endPct - startPct) * s) / steps);
-          if (authResult.current.ok && i >= 5) break;
+          if (authResult.current.ok && i >= 1) break;
         }
-        if (authResult.current.ok && i >= 6) {
+        if (authResult.current.ok && i >= 1) {
           setStageIndex(STAGES.length - 1);
           setProgress(100);
           break;
@@ -182,10 +187,8 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       }
 
       setPhase("welcome");
-      // Everyone (including owner) opens Home. Owner console is opened from Profile / link.
-      const dest = redirectTo;
       window.setTimeout(() => {
-        navigate({ to: dest as "/home", replace: true });
+        navigate({ to: redirectTo as "/home", replace: true });
       }, WELCOME_MS);
     }
 
@@ -195,59 +198,74 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   const stage = STAGES[stageIndex]!;
 
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center overflow-hidden bg-[#0b1424] px-6 text-white">
+    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center overflow-hidden bg-[#030814] px-6 text-white">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 28%, rgba(59,130,246,0.22), transparent 52%), radial-gradient(ellipse at 50% 95%, rgba(37,99,235,0.08), transparent 45%)",
+            "radial-gradient(ellipse at 50% 32%, rgba(56,189,248,0.28), transparent 48%), radial-gradient(ellipse at 50% 100%, rgba(37,99,235,0.12), transparent 40%)",
         }}
       />
 
       <div className="relative z-10 flex w-full flex-col items-center">
-        <div className="relative mb-5">
-          <div className="absolute -inset-5 rounded-full bg-blue-500/25 blur-2xl" />
+        <div className="relative mb-6">
+          <div
+            className="absolute -inset-4 rounded-full opacity-60 blur-2xl"
+            style={{ background: "radial-gradient(circle, rgba(56,189,248,0.45), transparent 70%)" }}
+          />
+          {phase === "loading" ? (
+            <div
+              className="absolute -inset-2 rounded-full border-2 border-cyan-400/30 border-t-cyan-300 animate-spin"
+              style={{ animationDuration: "0.9s" }}
+            />
+          ) : null}
           <img
             src={logoSrc}
             alt="TASKORA"
-            className="relative size-40 rounded-full object-cover shadow-[0_0_48px_rgba(59,130,246,0.45)] ring-2 ring-blue-400/40"
+            className="relative size-28 rounded-full object-cover shadow-[0_0_48px_rgba(56,189,248,0.4)] ring-2 ring-cyan-400/50"
             onError={() => {
               if (logoSrc !== TASKORA_WELCOME_IMAGE) setLogoSrc(TASKORA_WELCOME_IMAGE);
             }}
           />
         </div>
 
-        <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-blue-300/80">TASKORA</p>
-        <h1 className="mt-2 text-center text-2xl font-bold tracking-tight text-white">
-          {phase === "welcome"
-            ? `Welcome, ${welcomeName}${goOwner ? " · Owner" : ""}`
-            : "Verified Tasks. Real Rewards."}
-        </h1>
-        <p className="mt-1 text-center text-xs text-slate-400">@Taskoraplusbot</p>
+        <p
+          className="text-[22px] font-black tracking-[0.14em]"
+          style={{
+            background: "linear-gradient(90deg,#e0f2fe,#38bdf8,#2563eb)",
+            WebkitBackgroundClip: "text",
+            color: "transparent",
+          }}
+        >
+          TASKORA
+        </p>
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.28em] text-cyan-300/70">
+          Earn · Play · Grow
+        </p>
 
         {phase === "loading" || phase === "welcome" ? (
           <div className="mt-10 w-full max-w-xs">
-            <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">
-              {stage.title}
-            </p>
-            <p className="mt-1.5 text-center text-xs text-slate-400">{stage.detail}</p>
-            <div className="mt-4 mb-2 flex items-center justify-between text-[11px] text-slate-400">
-              <span>
-                Step {stageIndex + 1} of {STAGES.length}
-              </span>
-              <span className="font-semibold tabular-nums text-blue-300">{Math.floor(progress)}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+            {phase === "welcome" ? (
+              <p className="text-center text-lg font-black text-white">
+                Welcome, {welcomeName}
+                {goOwner ? " · Owner" : ""}
+              </p>
+            ) : (
+              <>
+                <p className="text-center text-sm font-bold text-cyan-100">{stage.title}</p>
+                <p className="mt-1 text-center text-[12px] text-slate-400">{stage.detail}</p>
+              </>
+            )}
+
+            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full transition-[width] duration-150 ease-out"
-                style={{ width: `${progress}%`, background: BLUE_GRAD }}
+                style={{ width: `${Math.min(100, progress)}%`, background: BLUE_GRAD }}
               />
             </div>
-            {phase === "welcome" ? (
-              <p className="mt-4 text-center text-sm text-slate-300">Opening TASKORA…</p>
-            ) : (
-              <p className="mt-3 text-center text-[10px] text-slate-500">Please wait — finishing setup</p>
-            )}
+            <p className="mt-2 text-center text-[11px] font-semibold tabular-nums text-cyan-300/80">
+              {phase === "welcome" ? "Opening…" : `${Math.floor(progress)}%`}
+            </p>
           </div>
         ) : null}
 
