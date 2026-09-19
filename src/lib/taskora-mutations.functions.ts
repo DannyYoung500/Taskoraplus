@@ -3,7 +3,41 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 import { RULES, hoursSince, normalizeWalletAddress } from "@/lib/platform-rules";
 
-/** Submission with velocity limit + slot check + proof quality. Prefer this over raw insert paths. */
+/** Read owner kill-switches from app_settings.maintenance_switches */
+async function getMaintenanceSwitches(): Promise<{
+  read_only: boolean;
+  withdrawals_paused: boolean;
+  deposits_paused: boolean;
+  task_creation_paused: boolean;
+  verification_paused: boolean;
+}> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "maintenance_switches")
+      .maybeSingle();
+    const v = (data?.value ?? {}) as Record<string, unknown>;
+    return {
+      read_only: Boolean(v.read_only),
+      withdrawals_paused: Boolean(v.withdrawals_paused),
+      deposits_paused: Boolean(v.deposits_paused),
+      task_creation_paused: Boolean(v.task_creation_paused),
+      verification_paused: Boolean(v.verification_paused),
+    };
+  } catch {
+    return {
+      read_only: false,
+      withdrawals_paused: false,
+      deposits_paused: false,
+      task_creation_paused: false,
+      verification_paused: false,
+    };
+  }
+}
+
+/** Submission with velocity limit + slot check + proof quality + kill-switches. */
 export const submitTaskGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -11,6 +45,12 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
+    const maint = await getMaintenanceSwitches();
+    if (maint.read_only) throw new Error("Platform is in read-only mode. Try again later.");
+    if (maint.task_creation_paused) {
+      throw new Error("New task submissions are temporarily paused by the owner.");
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const since = new Date(Date.now() - RULES.submissionWindowMs).toISOString();
@@ -49,7 +89,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       /t\.me\//i.test(taskLink) ||
       String((task as { proof?: string }).proof ?? "") === "auto";
 
-    // Telegram join / channel tasks: bot getChatMember is primary proof (no screenshot farm).
     let autoVerified = false;
     if (isTelegramJoin) {
       const verified = await tryTelegramMembershipProof(userId, taskLink, proofText);
@@ -85,7 +124,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       .update({ slots_left: Math.max(0, task.slots_left - 1) })
       .eq("id", task.id);
 
-    // Auto-pay reward on verified Telegram membership
     if (autoVerified) {
       const reward = Number((task as { reward?: number }).reward ?? 0);
       if (reward > 0) {
@@ -97,14 +135,12 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
           reference: `task:${task.id}:${userId}`,
         } as never);
       }
-      // Credit inviter referral Task Points only after invitee first verified task
       await creditDeferredReferralPoints(userId).catch(() => undefined);
     }
 
     return { status: status as "pending" | "verified", autoVerified };
   });
 
-/** Resolve chat_id from t.me link or @username; verify user is member via bot. */
 async function tryTelegramMembershipProof(
   userId: string,
   taskLink: string,
@@ -176,7 +212,6 @@ function extractTelegramChatRef(input: string): string | null {
   return null;
 }
 
-/** After first verified task, award deferred invite Task Points (never USDT). */
 async function creditDeferredReferralPoints(inviteeId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: me } = await supabaseAdmin
@@ -228,7 +263,7 @@ async function creditDeferredReferralPoints(inviteeId: string) {
   });
 }
 
-/** Withdrawal with min floor, 24h hold, shared-address block, pending cap. */
+/** Withdrawal with min floor, 24h hold, shared-address block, pending cap, dual-approval flag. */
 export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { method: string; address: string; amount: number }) => d)
@@ -237,10 +272,17 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     const address = normalizeWalletAddress(data.address);
     if (!address || address.length < 10) throw new Error("Enter a valid wallet address.");
 
+    const maint = await getMaintenanceSwitches();
+    if (maint.read_only || maint.withdrawals_paused) {
+      throw new Error("Withdrawals are temporarily paused by the owner.");
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let minWd = RULES.minWithdrawalUsd;
     let payoutsPaused = false;
+    let dualEnabled = true;
+    let dualThreshold = 20;
     try {
       const { data: econ } = await supabaseAdmin
         .from("app_settings")
@@ -250,6 +292,8 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       const v = (econ?.value ?? {}) as Record<string, unknown>;
       minWd = Math.max(RULES.minWithdrawalUsd, Number(v.min_withdrawal_usd ?? RULES.minWithdrawalUsd));
       payoutsPaused = Boolean(v.payouts_paused);
+      dualEnabled = v.dual_approval_enabled !== false;
+      dualThreshold = Math.max(0, Number(v.dual_approval_threshold_usd ?? 20));
     } catch {
       /* defaults */
     }
@@ -262,6 +306,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
         `Amounts over $${RULES.maxAutoWithdrawalUsd} need manual owner review. Split or contact support.`,
       );
     }
+    const requiresDual = dualEnabled && data.amount >= dualThreshold;
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -312,7 +357,9 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       address,
       amount: data.amount,
       status: "pending",
-    });
+      requires_dual: requiresDual,
+      approval_stage: requiresDual ? "needs_dual" : "pending",
+    } as never);
     if (error) throw new Error(error.message);
 
     await supabaseAdmin.from("transactions").insert({
@@ -321,7 +368,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       amount: -Math.abs(data.amount),
       kind: "withdrawal",
     });
-    return { ok: true };
+    return { ok: true, requiresDual };
   });
 
 /** Create a pending crypto deposit intent (owner confirms or webhook completes). */
@@ -332,6 +379,11 @@ export const requestDepositGuarded = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
+    const maint = await getMaintenanceSwitches();
+    if (maint.read_only || maint.deposits_paused) {
+      throw new Error("Deposits are temporarily paused by the owner.");
+    }
+
     const amount = Number(data.amount);
     if (!(amount >= 1)) throw new Error("Minimum deposit is $1.00.");
     if (!(amount <= 50_000)) throw new Error("Maximum single deposit is $50,000.");
