@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-import { RULES, hoursSince } from "@/lib/platform-rules";
+import { RULES, hoursSince, normalizeWalletAddress } from "@/lib/platform-rules";
 
-/** Submission with velocity limit + slot check. Prefer this over raw insert paths. */
+/** Submission with velocity limit + slot check + proof quality. Prefer this over raw insert paths. */
 export const submitTaskGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -40,12 +40,21 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) throw new Error("You already submitted this task.");
 
+    const proofText = (data.proofText ?? "").trim();
+    const proofUrl = (data.proofUrl ?? "").trim();
+    if (!proofText && !proofUrl) {
+      throw new Error("Add proof text or a proof link/screenshot URL.");
+    }
+    if (proofText && proofText.length < RULES.minProofTextChars && !proofUrl) {
+      throw new Error(`Proof text must be at least ${RULES.minProofTextChars} characters.`);
+    }
+
     const { error } = await supabaseAdmin.from("submissions").insert({
       user_id: userId,
       task_id: task.id,
       status: "pending",
-      proof_text: data.proofText ?? null,
-      proof_url: data.proofUrl ?? null,
+      proof_text: proofText || null,
+      proof_url: proofUrl || null,
     });
     if (error) throw new Error(error.message);
 
@@ -57,14 +66,14 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     return { status: "pending" as const };
   });
 
-/** Withdrawal with min amount, 24h new-account hold, shared-address detection. */
+/** Withdrawal with min floor, 24h hold, shared-address block, pending cap. */
 export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { method: string; address: string; amount: number }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const address = data.address.trim();
-    if (!address) throw new Error("Enter your wallet address.");
+    const address = normalizeWalletAddress(data.address);
+    if (!address || address.length < 10) throw new Error("Enter a valid wallet address.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -77,7 +86,8 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
         .eq("key", "economy")
         .maybeSingle();
       const v = (econ?.value ?? {}) as Record<string, unknown>;
-      minWd = Math.max(0, Number(v.min_withdrawal_usd ?? RULES.minWithdrawalUsd));
+      // Owner can raise min, never go below hard floor
+      minWd = Math.max(RULES.minWithdrawalUsd, Number(v.min_withdrawal_usd ?? RULES.minWithdrawalUsd));
       payoutsPaused = Boolean(v.payouts_paused);
     } catch {
       /* defaults */
@@ -85,6 +95,11 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     if (payoutsPaused) throw new Error("Withdrawals are temporarily paused by the owner.");
     if (!(data.amount >= minWd)) {
       throw new Error(`Minimum withdrawal is $${minWd.toFixed(2)}.`);
+    }
+    if (data.amount > RULES.maxAutoWithdrawalUsd) {
+      throw new Error(
+        `Amounts over $${RULES.maxAutoWithdrawalUsd} need manual owner review. Split or contact support.`,
+      );
     }
 
     const { data: profile } = await supabaseAdmin
@@ -105,14 +120,26 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       );
     }
 
-    // Shared payout address across different users
+    // Cap concurrent pending withdrawals
+    const { count: pendingCount } = await supabaseAdmin
+      .from("withdrawals")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "pending");
+    if ((pendingCount ?? 0) >= RULES.maxPendingWithdrawals) {
+      throw new Error(`You already have ${RULES.maxPendingWithdrawals} pending withdrawals. Wait for review.`);
+    }
+
+    // Shared payout address across different users (normalized)
     const { data: others } = await supabaseAdmin
       .from("withdrawals")
-      .select("user_id")
-      .eq("address", address)
+      .select("user_id, address")
       .neq("user_id", userId)
-      .limit(1);
-    if (others && others.length > 0) {
+      .limit(200);
+    const shared = (others ?? []).some(
+      (w) => normalizeWalletAddress(String((w as { address?: string }).address ?? "")) === address,
+    );
+    if (shared) {
       throw new Error("This wallet address is already linked to another account.");
     }
 
@@ -125,6 +152,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       method: data.method,
       address,
       amount: data.amount,
+      status: "pending",
     });
     if (error) throw new Error(error.message);
 
@@ -136,7 +164,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
-
 
 /** Create a pending crypto deposit intent (owner confirms or webhook completes). */
 export const requestDepositGuarded = createServerFn({ method: "POST" })
