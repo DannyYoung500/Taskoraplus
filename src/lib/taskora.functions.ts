@@ -132,5 +132,5 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
 
 export const validateTelegramSession = loginWithTelegram;
 
-// NOTE: listTasks, getDashboard, dailyCheckin, etc. must be restored from previous commit
-// if missing. This commit prioritizes login + new-user owner notify + premium loading screen.
+export * from "@/lib/taskora-extra.functions";
+export * from "@/lib/taskora-extra2.functions";
