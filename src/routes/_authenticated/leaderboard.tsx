@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/leaderboard")({
   component: RankPage,
 });
 
-type Tab = "usdt" | "points" | "referrers";
+type Tab = "usdt" | "points" | "tasks" | "referrers";
 
 function weekLabel() {
   const now = new Date();
@@ -52,20 +52,23 @@ function RankPage() {
     transactions.reduce((s, t) => s + Number(t.amount), 0),
   );
 
+  // Real ranking only — no invented users
   const sorted = [...rows]
     .filter((r) => {
       if (tab === "referrers") return r.referrals > 0;
       if (tab === "usdt") return Number(r.usdt_earned ?? 0) > 0;
+      if (tab === "tasks") return Number(r.tasks_completed ?? 0) > 0;
       return r.task_points > 0;
     })
     .sort((a, b) => {
       if (tab === "referrers") return b.referrals - a.referrals;
       if (tab === "usdt") return Number(b.usdt_earned ?? 0) - Number(a.usdt_earned ?? 0);
+      if (tab === "tasks") return Number(b.tasks_completed ?? 0) - Number(a.tasks_completed ?? 0);
       return b.task_points - a.task_points;
     });
 
   const myRank =
-    sorted.findIndex((r) => r.display_name === name) + 1;
+    sorted.findIndex((r) => r.display_name === name || r.user_id === (dash as { profile?: { id?: string } } | null)?.profile?.id) + 1;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#030814] px-3.5 pb-28 pt-3 text-white">
@@ -85,9 +88,9 @@ function RankPage() {
           >
             Rank
           </p>
-          <p className="text-[10px] text-slate-500">Live leaderboard · real Task Points</p>
+          <p className="text-[10px] text-slate-500">Live leaderboard · real data only</p>
         </div>
-        <Link to="/notifications" className="rounded-full border border-white/10 bg-[#0b1628] p-2">
+        <Link to="/home" className="rounded-full border border-white/10 bg-[#0b1628] p-2">
           <Bell className="size-4 text-slate-300" />
         </Link>
       </header>
@@ -134,9 +137,7 @@ function RankPage() {
             <p className="text-sm font-black">Your Task Points</p>
             <Info className="size-3 text-slate-500" />
           </div>
-          <p className="text-[10px] text-slate-400">
-            From check-ins, referrals, and owner daily quests.
-          </p>
+          <p className="text-[10px] text-slate-400">From check-ins, referrals, and owner daily quests.</p>
         </div>
         <p className="text-xl font-black text-amber-200">{taskPoints.toLocaleString()}</p>
       </section>
@@ -159,16 +160,17 @@ function RankPage() {
       <div className="mb-3 flex gap-1 rounded-2xl border border-white/8 bg-[#0b1628] p-1">
         {(
           [
-            ["usdt", "USDT Earned"],
-            ["points", "Task Points"],
-            ["referrers", "Top Referrers"],
+            ["usdt", "USDT"],
+            ["points", "Points"],
+            ["tasks", "Tasks"],
+            ["referrers", "Invites"],
           ] as const
         ).map(([id, label]) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`flex-1 rounded-xl px-2 py-2.5 text-[10px] font-bold transition ${
+            className={`flex-1 rounded-xl px-1.5 py-2.5 text-[10px] font-bold transition ${
               tab === id ? "text-[#04101c]" : "text-slate-400"
             }`}
             style={tab === id ? { background: BLUE_GRAD } : undefined}
@@ -183,7 +185,7 @@ function RankPage() {
           <span>#</span>
           <span>User</span>
           <span className="text-right">
-            {tab === "referrers" ? "Invites" : tab === "usdt" ? "USDT" : "Task Points"}
+            {tab === "referrers" ? "Invites" : tab === "usdt" ? "USDT" : tab === "tasks" ? "Tasks" : "Task Points"}
           </span>
         </div>
         {sorted.length === 0 ? (
@@ -191,7 +193,7 @@ function RankPage() {
             <Trophy className="mx-auto size-8 text-slate-600" />
             <p className="mt-3 text-sm font-bold text-slate-300">No ranked users yet</p>
             <p className="mt-1 text-[12px] text-slate-500">
-              Earn Task Points from check-ins and owner daily quests to appear here.
+              Complete verified tasks and earn USDT / Task Points to appear here.
             </p>
           </div>
         ) : (
@@ -203,15 +205,15 @@ function RankPage() {
                 ? row.referrals
                 : tab === "usdt"
                   ? Number(row.usdt_earned ?? 0)
-                  : row.task_points;
+                  : tab === "tasks"
+                    ? Number(row.tasks_completed ?? 0)
+                    : row.task_points;
             return (
               <div
                 key={row.user_id}
                 className="grid grid-cols-[32px_1fr_auto] items-center gap-2 border-b border-white/5 px-3.5 py-3 last:border-0"
               >
-                <span className="text-center text-sm font-black text-slate-400">
-                  {medal ?? rank}
-                </span>
+                <span className="text-center text-sm font-black text-slate-400">{medal ?? rank}</span>
                 <div className="flex min-w-0 items-center gap-2.5">
                   {row.photo_url ? (
                     <img src={row.photo_url} alt="" className="size-9 rounded-full object-cover ring-1 ring-white/10" />
@@ -237,7 +239,7 @@ function RankPage() {
       </div>
 
       <p className="mt-3 text-center text-[10px] text-slate-500">
-        Weekly season ranks · real Task Points only · no demo users.
+        Real ranks only · verified tasks · USDT ledger · no demo users.
       </p>
     </main>
   );
