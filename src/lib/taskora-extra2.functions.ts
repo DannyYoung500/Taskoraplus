@@ -39,9 +39,7 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
       const { data: settingsRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "economy").maybeSingle();
       const v = (settingsRow?.value ?? {}) as { min_withdrawal_usd?: number };
       minWd = Math.max(RULES.minWithdrawalUsd, Number(v.min_withdrawal_usd ?? RULES.minWithdrawalUsd));
-    } catch {
-      /* use default */
-    }
+    } catch { /* use default */ }
     if (!(data.amount >= minWd)) throw new Error(`Minimum withdrawal is $${minWd.toFixed(2)}.`);
 
     const { data: profile } = await supabaseAdmin
@@ -55,9 +53,7 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
     const ageH = hoursSince((profile as { created_at?: string } | null)?.created_at);
     if (ageH < RULES.newAccountWithdrawHoldHours) {
       const left = Math.ceil(RULES.newAccountWithdrawHoldHours - ageH);
-      throw new Error(
-        `New accounts wait ${RULES.newAccountWithdrawHoldHours}h before first withdrawal (~${left}h left).`,
-      );
+      throw new Error(`New accounts wait ${RULES.newAccountWithdrawHoldHours}h before first withdrawal (~${left}h left).`);
     }
 
     const { data: txs } = await supabaseAdmin
@@ -108,52 +104,87 @@ export const applyReferral = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!inviter) throw new Error("That invite code doesn't exist.");
 
+    // Link only — Task Points paid after invitee completes first *verified* task (anti-farm).
+    // Never credits USDT on invite alone.
     await supabaseAdmin.from("profiles").update({ referred_by: inviter.id }).eq("id", userId);
-    const { data: settingsRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "economy").maybeSingle();
+
+    const { data: settingsRow } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "economy")
+      .maybeSingle();
     const referralPoints = Math.max(
       0,
-      Math.floor(Number((settingsRow?.value as { referral_points?: number } | null)?.referral_points ?? 100)),
+      Math.floor(
+        Number(
+          (settingsRow?.value as { referral_points?: number } | null)?.referral_points ?? 100,
+        ),
+      ),
     );
-    const { data: taskPointTotal, error: pointsError } = await (supabaseAdmin as any).rpc("award_task_points", {
-      _user_id: inviter.id,
-      _amount: referralPoints,
-      _kind: "referral",
-      _label: "Referral reward",
-      _reference: `referral:${userId}`,
-    });
-    if (pointsError) throw new Error(pointsError.message);
-    return { ok: true, taskPoints: referralPoints, taskPointTotal: Number(taskPointTotal ?? 0) };
+
+    // Small signup link bonus in Task Points only (capped); main reward is deferred verified invite.
+    const linkBonus = Math.min(25, Math.floor(referralPoints * 0.1));
+    let taskPointTotal = 0;
+    if (linkBonus > 0) {
+      const { data: total, error: pointsError } = await (supabaseAdmin as any).rpc(
+        "award_task_points",
+        {
+          _user_id: inviter.id,
+          _amount: linkBonus,
+          _kind: "referral",
+          _label: "Invite linked (pending first verified task)",
+          _reference: `referral_link:${userId}`,
+        },
+      );
+      if (pointsError) throw new Error(pointsError.message);
+      taskPointTotal = Number(total ?? 0);
+    }
+
+    return {
+      ok: true,
+      taskPoints: linkBonus,
+      pendingVerifiedBonus: Math.max(0, referralPoints - linkBonus),
+      taskPointTotal,
+      note: "Full invite Task Points unlock after your friend completes their first verified task.",
+    };
   });
 
 export const ownerCreateTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
     (d: {
+      platform: string;
       title: string;
-      description?: string;
-      platform?: string;
+      advertiser: string;
       reward: number;
-      slots?: number;
-      advertiser?: string;
+      slots: number;
+      steps: string[];
+      proof: "auto" | "screenshot" | "username";
+      link?: string | undefined;
     }) => d,
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const slots = Math.max(1, Number(data.slots ?? 100));
-    const { data: row, error } = await supabaseAdmin
+    if (!(data.reward > 0) || !(data.slots > 0) || !data.title.trim()) {
+      throw new Error("Invalid task configuration.");
+    }
+
+    const { data: task, error } = await supabaseAdmin
       .from("tasks")
       .insert({
+        platform: data.platform as never,
         title: data.title.trim(),
-        description: data.description?.trim() ?? null,
-        platform: data.platform ?? "telegram",
-        reward: Number(data.reward),
-        slots_left: slots,
+        advertiser: data.advertiser.trim() || "TASKORA",
+        reward: data.reward,
+        slots_left: data.slots,
+        steps: data.steps.length ? data.steps : ["Complete the required action", "Return and submit proof"],
+        proof: data.proof,
+        link: data.link ?? null,
         is_active: true,
-        advertiser: data.advertiser?.trim() ?? "TASKORA",
-      } as never)
-      .select("id")
-      .maybeSingle();
+      })
+      .select("*")
+      .single();
     if (error) throw new Error(error.message);
-    return { id: row?.id, ok: true };
+    return task;
   });
