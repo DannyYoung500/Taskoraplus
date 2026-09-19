@@ -1,5 +1,5 @@
 /**
- * Owner ops: system health, audit log listing, fraud flags + risk scoring.
+ * Owner ops: system health, audit log listing, fraud flags + risk scoring + feature flags.
  * Server-only via createServerFn + assertOwner.
  */
 import { createServerFn } from "@tanstack/react-start";
@@ -78,14 +78,10 @@ export const getSystemHealth = createServerFn({ method: "GET" })
         supabaseAdmin.from("deposits").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabaseAdmin.from("fraud_flags").select("id", { count: "exact", head: true }).eq("status", "open"),
       ]);
-      const wdN = wd.count ?? 0;
-      const subN = sub.count ?? 0;
-      const depN = dep.count ?? 0;
-      const frN = fraud.count ?? 0;
-      checks.push({ name: "Pending withdrawals", status: wdN > 25 ? "warn" : "ok", detail: `${wdN} awaiting review` });
-      checks.push({ name: "Pending submissions", status: subN > 100 ? "warn" : "ok", detail: `${subN} awaiting verification` });
-      checks.push({ name: "Pending deposits", status: depN > 20 ? "warn" : "ok", detail: `${depN} awaiting confirmation` });
-      checks.push({ name: "Open fraud flags", status: frN > 0 ? "warn" : "ok", detail: `${frN} open` });
+      checks.push({ name: "Pending withdrawals", status: (wd.count ?? 0) > 25 ? "warn" : "ok", detail: `${wd.count ?? 0} awaiting review` });
+      checks.push({ name: "Pending submissions", status: (sub.count ?? 0) > 100 ? "warn" : "ok", detail: `${sub.count ?? 0} awaiting verification` });
+      checks.push({ name: "Pending deposits", status: (dep.count ?? 0) > 20 ? "warn" : "ok", detail: `${dep.count ?? 0} awaiting confirmation` });
+      checks.push({ name: "Open fraud flags", status: (fraud.count ?? 0) > 0 ? "warn" : "ok", detail: `${fraud.count ?? 0} open` });
     } catch (e) {
       checks.push({ name: "Queues", status: "warn", detail: e instanceof Error ? e.message : "Queue probe failed" });
     }
@@ -377,4 +373,164 @@ export const scanFraudSignals = createServerFn({ method: "POST" })
     }).catch(() => undefined);
 
     return { ok: true, created };
+  });
+
+/** Feature flags + granular maintenance kill switches (app_settings). */
+
+const DEFAULT_FLAGS: Array<{ key: string; enabled: boolean; label: string }> = [
+  { key: "games_enabled", enabled: false, label: "Games hub" },
+  { key: "watch_earn_enabled", enabled: true, label: "Watch & Earn" },
+  { key: "advertise_enabled", enabled: true, label: "Advertise / create tasks" },
+  { key: "referrals_enabled", enabled: true, label: "Invite & Earn" },
+  { key: "leaderboard_enabled", enabled: true, label: "Leaderboard" },
+  { key: "daily_checkin_enabled", enabled: true, label: "Daily check-in" },
+];
+
+const DEFAULT_MAINTENANCE = {
+  read_only: false,
+  withdrawals_paused: false,
+  deposits_paused: false,
+  task_creation_paused: false,
+  verification_paused: false,
+};
+
+export const listFeatureFlags = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: flagsRow }, { data: maintRow }] = await Promise.all([
+      supabaseAdmin.from("app_settings").select("value").eq("key", "feature_flags").maybeSingle(),
+      supabaseAdmin.from("app_settings").select("value").eq("key", "maintenance_switches").maybeSingle(),
+    ]);
+
+    const stored = (flagsRow?.value ?? {}) as Record<string, unknown>;
+    const flags = DEFAULT_FLAGS.map((f) => ({
+      key: f.key,
+      label: f.label,
+      enabled: typeof stored[f.key] === "boolean" ? Boolean(stored[f.key]) : f.enabled,
+    }));
+
+    for (const [k, v] of Object.entries(stored)) {
+      if (!flags.some((f) => f.key === k)) {
+        flags.push({ key: k, label: k, enabled: Boolean(v) });
+      }
+    }
+
+    const maintStored = (maintRow?.value ?? {}) as Record<string, unknown>;
+    const maintenance = {
+      read_only: Boolean(maintStored.read_only ?? DEFAULT_MAINTENANCE.read_only),
+      withdrawals_paused: Boolean(maintStored.withdrawals_paused ?? DEFAULT_MAINTENANCE.withdrawals_paused),
+      deposits_paused: Boolean(maintStored.deposits_paused ?? DEFAULT_MAINTENANCE.deposits_paused),
+      task_creation_paused: Boolean(maintStored.task_creation_paused ?? DEFAULT_MAINTENANCE.task_creation_paused),
+      verification_paused: Boolean(maintStored.verification_paused ?? DEFAULT_MAINTENANCE.verification_paused),
+    };
+
+    return { flags, maintenance };
+  });
+
+export const setFeatureFlag = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { key: string; enabled: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const key = (data.key || "").trim();
+    if (!key) throw new Error("Flag key required.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "feature_flags")
+      .maybeSingle();
+    const prev = (row?.value ?? {}) as Record<string, unknown>;
+    const next = { ...prev, [key]: Boolean(data.enabled) };
+
+    const { error } = await supabaseAdmin.from("app_settings").upsert(
+      { key: "feature_flags", value: next } as never,
+      { onConflict: "key" },
+    );
+    if (error) throw new Error(error.message);
+
+    await audit({
+      adminId: context.userId,
+      action: data.enabled ? "feature_flag.on" : "feature_flag.off",
+      targetType: "feature_flag",
+      targetId: key,
+      previous: { [key]: prev[key] ?? null },
+      next: { [key]: data.enabled },
+    }).catch(() => undefined);
+
+    return { ok: true, key, enabled: Boolean(data.enabled) };
+  });
+
+export const setMaintenanceMode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      read_only?: boolean;
+      withdrawals_paused?: boolean;
+      deposits_paused?: boolean;
+      task_creation_paused?: boolean;
+      verification_paused?: boolean;
+    }) => d,
+  )
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "maintenance_switches")
+      .maybeSingle();
+    const prev = (row?.value ?? {}) as Record<string, unknown>;
+    const next = {
+      read_only: Boolean(data.read_only ?? prev.read_only ?? false),
+      withdrawals_paused: Boolean(data.withdrawals_paused ?? prev.withdrawals_paused ?? false),
+      deposits_paused: Boolean(data.deposits_paused ?? prev.deposits_paused ?? false),
+      task_creation_paused: Boolean(data.task_creation_paused ?? prev.task_creation_paused ?? false),
+      verification_paused: Boolean(data.verification_paused ?? prev.verification_paused ?? false),
+    };
+
+    const { error } = await supabaseAdmin.from("app_settings").upsert(
+      { key: "maintenance_switches", value: next } as never,
+      { onConflict: "key" },
+    );
+    if (error) throw new Error(error.message);
+
+    if (next.read_only) {
+      await supabaseAdmin.from("app_settings").upsert(
+        {
+          key: "maintenance",
+          value: { enabled: true, message: "Platform is in read-only maintenance mode." },
+        } as never,
+        { onConflict: "key" },
+      );
+    } else {
+      const { data: globalMaint } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "maintenance")
+        .maybeSingle();
+      const gv = (globalMaint?.value ?? {}) as { enabled?: boolean; message?: string };
+      if (gv.enabled && gv.message?.includes("read-only")) {
+        await supabaseAdmin.from("app_settings").upsert(
+          { key: "maintenance", value: { enabled: false, message: gv.message ?? "" } } as never,
+          { onConflict: "key" },
+        );
+      }
+    }
+
+    await audit({
+      adminId: context.userId,
+      action: "maintenance_switches.update",
+      targetType: "settings",
+      targetId: "maintenance_switches",
+      previous: prev,
+      next,
+    }).catch(() => undefined);
+
+    return { ok: true, maintenance: next };
   });
