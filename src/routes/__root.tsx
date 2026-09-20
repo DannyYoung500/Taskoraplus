@@ -85,6 +85,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content: "Complete verified social tasks and earn real crypto rewards inside Telegram.",
       },
       { name: "theme-color", content: "#0b1424" },
+      { name: "color-scheme", content: "dark" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { property: "og:title", content: "TASKORA — Verified Tasks. Real Rewards." },
       {
         property: "og:description",
@@ -113,11 +115,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" style={{ backgroundColor: "#0b1424", colorScheme: "dark" }}>
       <head>
         <HeadContent />
       </head>
-      <body className="bg-[#0b1424] text-slate-100">
+      <body className="bg-[#0b1424] text-slate-100 min-h-screen" style={{ backgroundColor: "#0b1424" }}>
         {children}
         <Scripts />
       </body>
