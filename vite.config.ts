@@ -11,8 +11,7 @@ if (process.env["SUPABASE_URL"]) {
   process.env["VITE_SUPABASE_URL"] = process.env["SUPABASE_URL"];
 }
 if (process.env["SUPABASE_PUBLISHABLE_KEY"]) {
-  process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] =
-    process.env["SUPABASE_PUBLISHABLE_KEY"];
+  process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] = process.env["SUPABASE_PUBLISHABLE_KEY"];
 }
 
 export default defineConfig({
@@ -25,7 +24,13 @@ export default defineConfig({
     tanstackStart({
       srcDirectory: "src",
     }),
-    nitro(),
+    nitro({
+      serverEntry: "./server.ts",
+      renderer: false,
+    }),
     viteReact(),
   ],
+  environments: {
+    ssr: { build: { rollupOptions: { input: "./server.ts" } } },
+  },
 });
