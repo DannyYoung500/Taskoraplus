@@ -25,6 +25,7 @@ const money = (value: unknown) => `$${Number(value ?? 0).toFixed(4)}`;
 const NAV = [
   { to: "/owner/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/owner/users", label: "Users", icon: Users },
+  { to: "/owner/analytics", label: "Analytics", icon: Activity },
   { to: "/owner/tasks", label: "Tasks", icon: ClipboardCheck },
   { to: "/owner/reviews", label: "Reviews", icon: CheckCircle2 },
   { to: "/owner/withdrawals", label: "Withdrawals", icon: Wallet },
@@ -120,7 +121,7 @@ function OwnerHub() {
                 ["/owner/reviews", "Review tasks", ClipboardCheck],
                 ["/owner/withdrawals", "Payouts", Wallet],
                 ["/owner/users", "Users", Users],
-                ["/owner/economy", "Economy", Settings],
+                ["/owner/analytics", "Analytics", Activity],
               ].map(([to, title, Icon]) => (
                 <Link
                   key={title as string}
