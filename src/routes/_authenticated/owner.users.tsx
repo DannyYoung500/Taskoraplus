@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { ownerListUsers, ownerSetUserStatus, ownerAdjustWallet } from "@/lib/owner.functions";
 import { getUserRiskScore } from "@/lib/owner-ops.functions";
+import { presenceFromLastActive, formatCountryLine } from "@/lib/locale-geo";
 
 export const Route = createFileRoute("/_authenticated/owner/users")({
   loader: async () => {
@@ -40,22 +41,35 @@ function OwnerUsers() {
   const [adjReason, setAdjReason] = useState("");
   const [adjMode, setAdjMode] = useState<"add" | "deduct">("deduct");
 
-  const stats = useMemo(() => {
-    const online = rows.filter((r) => (r as { presence_status?: string }).presence_status === "online").length;
-    return {
-      total: rows.length,
-      active: rows.filter((r) => String(r.status ?? "active") === "active").length,
-      suspended: rows.filter((r) => String(r.status) === "suspended").length,
-      banned: rows.filter((r) => String(r.status) === "banned").length,
-      totalBal: rows.reduce((s, r) => s + Number(r.balance ?? 0), 0),
-      online,
-    };
+  const enriched = useMemo(() => {
+    return rows.map((r) => {
+      const lastActive = (r as { last_active_at?: string | null }).last_active_at ?? null;
+      const presence = presenceFromLastActive(lastActive);
+      const countryLine = formatCountryLine({
+        country: (r as { country?: string | null }).country,
+        country_code: (r as { country_code?: string | null }).country_code,
+        language_code: (r as { language_code?: string | null }).language_code,
+      });
+      return { ...r, presence_status: presence.status, presence_label: presence.label, country_line: countryLine };
+    });
   }, [rows]);
 
+  const stats = useMemo(() => {
+    const online = enriched.filter((r) => r.presence_status === "online").length;
+    return {
+      total: enriched.length,
+      active: enriched.filter((r) => String(r.status ?? "active") === "active").length,
+      suspended: enriched.filter((r) => String(r.status) === "suspended").length,
+      banned: enriched.filter((r) => String(r.status) === "banned").length,
+      totalBal: enriched.reduce((s, r) => s + Number(r.balance ?? 0), 0),
+      online,
+    };
+  }, [enriched]);
+
   const visibleRows = useMemo(() => {
-    if (presenceFilter === "all") return rows;
-    return rows.filter((r) => (r as { presence_status?: string }).presence_status === presenceFilter);
-  }, [rows, presenceFilter]);
+    if (presenceFilter === "all") return enriched;
+    return enriched.filter((r) => r.presence_status === presenceFilter);
+  }, [enriched, presenceFilter]);
 
   async function refresh(q?: string, status?: string) {
     setMsg(null);
@@ -164,9 +178,9 @@ function OwnerUsers() {
         ) : visibleRows.map((u) => {
           const photo = photoOf(u);
           const status = String(u.status ?? "active");
-          const presence = String((u as { presence_status?: string }).presence_status ?? "unknown");
-          const presenceLabel = String((u as { presence_label?: string }).presence_label ?? "—");
-          const countryLine = String((u as { country_line?: string }).country_line ?? "—");
+          const presence = String(u.presence_status ?? "unknown");
+          const presenceLabel = String(u.presence_label ?? "—");
+          const countryLine = String(u.country_line ?? "—");
           const tgHandle = u.username ? `@${String(u.username).replace(/^@/, "")}` : null;
           const tgId = u.telegram_id != null ? Number(u.telegram_id) : null;
           const tgLink = tgHandle ? `https://t.me/${String(u.username).replace(/^@/, "")}` : tgId != null ? `tg://user?id=${tgId}` : null;
