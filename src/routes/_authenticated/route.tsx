@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
 import { getAccountAccess } from "@/lib/account-access.functions";
+import { touchPresence } from "@/lib/presence.functions";
 
 declare global {
   interface Window {
@@ -23,6 +24,10 @@ export const Route = createFileRoute("/_authenticated")({
 
     const path = location.pathname || "";
 
+    // Presence heartbeat on every authenticated navigation (non-blocking)
+    void touchPresence().catch(() => undefined);
+
+    // Ban / suspend / maintenance (owners still reach /owner during maintenance)
     try {
       const access = await getAccountAccess();
       if (access.state === "banned") throw redirect({ to: "/banned" });
@@ -34,6 +39,7 @@ export const Route = createFileRoute("/_authenticated")({
       if (e && typeof e === "object" && "to" in (e as object)) throw e;
     }
 
+    // Owner console and gate screen themselves are exempt from membership gate
     if (path.startsWith("/owner") || path === "/telegram-gate") {
       return { user: { id: data.user.id } };
     }
