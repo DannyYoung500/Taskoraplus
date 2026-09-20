@@ -25,8 +25,23 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
       validated.user.username ||
       `User ${telegramId}`;
     const photoUrl = validated.user.photo_url ?? null;
+    const languageCode = validated.user.language_code?.trim().toLowerCase() || null;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { countryFromRequestHeaders, resolveCountryFromLanguage } = await import(
+      "@/lib/locale-geo"
+    );
+
+    let edgeCountry: { code: string | null; name: string | null } = { code: null, name: null };
+    try {
+      const { getRequest } = await import("@tanstack/react-start/server");
+      edgeCountry = countryFromRequestHeaders(getRequest()?.headers);
+    } catch {
+      /* headers unavailable outside request context */
+    }
+    const langCountry = resolveCountryFromLanguage(languageCode);
+    const countryCode = edgeCountry.code || langCountry.code || null;
+    const countryName = edgeCountry.name || langCountry.name || null;
 
     let userId: string | undefined;
     const { data: listed } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -72,6 +87,7 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
     }
 
     const referralCode = `TASKORA-${String(telegramId).slice(-6).toUpperCase()}`;
+    const nowIso = new Date().toISOString();
     await supabaseAdmin.from("profiles").upsert(
       {
         id: userId,
@@ -81,6 +97,10 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
         ...({
           telegram_id: telegramId,
           photo_url: photoUrl,
+          last_active_at: nowIso,
+          language_code: languageCode,
+          ...(countryCode ? { country_code: countryCode } : {}),
+          ...(countryName ? { country: countryName } : {}),
         } as Record<string, unknown>),
       } as never,
       { onConflict: "id" },
