@@ -28,12 +28,16 @@ function OwnerWithdrawals() {
   const [rows, setRows] = useState((initial.rows ?? []) as WdRow[]);
   const [error, setError] = useState(initial.error);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [txHashes, setTxHashes] = useState<Record<string, string>>({});
 
   async function act(id: string, decision: "paid" | "rejected" | "first_approve") {
     setBusyId(id);
     setError(null);
     try {
-      await reviewWithdrawal({ data: { withdrawalId: id, decision } });
+      const txHash = decision === "paid" ? (txHashes[id] || "").trim() || undefined : undefined;
+      await reviewWithdrawal({
+        data: { withdrawalId: id, decision, txHash },
+      });
       if (decision === "first_approve") {
         setRows((prev) =>
           prev.map((row) =>
@@ -54,7 +58,7 @@ function OwnerWithdrawals() {
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-6 text-white">
       <h1 className="text-xl font-bold">Withdrawals</h1>
       <p className="mt-1 text-xs text-white/45">
-        Mark paid only after on-chain send. Dual-approval rows need two different owners.
+        Mark paid only after on-chain send. Paste tx hash when available. Dual-approval needs two owners.
       </p>
       {error ? <p className="mt-3 text-xs text-amber-300">{error}</p> : null}
       <div className="mt-4 space-y-3">
@@ -92,6 +96,12 @@ function OwnerWithdrawals() {
                     : ""}
                 </p>
                 <p className="break-all text-[11px] text-white/35">{w.address}</p>
+                <input
+                  value={txHashes[w.id] ?? ""}
+                  onChange={(e) => setTxHashes((prev) => ({ ...prev, [w.id]: e.target.value }))}
+                  placeholder="On-chain tx hash (optional)"
+                  className="w-full rounded-xl border border-white/10 bg-[#0a0c12] px-3 py-2 text-[11px] text-white/80 outline-none focus:border-cyan-400/40"
+                />
                 <div className="flex flex-wrap gap-2">
                   {dual && !firstOk ? (
                     <button
