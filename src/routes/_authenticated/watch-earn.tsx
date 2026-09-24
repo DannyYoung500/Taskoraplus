@@ -286,6 +286,31 @@ function WatchEarnPage() {
   );
 }
 
+function getVideoThumbnail(video: WatchVideo): string | null {
+  if (video.thumbnailUrl) return video.thumbnailUrl;
+  const source = String(video.videoUrl ?? "").trim();
+  if (!source) return null;
+  try {
+    const url = new URL(source);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    let id = "";
+    if (host === "youtu.be") {
+      id = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    } else if (host === "youtube.com" || host === "m.youtube.com") {
+      id = url.searchParams.get("v") ?? "";
+      if (!id) {
+        const parts = url.pathname.split("/").filter(Boolean);
+        const marker = parts.findIndex((part) => part === "embed" || part === "shorts" || part === "live");
+        if (marker >= 0) id = parts[marker + 1] ?? "";
+      }
+    }
+    if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+      return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+    }
+  } catch {}
+  return null;
+}
+
 function VideoFeedCard({
   video,
   rank,
@@ -309,13 +334,21 @@ function VideoFeedCard({
         className="block w-full text-left active:scale-[0.995]"
       >
         <div className="relative aspect-video overflow-hidden rounded-2xl bg-[#101722] ring-1 ring-white/[0.08]">
-          {video.thumbnailUrl ? (
-            <img src={video.thumbnailUrl} alt="" className="size-full object-cover" loading={rank < 2 ? "eager" : "lazy"} />
-          ) : (
-            <div className="flex size-full items-center justify-center bg-[radial-gradient(circle_at_50%_30%,rgba(34,211,238,.22),transparent_45%),#0b1420]">
-              <Play className="size-10 fill-white/90 text-white/90" />
-            </div>
-          )}
+          {getVideoThumbnail(video) ? (
+            <img
+              src={getVideoThumbnail(video)!}
+              alt=""
+              className="size-full object-cover"
+              loading={rank < 2 ? "eager" : "lazy"}
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+                event.currentTarget.nextElementSibling?.classList.remove("hidden");
+              }}
+            />
+          ) : null}
+          <div className={`flex size-full items-center justify-center bg-[radial-gradient(circle_at_50%_30%,rgba(34,211,238,.22),transparent_45%),#0b1420]${getVideoThumbnail(video) ? " hidden" : ""}`}>
+            <Play className="size-10 fill-white/90 text-white/90" />
+          </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" />
           <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[9px] font-black backdrop-blur">
             <Play className="size-3 fill-white" /> WATCH
