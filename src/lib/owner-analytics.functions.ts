@@ -27,7 +27,7 @@ export const ownerGetAnalytics = createServerFn({ method: "GET" })
     const now = Date.now();
     let online = 0;
     let recent = 0;
-    const byCountry = new Map<string, number>();
+    const byCountry = new Map<string, { count: number; online: number }>();
     const byStatus = { active: 0, suspended: 0, banned: 0, other: 0 };
     const dayMs = 86_400_000;
     let new24h = 0;
@@ -41,13 +41,16 @@ export const ownerGetAnalytics = createServerFn({ method: "GET" })
       else if (st === "banned") byStatus.banned += 1;
       else byStatus.other += 1;
 
+      let isOnline = false;
       const last = (p as { last_active_at?: string | null }).last_active_at;
       if (last) {
         const t = new Date(last).getTime();
         if (Number.isFinite(t)) {
           const d = now - t;
-          if (d <= ONLINE_MS) online += 1;
-          else if (d <= RECENT_MS) recent += 1;
+          if (d <= ONLINE_MS) {
+            online += 1;
+            isOnline = true;
+          } else if (d <= RECENT_MS) recent += 1;
         }
       }
 
@@ -65,13 +68,17 @@ export const ownerGetAnalytics = createServerFn({ method: "GET" })
       const code = String((p as { country_code?: string | null }).country_code ?? "").trim().toUpperCase();
       const name = String((p as { country?: string | null }).country ?? "").trim();
       const key = code || name || "Unknown";
-      byCountry.set(key, (byCountry.get(key) ?? 0) + 1);
+      const prev = byCountry.get(key) ?? { count: 0, online: 0 };
+      byCountry.set(key, {
+        count: prev.count + 1,
+        online: prev.online + (isOnline ? 1 : 0),
+      });
     }
 
     const countries = [...byCountry.entries()]
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, v]) => ({ name, count: v.count, online: v.online }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 20);
+      .slice(0, 25);
 
     const [subs, wds, txs] = await Promise.all([
       db.from("submissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
