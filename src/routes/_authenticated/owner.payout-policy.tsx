@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ownerGetPayoutPolicy, ownerSetPayoutPolicy } from "@/lib/owner-strong.functions";
+import { ownerGetPayoutPolicy, ownerSetPayoutPolicy } from "@/lib/owner-payout-policy.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/payout-policy")({
   loader: async () => {
@@ -43,14 +43,8 @@ function PayoutPolicyPage() {
           risk_force_dual: Number(policy!.risk_force_dual),
           risk_auto_freeze: Number(policy!.risk_auto_freeze),
           max_withdrawals_per_day: Number(policy!.max_withdrawals_per_day),
-          country_deny: deny
-            .split(/[,\s]+/)
-            .map((s) => s.trim())
-            .filter(Boolean),
-          country_allow: allow
-            .split(/[,\s]+/)
-            .map((s) => s.trim())
-            .filter(Boolean),
+          country_deny: deny.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean),
+          country_allow: allow.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean),
         },
       });
       setPolicy(r.policy);
@@ -72,63 +66,34 @@ function PayoutPolicyPage() {
       <div className="mt-4 space-y-3">
         <label className="block text-[11px] text-white/50">
           Force dual-approval at risk ≥
-          <input
-            type="number"
-            min={0}
-            max={100}
-            value={policy.risk_force_dual}
+          <input type="number" min={0} max={100} value={policy.risk_force_dual}
             onChange={(e) => setPolicy({ ...policy, risk_force_dual: Number(e.target.value) })}
-            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm"
-          />
+            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm" />
         </label>
         <label className="block text-[11px] text-white/50">
           Auto-freeze at risk ≥ (0 = off)
-          <input
-            type="number"
-            min={0}
-            max={100}
-            value={policy.risk_auto_freeze}
+          <input type="number" min={0} max={100} value={policy.risk_auto_freeze}
             onChange={(e) => setPolicy({ ...policy, risk_auto_freeze: Number(e.target.value) })}
-            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm"
-          />
+            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm" />
         </label>
         <label className="block text-[11px] text-white/50">
           Max WD requests / 24h
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={policy.max_withdrawals_per_day}
-            onChange={(e) =>
-              setPolicy({ ...policy, max_withdrawals_per_day: Number(e.target.value) })
-            }
-            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm"
-          />
+          <input type="number" min={1} max={20} value={policy.max_withdrawals_per_day}
+            onChange={(e) => setPolicy({ ...policy, max_withdrawals_per_day: Number(e.target.value) })}
+            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm" />
         </label>
         <label className="block text-[11px] text-white/50">
           Country deny (ISO, comma-separated)
-          <input
-            value={deny}
-            onChange={(e) => setDeny(e.target.value)}
-            placeholder="e.g. XX, YY"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm"
-          />
+          <input value={deny} onChange={(e) => setDeny(e.target.value)} placeholder="e.g. XX, YY"
+            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm" />
         </label>
         <label className="block text-[11px] text-white/50">
           Country allow only (empty = all)
-          <input
-            value={allow}
-            onChange={(e) => setAllow(e.target.value)}
-            placeholder="e.g. NG, GH, KE"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm"
-          />
+          <input value={allow} onChange={(e) => setAllow(e.target.value)} placeholder="e.g. NG, GH, KE"
+            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm" />
         </label>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void save()}
-          className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 text-sm font-bold disabled:opacity-50"
-        >
+        <button type="button" disabled={busy} onClick={() => void save()}
+          className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 text-sm font-bold disabled:opacity-50">
           {busy ? "Saving…" : "Save policy"}
         </button>
       </div>
