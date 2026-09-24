@@ -22,6 +22,12 @@ export const RULES = {
   /** Daily check-in streak bonus (Task Points) every 7 consecutive days */
   streakBonusPoints: 50,
   streakBonusDays: 7,
+  /** Max withdrawal requests per user per rolling 24h */
+  maxWithdrawalsPerDay: 3,
+  /** Risk score that forces dual approval */
+  riskForceDual: 40,
+  /** Risk score that auto-freezes wallet on WD attempt */
+  riskAutoFreeze: 70,
 } as const;
 
 export function hoursSince(iso: string | null | undefined): number {
