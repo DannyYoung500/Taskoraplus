@@ -9,7 +9,7 @@ async function ownerChatIds(): Promise<{ botToken: string; ownerIds: string[] }>
   return { botToken, ownerIds };
 }
 
-async function sendOwnerHtml(msg: string) {
+export async function sendOwnerHtml(msg: string) {
   const { botToken, ownerIds } = await ownerChatIds();
   if (!botToken || !ownerIds.length) return;
   await Promise.all(
