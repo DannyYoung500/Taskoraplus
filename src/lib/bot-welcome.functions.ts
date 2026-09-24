@@ -37,7 +37,7 @@ Your premium Telegram earning hub is ready.
 ▶️ WATCH & EARN — Watch eligible content and earn USDT.
 👥 REFER — Invite friends and earn eligible referral commission.
 💰 WALLET — Track your balance, earnings and withdrawals.
-⭐ LEVEL UP — Build Task Points and climb the leaderboard.
+⭐ RANK UP — Build Task Points and climb the leaderboard.
 
 🔐 Secure • Telegram-native • Built for earning
 
