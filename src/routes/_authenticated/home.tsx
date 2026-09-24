@@ -202,7 +202,7 @@ function HomePage() {
       <section className="mb-3.5 grid grid-cols-5 gap-1.5">
         <Quick to="/tasks" label="Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
         <Quick to="/watch-earn" label="Watch & Earn" sub="Watch Videos" Icon={PlayCircle} />
-        <Quick to="/home" label="Games" sub="Play & Earn" Icon={Gamepad2} badge="NEW" muted />
+        <Quick to="/games" label="Games" sub="Play & Earn" Icon={Gamepad2} badge="NEW" />
         <Quick to="/advertise" label="Advertise" sub="Campaigns" Icon={Megaphone} />
         <Quick to="/ambassador" label="Invite & Earn" sub="XP & Commission" Icon={Users} />
       </section>
@@ -298,22 +298,24 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-blue-400/25 bg-gradient-to-r from-[#0c1a30] to-[#07101f] p-3.5">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex size-14 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-            <Gamepad2 className="size-7" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="rounded bg-cyan-400 px-1.5 py-0.5 text-[8px] font-black text-[#04101c]">NEW</span>
-              <p className="text-sm font-black">Play Games, Earn More!</p>
-            </div>
-            <p className="mt-0.5 text-[10px] text-slate-400">
-              Games module is being prepared. Task Points stay from real activity only.
-            </p>
+      <Link
+        to="/games"
+        className="mb-3.5 flex items-center gap-3 overflow-hidden rounded-[20px] border border-blue-400/25 bg-gradient-to-r from-[#0c1a30] to-[#07101f] p-3.5 active:scale-[0.995]"
+      >
+        <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
+          <Gamepad2 className="size-7" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="rounded bg-cyan-400 px-1.5 py-0.5 text-[8px] font-black text-[#04101c]">NEW</span>
+            <p className="text-sm font-black">Taskora Tap Rush</p>
           </div>
+          <p className="mt-0.5 text-[10px] text-slate-400">
+            30 seconds of skill play · earn Task Points · daily cap 100 TP
+          </p>
         </div>
-      </section>
+        <ChevronRight className="size-5 shrink-0 text-cyan-300" />
+      </Link>
 
       <section>
         <div className="mb-2 flex items-center justify-between">
