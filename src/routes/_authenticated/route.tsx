@@ -85,7 +85,7 @@ function AuthenticatedPending() {
   );
 }
 
-function AuthenticatedError({ error, reset }: { error: Error; reset: () => void }) {
+function AuthenticatedError({ error }: { error: Error }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#030814] px-5 pb-28 text-white">
       <div className="w-full max-w-md rounded-3xl border border-red-400/20 bg-white/[0.04] p-6 text-center">
@@ -93,13 +93,6 @@ function AuthenticatedError({ error, reset }: { error: Error; reset: () => void 
         <p className="mt-2 break-words text-sm text-slate-400">
           {error.message || "Something went wrong while opening the page."}
         </p>
-        <button
-          type="button"
-          onClick={reset}
-          className="mt-5 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white"
-        >
-          Try again
-        </button>
       </div>
     </main>
   );

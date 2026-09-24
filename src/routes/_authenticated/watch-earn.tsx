@@ -231,44 +231,40 @@ function WatchEarnPage() {
       ) : null}
 
       {active ? (
-        <section className="mb-3 rounded-2xl border border-cyan-400/25 bg-[#0b1628] p-4">
-          <p className="text-sm font-bold">{active.title ?? "Watch video"}</p>
-          <p className="mt-1 text-[11px] text-slate-400">
-            Watch {required}s · Reward {formatUsd(Number(active.rewardUsdt ?? 0))}
-          </p>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
-              style={{ width: `${progress}%` }}
-            />
+        <section className="mb-4 overflow-hidden rounded-3xl border border-white/10 bg-[#0b1628] shadow-2xl">
+          <div className="relative aspect-video w-full bg-black">
+            <VideoPlayer video={active} />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
+            <div className="absolute inset-x-3 bottom-3">
+              <div className="mb-2 h-1 overflow-hidden rounded-full bg-white/25">
+                <div className="h-full rounded-full bg-white" style={{ width: `${progress}%` }} />
+              </div>
+              <div className="flex items-center justify-between text-[9px] font-semibold text-white/80">
+                <span>{elapsed}s / {required}s</span>
+                <span>{formatUsd(Number(active.rewardUsdt ?? 0))} reward</span>
+              </div>
+            </div>
           </div>
-          <p className="mt-1 text-[10px] text-slate-500">
-            {elapsed}s / {required}s {busy ? "· starting…" : ""}
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              disabled={!canComplete}
-              onClick={() => void onComplete()}
-              className="flex-1 rounded-xl py-3 text-xs font-black text-white disabled:opacity-40"
-              style={{ background: BLUE_GRAD }}
-            >
-              {busy ? <Loader2 className="mx-auto size-4 animate-spin" /> : "Claim reward"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveId(null);
-                setSessionId(null);
-              }}
-              className="rounded-xl border border-white/15 px-4 py-3 text-xs font-bold text-slate-300"
-            >
-              Close
-            </button>
+          <div className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 className="line-clamp-2 text-base font-black">{active.title ?? "Watch video"}</h2>
+                <p className="mt-1 text-[10px] text-slate-500">{active.providerName ?? "TASKORA"} · Watch the full video to qualify</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black text-amber-200">+{formatUsd(Number(active.rewardUsdt ?? 0)).replace("$", "")}</span>
+            </div>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-[width]" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button type="button" disabled={!canComplete} onClick={() => void onComplete()} className="flex-1 rounded-2xl py-3 text-xs font-black text-white disabled:opacity-40" style={{ background: BLUE_GRAD }}>
+                {busy ? <Loader2 className="mx-auto size-4 animate-spin" /> : canComplete ? "Claim reward" : `Keep watching · ${Math.max(0, required - elapsed)}s`}
+              </button>
+              <button type="button" onClick={() => { setActiveId(null); setSessionId(null); }} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-bold text-slate-300">Close</button>
+            </div>
           </div>
         </section>
       ) : null}
-
       <div className="space-y-2.5">
         {filtered.length === 0 ? (
           <p className="rounded-2xl border border-white/8 bg-[#0b1628] p-5 text-center text-sm text-slate-400">
@@ -336,6 +332,48 @@ function WatchEarnPage() {
   );
 }
 
+
+function VideoPlayer({ video }: { video: WatchVideo }) {
+  const src = getEmbedUrl(video.videoUrl, video.providerName);
+  if (src) {
+    return <iframe title={video.title} src={src} className="absolute inset-0 size-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />;
+  }
+  if (video.videoUrl && /\.(mp4|webm|ogg)(\?.*)?$/i.test(video.videoUrl)) {
+    return <video className="absolute inset-0 size-full object-contain" src={video.videoUrl} controls playsInline />;
+  }
+  return (
+    <a href={video.videoUrl ?? "#"} target="_blank" rel="noreferrer" className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#07111f] text-center">
+      {video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" className="absolute inset-0 size-full object-cover opacity-60" /> : null}
+      <span className="relative flex size-14 items-center justify-center rounded-full bg-white text-[#06111f] shadow-xl"><Play className="size-6 fill-current" /></span>
+      <span className="relative px-5 text-xs font-bold text-white">Open this video on {video.providerName ?? "the original platform"}</span>
+    </a>
+  );
+}
+
+function getEmbedUrl(videoUrl: string | null, providerName: string | null) {
+  if (!videoUrl) return null;
+  try {
+    const url = new URL(videoUrl);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be") {
+      let id = "";
+      if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0];
+      else if (url.pathname.startsWith("/watch")) id = url.searchParams.get("v") ?? "";
+      else if (url.pathname.startsWith("/shorts/")) id = url.pathname.split("/")[2] ?? "";
+      else if (url.pathname.startsWith("/embed/")) id = url.pathname.split("/")[2] ?? "";
+      return id ? "https://www.youtube.com/embed/" + id + "?autoplay=1&rel=0&modestbranding=1" : null;
+    }
+    if (host === "vimeo.com" || host === "player.vimeo.com") {
+      const id = url.pathname.split("/").filter(Boolean).pop();
+      return id && /^\d+$/.test(id) ? "https://player.vimeo.com/video/" + id + "?autoplay=1" : null;
+    }
+    if (host === "tiktok.com" || host === "vm.tiktok.com") {
+      const match = url.pathname.match(/\/video\/(\d+)/);
+      return match ? "https://www.tiktok.com/player/v1/" + match[1] + "?description=1&music_info=1" : null;
+    }
+  } catch {}
+  return null;
+}
 function Chip({ icon: Icon, label }: { icon: typeof Zap; label: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-semibold text-slate-300">
