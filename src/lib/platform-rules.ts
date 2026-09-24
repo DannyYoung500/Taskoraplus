@@ -28,6 +28,8 @@ export const RULES = {
   riskForceDual: 40,
   /** Risk score that auto-freezes wallet on WD attempt */
   riskAutoFreeze: 70,
+  /** Amounts at or above this require on-chain tx hash when marking Paid */
+  txHashRequiredUsd: 20,
 } as const;
 
 export function hoursSince(iso: string | null | undefined): number {
