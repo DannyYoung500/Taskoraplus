@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -7,6 +8,7 @@ import {
   ClipboardCheck,
   Crown,
   LayoutDashboard,
+  Send,
   Settings,
   Users,
   Wallet,
@@ -14,6 +16,7 @@ import {
 import { loadOwnerDashboard } from "@/lib/owner-dashboard.loader";
 import { TaskoraLogo } from "@/components/TaskoraLogo";
 import { OwnerShell } from "@/components/OwnerShell";
+import { ownerSendOpsDigest } from "@/lib/owner-ops.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/")({
   loader: async () => loadOwnerDashboard(),
@@ -38,6 +41,23 @@ function OwnerHub() {
   const o = (overview ?? {}) as Record<string, any>;
   const reviews = Array.isArray(submissions) ? submissions.slice(0, 5) : [];
   const payouts = Array.isArray(withdrawals) ? withdrawals.slice(0, 5) : [];
+  const [digestMsg, setDigestMsg] = useState<string | null>(null);
+  const [digestBusy, setDigestBusy] = useState(false);
+
+  async function sendDigest() {
+    setDigestBusy(true);
+    setDigestMsg(null);
+    try {
+      const r = await ownerSendOpsDigest();
+      setDigestMsg(
+        `Digest sent · online ${r.online} · new24h ${r.new24h} · WD ${r.pendingWd} · reviews ${r.pendingSub}`,
+      );
+    } catch (e) {
+      setDigestMsg(e instanceof Error ? e.message : "Digest failed");
+    } finally {
+      setDigestBusy(false);
+    }
+  }
 
   const stats = [
     { label: "Users", value: String(o.totalUsers ?? 0), icon: Users, tone: "cyan" },
@@ -121,7 +141,7 @@ function OwnerHub() {
                 ["/owner/reviews", "Review tasks", ClipboardCheck],
                 ["/owner/withdrawals", "Payouts", Wallet],
                 ["/owner/users", "Users", Users],
-                ["/owner/analytics", "Analytics", Activity],
+                ["/owner/economy", "Economy", Settings],
               ].map(([to, title, Icon]) => (
                 <Link
                   key={title as string}
@@ -176,13 +196,27 @@ function OwnerHub() {
                 <span className="rounded-full bg-white/[0.04] px-2.5 py-1">API · OK</span>
                 <span className="rounded-full bg-white/[0.04] px-2.5 py-1">Bot · OK</span>
               </div>
-              <Link
-                to="/owner/settings"
-                className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[11px] font-bold text-cyan-200"
-              >
-                Settings
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={digestBusy}
+                  onClick={() => void sendDigest()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/25 bg-violet-500/10 px-3 py-2 text-[11px] font-bold text-violet-200 disabled:opacity-50"
+                >
+                  <Send className="size-3.5" />
+                  {digestBusy ? "Sending…" : "Ops digest"}
+                </button>
+                <Link
+                  to="/owner/settings"
+                  className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[11px] font-bold text-cyan-200"
+                >
+                  Settings
+                </Link>
+              </div>
             </div>
+            {digestMsg ? (
+              <p className="mt-3 text-[11px] text-violet-200/90">{digestMsg}</p>
+            ) : null}
           </section>
         </div>
       </div>
