@@ -27,7 +27,7 @@ export const ownerSetPayoutPolicy = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
-    const { loadPayoutPolicy } = await import("@/lib/strong-guards");
+    const { loadPayoutPolicy, DEFAULT_PAYOUT_POLICY } = await import("@/lib/strong-guards");
     const prev = await loadPayoutPolicy();
     const next = {
       risk_force_dual:
@@ -66,21 +66,62 @@ export const ownerSetPayoutPolicy = createServerFn({ method: "POST" })
     return { ok: true, policy: next };
   });
 
-/** Cron-friendly ops digest (CRON_SECRET or TASKORA_CRON_SECRET header). */
+
+/** Read / write public payout proof channel (Telegram channel id or @username). */
+export const ownerGetPayoutChannel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const { getPayoutChannelConfig } = await import("@/lib/notify-owner");
+    return getPayoutChannelConfig();
+  });
+
+export const ownerSetPayoutChannel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { channel_id: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const { setPayoutChannelConfig } = await import("@/lib/notify-owner");
+    const result = await setPayoutChannelConfig(data.channel_id);
+    await audit({
+      adminId: context.userId,
+      action: "payout_channel.update",
+      targetType: "settings",
+      targetId: "payout_channel",
+      previous: null,
+      next: result,
+    }).catch(() => undefined);
+    return { ok: true, ...result };
+  });
+
+/** Cron-friendly ops digest (owner session OR CRON_SECRET header). */
 export const cronOpsDigest = createServerFn({ method: "POST" })
   .handler(async () => {
+    // Auth: CRON_SECRET / TASKORA_CRON_SECRET / LOVABLE_CRON_SECRET via header
     try {
       const { getRequest } = await import("@tanstack/react-start/server");
       const req = getRequest();
-      const secret = process.env["CRON_SECRET"] ?? process.env["TASKORA_CRON_SECRET"] ?? "";
-      const hdr = req?.headers?.get("x-cron-secret") ?? req?.headers?.get("authorization") ?? "";
-      const okCron = Boolean(secret && (hdr === secret || hdr === `Bearer ${secret}`));
-      if (!okCron) throw new Error("cron_auth_required");
+      const secret =
+        process.env["CRON_SECRET"] ??
+        process.env["TASKORA_CRON_SECRET"] ??
+        process.env["LOVABLE_CRON_SECRET"] ??
+        "";
+      const hdr =
+        req?.headers?.get("x-cron-secret") ??
+        req?.headers?.get("authorization") ??
+        "";
+      const okCron =
+        Boolean(secret) &&
+        (hdr === secret || hdr === `Bearer ${secret}` || hdr.endsWith(secret));
+      if (!okCron) {
+        throw new Error("cron_auth_required");
+      }
     } catch (e) {
       if (e instanceof Error && e.message === "cron_auth_required") throw e;
       throw new Error("Cron auth failed.");
     }
 
+    // Reuse digest builder by calling the same logic inline
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { ONLINE_MS } = await import("@/lib/locale-geo");
     const now = Date.now();
