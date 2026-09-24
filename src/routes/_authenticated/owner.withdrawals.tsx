@@ -89,7 +89,8 @@ function OwnerWithdrawals() {
       <h1 className="text-xl font-bold">Withdrawals</h1>
       <p className="mt-1 text-xs text-white/45">
         Mark paid only after on-chain send. Dual-approval needs two different owners. Risk scores
-        auto-enrich.
+        auto-enrich. Every Paid mark posts public proof to your payment channel (configure under
+        Payout policy).
       </p>
       {error ? <p className="mt-3 text-xs text-amber-300">{error}</p> : null}
       <div className="mt-4 space-y-3">
@@ -156,8 +157,16 @@ function OwnerWithdrawals() {
                 <input
                   value={txHashes[w.id] ?? ""}
                   onChange={(e) => setTxHashes((prev) => ({ ...prev, [w.id]: e.target.value }))}
-                  placeholder="On-chain tx hash (optional)"
-                  className="w-full rounded-xl border border-white/10 bg-[#0a0c12] px-3 py-2 text-[11px] text-white/80 outline-none focus:border-cyan-400/40"
+                  placeholder={
+                    Number(w.amount) >= 20
+                      ? "On-chain tx hash (required ≥ $20)"
+                      : "On-chain tx hash (optional)"
+                  }
+                  className={`w-full rounded-xl border bg-[#0a0c12] px-3 py-2 text-[11px] text-white/80 outline-none focus:border-cyan-400/40 ${
+                    Number(w.amount) >= 20 && !(txHashes[w.id] ?? "").trim()
+                      ? "border-amber-400/40"
+                      : "border-white/10"
+                  }`}
                 />
                 <div className="flex flex-wrap gap-2">
                   {dual && !firstOk ? (
