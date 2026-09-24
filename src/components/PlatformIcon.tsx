@@ -81,9 +81,9 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
   },
   x: {
     Icon: SiX,
-    color: "#000000",
+    color: "#FFFFFF",
     bg: "from-[#1a1a1a] to-[#333]",
-    label: "X (Twitter)",
+    label: "X",
     category: "social",
     services: 4,
     blurb: "Followers, likes, reposts & audience",
@@ -108,7 +108,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
   },
   threads: {
     Icon: SiThreads,
-    color: "#000000",
+    color: "#FFFFFF",
     bg: "from-[#1a1a1a] to-[#444]",
     label: "Threads",
     category: "social",
@@ -302,11 +302,19 @@ export function PlatformLogo({ platform, size = 52 }: { platform: Platform; size
   const meta = PLATFORM_META[platform];
   if (!meta) return null;
   const { Icon, color, label } = meta;
-  const solidBg = platform === "instagram" ? undefined : color === "#000000" ? "#111111" : color;
+  const isDarkBrand = platform === "x" || platform === "threads" || platform === "tiktok";
+  const solidBg =
+    platform === "instagram"
+      ? undefined
+      : isDarkBrand
+        ? "#111111"
+        : color === "#FFFFFF"
+          ? "#111111"
+          : color;
 
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full shadow-md"
+      className="inline-flex shrink-0 items-center justify-center rounded-2xl shadow-md ring-1 ring-white/10"
       style={{
         width: size,
         height: size,
@@ -316,8 +324,9 @@ export function PlatformLogo({ platform, size = 52 }: { platform: Platform; size
             : solidBg,
       }}
       title={label}
+      aria-label={label}
     >
-      <Icon size={Math.round(size * 0.48)} color="#fff" />
+      <Icon size={Math.round(size * 0.46)} color="#fff" />
     </span>
   );
 }
