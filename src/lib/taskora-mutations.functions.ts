@@ -49,6 +49,17 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .gte("created_at", since);
     if ((count ?? 0) >= RULES.maxSubmissionsPerHour) {
+      try {
+        const { notifyOwnersVelocityAlert } = await import("@/lib/notify-owner");
+        await notifyOwnersVelocityAlert({
+          userId,
+          kind: "submissions",
+          count: count ?? 0,
+          limit: RULES.maxSubmissionsPerHour,
+        });
+      } catch {
+        /* soft */
+      }
       throw new Error(`Rate limit: max ${RULES.maxSubmissionsPerHour} submissions per hour.`);
     }
     const { data: task } = await supabaseAdmin
@@ -217,6 +228,29 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       amount: -Math.abs(data.amount),
       kind: "withdrawal",
     });
+
+    // Notify owners on dual / large withdrawals
+    if (requiresDual || data.amount >= dualThreshold) {
+      try {
+        const { data: prof } = await supabaseAdmin
+          .from("profiles")
+          .select("display_name")
+          .eq("id", userId)
+          .maybeSingle();
+        const { notifyOwnersLargeWithdrawal } = await import("@/lib/notify-owner");
+        await notifyOwnersLargeWithdrawal({
+          userId,
+          amount: data.amount,
+          method: data.method,
+          address,
+          requiresDual,
+          displayName: (prof as { display_name?: string | null } | null)?.display_name ?? null,
+        });
+      } catch {
+        /* soft */
+      }
+    }
+
     return { ok: true, requiresDual };
   });
 
