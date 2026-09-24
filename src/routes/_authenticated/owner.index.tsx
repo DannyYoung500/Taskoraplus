@@ -16,7 +16,7 @@ import {
 import { loadOwnerDashboard } from "@/lib/owner-dashboard.loader";
 import { TaskoraLogo } from "@/components/TaskoraLogo";
 import { OwnerShell } from "@/components/OwnerShell";
-import { ownerSendOpsDigest } from "@/lib/owner-ops.functions";
+import { ownerSendOpsDigest } from "@/lib/owner-strong.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/")({
   loader: async () => loadOwnerDashboard(),
