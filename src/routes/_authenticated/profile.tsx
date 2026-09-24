@@ -148,6 +148,7 @@ function ProfileScreen() {
         <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="Task Points + commission" />
         <Row to="/connected" icon={Link2} label="Connected accounts" sub={`${accounts.length} linked`} />
         <Row to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
+        <Row to="/payout-proofs" icon={Shield} label="Payout proofs" sub="Public paid withdrawal log" />
         <Row to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
         <Row to="/notifications" icon={Bell} label="Notifications" sub="Alerts" />
       </section>
