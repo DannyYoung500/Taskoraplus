@@ -61,8 +61,9 @@ function OwnerAnalytics() {
 
           <section className="mt-5">
             <h2 className="mb-2 flex items-center gap-1.5 text-sm font-black">
-              <Globe className="size-4 text-cyan-300" /> Top countries
+              <Globe className="size-4 text-cyan-300" /> Country heat map
             </h2>
+            <p className="mb-2 text-[10px] text-white/40">Users · online now · share of base</p>
             {data.countries.length === 0 ? (
               <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm text-white/40">
                 No country data yet. Run PRESENCE_COUNTRY_RUN_ONCE.sql and have users open the app.
@@ -71,14 +72,32 @@ function OwnerAnalytics() {
               <div className="space-y-1.5">
                 {data.countries.map((c) => {
                   const pct = data.totalUsers > 0 ? Math.round((c.count / data.totalUsers) * 100) : 0;
+                  const onlineN = Number((c as { online?: number }).online ?? 0);
                   return (
-                    <div key={c.name} className="flex items-center gap-3 rounded-xl border border-white/8 bg-[#12141c] px-3 py-2.5">
-                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-white/90">{c.name}</span>
-                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
-                        <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.min(100, pct)}%` }} />
+                    <div
+                      key={c.name}
+                      className="flex items-center gap-2 rounded-xl border border-white/8 bg-[#12141c] px-3 py-2.5"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-white/90">
+                        {c.name}
+                      </span>
+                      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-cyan-400"
+                          style={{ width: `${Math.min(100, pct)}%` }}
+                        />
                       </div>
-                      <span className="w-10 text-right text-[11px] font-bold tabular-nums text-cyan-200">{c.count}</span>
-                      <span className="w-8 text-right text-[10px] text-white/35">{pct}%</span>
+                      <span className="w-8 text-right text-[11px] font-bold tabular-nums text-cyan-200">
+                        {c.count}
+                      </span>
+                      <span
+                        className={`w-10 text-right text-[10px] font-semibold tabular-nums ${
+                          onlineN > 0 ? "text-emerald-300" : "text-white/25"
+                        }`}
+                      >
+                        {onlineN > 0 ? `${onlineN} on` : "—"}
+                      </span>
+                      <span className="w-7 text-right text-[10px] text-white/35">{pct}%</span>
                     </div>
                   );
                 })}
