@@ -82,6 +82,7 @@ export async function runWithdrawalStrongGuards(opts: {
   const policy = await loadPayoutPolicy();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  // Velocity: max WDs / 24h
   const since24 = new Date(Date.now() - 86_400_000).toISOString();
   const { count: wd24 } = await supabaseAdmin
     .from("withdrawals")
@@ -89,6 +90,17 @@ export async function runWithdrawalStrongGuards(opts: {
     .eq("user_id", opts.userId)
     .gte("created_at", since24);
   if ((wd24 ?? 0) >= policy.max_withdrawals_per_day) {
+    try {
+      const { notifyOwnersVelocityAlert } = await import("@/lib/notify-owner");
+      await notifyOwnersVelocityAlert({
+        userId: opts.userId,
+        kind: "withdrawals",
+        count: wd24 ?? 0,
+        limit: policy.max_withdrawals_per_day,
+      });
+    } catch {
+      /* soft */
+    }
     return {
       requiresDual: opts.requiresDual,
       riskScore: 0,
@@ -97,6 +109,7 @@ export async function runWithdrawalStrongGuards(opts: {
     };
   }
 
+  // Country policy
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("country_code")
@@ -124,6 +137,7 @@ export async function runWithdrawalStrongGuards(opts: {
     };
   }
 
+  // Risk score
   let riskScore = 0;
   let riskSignals: string[] = [];
   try {
@@ -140,6 +154,7 @@ export async function runWithdrawalStrongGuards(opts: {
     requiresDual = true;
   }
 
+  // Auto-freeze extreme risk
   if (riskScore >= policy.risk_auto_freeze && policy.risk_auto_freeze > 0) {
     try {
       await supabaseAdmin
@@ -170,6 +185,7 @@ export async function runWithdrawalStrongGuards(opts: {
     };
   }
 
+  // Large WD floor still applies via RULES
   if (opts.amount > RULES.maxAutoWithdrawalUsd) {
     requiresDual = true;
   }
