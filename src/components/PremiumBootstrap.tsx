@@ -87,28 +87,9 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
         return;
       }
       try {
-        // Reuse valid session on re-open (cuts false Retry flashes)
-        const existing = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
-        if (existing.data.session?.access_token) {
-          const { data: confirmed } = await supabase.auth.getUser();
-          if (confirmed.user) {
-            const metaName =
-              (confirmed.user.user_metadata?.first_name as string | undefined) ||
-              (confirmed.user.user_metadata?.full_name as string | undefined);
-            authResult.current = {
-              ok: true,
-              firstName: metaName,
-              isOwner: Boolean(confirmed.user.user_metadata?.is_owner),
-            };
-            try {
-              window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success");
-            } catch {
-              /* ignore */
-            }
-            return;
-          }
-        }
-
+        // Always bind the Supabase session to the Telegram user that launched this Mini App.
+        // A cached browser session can belong to a different Telegram account and trigger
+        // a false "Telegram account not linked" gate error.
         const result = await loginWithTelegram({ data: { initData } });
         const { error: sessErr } = await supabase.auth.setSession({
           access_token: result.access_token,
