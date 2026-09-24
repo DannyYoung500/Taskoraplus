@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { listPendingWithdrawals, reviewWithdrawal } from "@/lib/taskora-extra.functions";
+import { ownerSetWalletFrozen } from "@/lib/owner-ops.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/withdrawals")({
   loader: async () => {
@@ -21,6 +22,11 @@ type WdRow = Awaited<ReturnType<typeof listPendingWithdrawals>>[number] & {
   requires_dual?: boolean;
   approval_stage?: string;
   first_approved_by?: string | null;
+  risk_score?: number;
+  risk_signals?: string[];
+  country_line?: string;
+  presence_label?: string;
+  wallet_frozen?: boolean;
 };
 
 function OwnerWithdrawals() {
@@ -54,6 +60,23 @@ function OwnerWithdrawals() {
     }
   }
 
+  async function freezeUser(userId: string, frozen: boolean) {
+    setBusyId(userId);
+    setError(null);
+    try {
+      await ownerSetWalletFrozen({
+        data: { userId, frozen, reason: frozen ? "Frozen from withdrawal queue" : undefined },
+      });
+      setRows((prev) =>
+        prev.map((row) => (row.user_id === userId ? { ...row, wallet_frozen: frozen } : row)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Freeze failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-6 text-white">
       <h1 className="text-xl font-bold">Withdrawals</h1>
@@ -71,23 +94,43 @@ function OwnerWithdrawals() {
             const dual = Boolean(w.requires_dual);
             const stage = String(w.approval_stage ?? "pending");
             const firstOk = stage === "first_ok" || stage === "ready";
+            const risk = Number(w.risk_score ?? 0);
+            const riskHigh = risk >= 50;
             return (
               <div key={w.id} className="space-y-2 rounded-2xl border border-white/8 bg-[#12141c] p-4">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold">
                     ${Number(w.amount).toFixed(2)} · {w.method}
                   </p>
-                  {dual ? (
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        firstOk
-                          ? "bg-emerald-500/15 text-emerald-300"
-                          : "bg-amber-500/15 text-amber-200"
-                      }`}
-                    >
-                      {firstOk ? "1/2 approved" : "DUAL required"}
-                    </span>
-                  ) : null}
+                  <div className="flex shrink-0 flex-wrap gap-1">
+                    {dual ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          firstOk
+                            ? "bg-emerald-500/15 text-emerald-300"
+                            : "bg-amber-500/15 text-amber-200"
+                        }`}
+                      >
+                        {firstOk ? "1/2 approved" : "DUAL required"}
+                      </span>
+                    ) : null}
+                    {risk > 0 ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          riskHigh
+                            ? "bg-rose-500/15 text-rose-300"
+                            : "bg-violet-500/15 text-violet-200"
+                        }`}
+                      >
+                        Risk {risk}
+                      </span>
+                    ) : null}
+                    {w.wallet_frozen ? (
+                      <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                        FROZEN
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <p className="text-xs text-white/50">
                   {(w as { display_name?: string }).display_name || "User"}
@@ -95,6 +138,12 @@ function OwnerWithdrawals() {
                     ? ` · @${(w as { username?: string }).username}`
                     : ""}
                 </p>
+                <p className="text-[10px] text-white/40">
+                  {w.presence_label ?? "—"} · {w.country_line ?? "—"}
+                </p>
+                {Array.isArray(w.risk_signals) && w.risk_signals.length > 0 ? (
+                  <p className="text-[10px] text-amber-200/80">{w.risk_signals.slice(0, 3).join(" · ")}</p>
+                ) : null}
                 <p className="break-all text-[11px] text-white/35">{w.address}</p>
                 <input
                   value={txHashes[w.id] ?? ""}
@@ -129,6 +178,16 @@ function OwnerWithdrawals() {
                   >
                     Reject
                   </button>
+                  {w.user_id ? (
+                    <button
+                      type="button"
+                      disabled={busyId === w.user_id}
+                      onClick={() => void freezeUser(String(w.user_id), !w.wallet_frozen)}
+                      className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 disabled:opacity-50"
+                    >
+                      {w.wallet_frozen ? "Unfreeze" : "Freeze $"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );
