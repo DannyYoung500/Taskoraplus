@@ -94,7 +94,6 @@ export const verifyPublicProfile = createServerFn({method:"POST"}).middleware([r
   const rawHtml=await r.text();
   const html=rawHtml.replace(/&amp;/g,"&").replace(/&#x2F;/gi,"/").replace(/\s+/g," ").toLowerCase();
   const token=data.token.toLowerCase();
-  const expectedMessage=makeMessage(String((await supabaseAdmin.from("profiles").select("referral_code,telegram_id").eq("id",context.userId).maybeSingle()).data?.referral_code||""),token).toLowerCase();
   if(!html.includes(token)||!html.includes("i earn money every day on taskora")) throw new Error("We did not find the required verification message in your public bio. Make sure the profile is public, paste the complete message, save it, and try again.");
   const {data:conflict}=await supabaseAdmin.from("connected_accounts").select("id").eq("platform",platform).eq("profile_url",submitted.toString()).eq("status","verified").neq("user_id",context.userId).maybeSingle();
   if(conflict) throw new Error("That public profile is already connected to another Taskora account.");
