@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Rocket,
   ShieldCheck,
+  Upload,
 } from "lucide-react";
 import {
   PLATFORM_META,
@@ -55,7 +56,6 @@ function AdvertisePage() {
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [warning, setWarning] = useState("");
-  const [featured, setFeatured] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -99,7 +99,6 @@ function AdvertisePage() {
     setInstructions(s.defaultSteps.join("\n"));
     setWarning(s.defaultWarning);
     setLink("");
-    setFeatured(false);
     setMsg(null);
   }
 
@@ -165,7 +164,6 @@ function AdvertisePage() {
   if (platform && service) {
     const meta = PLATFORM_META[platform];
     const unitLabel = QTY_UNIT_LABEL[service.unit] || service.unit;
-    const singularUnit = unitLabel.endsWith("s") ? unitLabel.slice(0, -1) : unitLabel;
 
     return (
       <main
@@ -202,6 +200,7 @@ function AdvertisePage() {
           </p>
         </div>
 
+        {!isWatchService ? (
         <section
           className="mb-3 space-y-3 rounded-2xl border p-4"
           style={{ background: COLORS.surface, borderColor: COLORS.border }}
@@ -249,6 +248,8 @@ function AdvertisePage() {
             </div>
           </div>
 
+        ) : null}
+
           {service.id === "yt_watch" ? (
             <div className="space-y-3 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3">
               <div>
@@ -294,19 +295,10 @@ function AdvertisePage() {
             </div>
           ) : null}
 
-          <div>
-            <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
-              Notes <span className="font-normal text-white/30">(optional)</span>
-            </label>
-            <input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any special instructions\u2026"
-              className="w-full rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm outline-none transition focus:border-sky-400/50"
-            />
           </div>
         </section>
 
+        {!isWatchService ? (
         <section
           className="mb-3 space-y-4 rounded-2xl border p-4"
           style={{ background: COLORS.surface, borderColor: COLORS.border }}
@@ -394,25 +386,7 @@ function AdvertisePage() {
           </div>
         </section>
 
-        <label
-          className={`mb-3 flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
-            featured ? "border-amber-400/40 bg-amber-400/10" : "border-amber-400/20 bg-amber-400/[0.04]"
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={featured}
-            onChange={(e) => setFeatured(e.target.checked)}
-            className="mt-0.5 size-4 accent-amber-400"
-          />
-          <div>
-            <p className="text-sm font-semibold text-amber-100">Feature this task for more visibility</p>
-            <p className="mt-1 text-[11px] leading-snug text-white/45">
-              Appears in the Featured section \u2014 more attention, faster completion. +$
-              {FEATURE_FEE_USD.toFixed(2)} feature fee.
-            </p>
-          </div>
-        </label>
+        ) : null}
 
         <section
           className="mb-3 space-y-2.5 rounded-2xl border p-4"
@@ -442,15 +416,9 @@ function AdvertisePage() {
               <span className="text-white/50">Estimated delivery</span>
               <span>{service.delivery}</span>
             </div>
-            {featured ? (
-              <div className="flex justify-between">
-                <span className="text-white/50">Feature fee</span>
-                <span>{formatUsd(featureFee)}</span>
-              </div>
-            ) : null}
             <div className="flex justify-between border-t border-white/10 pt-2.5 text-base font-bold">
               <span>Total</span>
-              <span className="text-emerald-300">{formatUsd(total)}</span>
+              <span className="text-blue-200">{formatUsd(total)}</span>
             </div>
           </div>
 
@@ -467,7 +435,7 @@ function AdvertisePage() {
             type="button"
             disabled={busy || insufficient}
             onClick={() => void placeOrder()}
-            className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 py-3.5 text-sm font-bold text-[#0a0c12] shadow-lg shadow-emerald-500/20 transition active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
+            className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 py-3.5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
           >
             <Rocket className="size-4" />
             {busy ? "Placing order\u2026" : `Place Order \u00b7 $${total.toFixed(2)}`}
