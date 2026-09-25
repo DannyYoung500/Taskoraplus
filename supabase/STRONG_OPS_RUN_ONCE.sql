@@ -1,25 +1,12 @@
 -- TASKORA strong ops — run once in Supabase SQL editor
--- Safe / idempotent
-
-CREATE INDEX IF NOT EXISTS idx_fraud_flags_status_created
-  ON public.fraud_flags (status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_fraud_flags_user
-  ON public.fraud_flags (user_id, status);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created
-  ON public.audit_logs (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_withdrawals_address_lower
-  ON public.withdrawals ((lower(trim(address))));
-CREATE INDEX IF NOT EXISTS idx_submissions_user_status
-  ON public.submissions (user_id, status);
-CREATE INDEX IF NOT EXISTS idx_submissions_created
-  ON public.submissions (created_at DESC);
-
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS streak integer NOT NULL DEFAULT 0;
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS last_checkin date;
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS risk_score integer NOT NULL DEFAULT 0;
-
-COMMENT ON TABLE public.fraud_flags IS 'TASKORA owner fraud flags — shared wallet, high rejects, velocity';
-COMMENT ON TABLE public.audit_logs IS 'Owner/admin action audit trail';
+ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS proof_hash text;
+CREATE INDEX IF NOT EXISTS submissions_proof_hash_idx ON public.submissions (proof_hash) WHERE proof_hash IS NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS device_fp text, ADD COLUMN IF NOT EXISTS last_ip_hint text, ADD COLUMN IF NOT EXISTS last_seen_at timestamptz;
+CREATE INDEX IF NOT EXISTS profiles_device_fp_idx ON public.profiles (device_fp) WHERE device_fp IS NOT NULL;
+CREATE TABLE IF NOT EXISTS public.payout_address_allowlist (
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  address text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, address)
+);
+CREATE INDEX IF NOT EXISTS payout_allowlist_user_idx ON public.payout_address_allowlist (user_id);

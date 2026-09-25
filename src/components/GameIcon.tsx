@@ -1,32 +1,25 @@
 /**
- * Game brand tiles for Play & Earn section (official-style colors).
+ * Original TASKORA skill-game tiles (not third-party brands).
  */
 import type { CSSProperties } from "react";
 
-export type GameId = "pubg" | "freefire" | "cod" | "mobilelegends" | "roblox" | "generic";
+export type GameId = "tap" | "spin" | "quiz" | "rush" | "puzzle";
 
 const GAMES: Record<
   GameId,
   { label: string; short: string; bg: string; accent: string }
 > = {
-  pubg: { label: "PUBG Mobile", short: "PUBG", bg: "#F2A900", accent: "#1a1a1a" },
-  freefire: { label: "Free Fire", short: "FF", bg: "#FF6B00", accent: "#fff" },
-  cod: { label: "Call of Duty", short: "COD", bg: "#1B5E20", accent: "#fff" },
-  mobilelegends: { label: "Mobile Legends", short: "MLBB", bg: "#1565C0", accent: "#fff" },
-  roblox: { label: "Roblox", short: "RBX", bg: "#E2231A", accent: "#fff" },
-  generic: { label: "Games", short: "PLAY", bg: "#0ea5e9", accent: "#fff" },
+  tap: { label: "Taskora Tap", short: "TAP", bg: "#0ea5e9", accent: "#fff" },
+  spin: { label: "Taskora Spin", short: "SPIN", bg: "#6366f1", accent: "#fff" },
+  quiz: { label: "Taskora Quiz", short: "QUIZ", bg: "#14b8a6", accent: "#fff" },
+  rush: { label: "Taskora Rush", short: "RUSH", bg: "#3b82f6", accent: "#fff" },
+  puzzle: { label: "Taskora Puzzle", short: "PUZ", bg: "#8b5cf6", accent: "#fff" },
 };
 
-export const FEATURED_GAMES: GameId[] = ["pubg", "freefire", "cod", "mobilelegends", "roblox"];
+export const FEATURED_GAMES: GameId[] = ["tap", "spin", "quiz", "rush", "puzzle"];
 
-export function GameLogo({
-  id,
-  size = 44,
-}: {
-  id: GameId;
-  size?: number;
-}) {
-  const g = GAMES[id] ?? GAMES.generic;
+export function GameLogo({ id, size = 44 }: { id: GameId; size?: number }) {
+  const g = GAMES[id] ?? GAMES.tap;
   return (
     <span
       className="inline-flex shrink-0 items-center justify-center rounded-2xl font-black shadow-md ring-1 ring-white/15"
@@ -36,7 +29,7 @@ export function GameLogo({
           height: size,
           background: g.bg,
           color: g.accent,
-          fontSize: Math.max(9, Math.round(size * 0.22)),
+          fontSize: Math.max(9, Math.round(size * 0.2)),
           letterSpacing: "0.02em",
         } as CSSProperties
       }
