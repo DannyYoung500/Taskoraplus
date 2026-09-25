@@ -63,21 +63,32 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
   }>({ ok: false });
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    // Critical: ready() first so Telegram drops its system loader immediately
-    try {
-      tg?.ready?.();
-      tg?.expand?.();
-      tg?.setHeaderColor?.("#030814");
-      tg?.setBackgroundColor?.("#030814");
-    } catch {
-      /* ignore */
+    // Telegram's SDK is loaded with async=true, so React can mount before
+    // window.Telegram.WebApp exists. Wait briefly instead of reading it once
+    // and accidentally starting auth with an empty initData value.
+    async function waitForTelegram() {
+      const startedAt = Date.now();
+      while (!window.Telegram?.WebApp && Date.now() - startedAt < 5000) {
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
+      }
+      return window.Telegram?.WebApp;
     }
 
-    const user = tg?.initDataUnsafe?.user;
-    if (user?.first_name) setWelcomeName(user.first_name);
-
     async function runAuth() {
+      const tg = await waitForTelegram();
+      // Critical: ready() first so Telegram drops its system loader immediately
+      try {
+        tg?.ready?.();
+        tg?.expand?.();
+        tg?.setHeaderColor?.("#030814");
+        tg?.setBackgroundColor?.("#030814");
+      } catch {
+        /* ignore */
+      }
+
+      const user = tg?.initDataUnsafe?.user;
+      if (user?.first_name) setWelcomeName(user.first_name);
+
       const initData = tg?.initData ?? "";
       if (!initData) {
         authResult.current = {
@@ -154,7 +165,17 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       if (started.current) return;
       started.current = true;
       const t0 = Date.now();
-      authPromise.current = runAuth();
+      authPromise.current = Promise.race([
+        runAuth(),
+        new Promise<void>((_, reject) =>
+          window.setTimeout(() => reject(new Error("Telegram authentication timed out.")), 10000),
+        ),
+      ]).catch((e) => {
+        authResult.current = {
+          ok: false,
+          error: e instanceof Error ? e.message : "Telegram authentication timed out.",
+        };
+      });
 
       for (let i = 0; i < STAGES.length; i++) {
         setStageIndex(i);
