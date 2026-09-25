@@ -5,6 +5,7 @@ import {
   PlayCircle,
   Users,
   Bell,
+  Megaphone,
   Crown,
   ChevronRight,
   CalendarCheck,
@@ -198,9 +199,10 @@ function HomePage() {
         </Link>
       </section>
 
-      <section className="mb-3.5 grid grid-cols-4 gap-1.5">
+      <section className="mb-3.5 grid grid-cols-5 gap-1.5">
         <Quick to="/tasks" label="Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
         <Quick to="/watch-earn" label="Watch & Earn" sub="Watch Videos" Icon={PlayCircle} />
+        <Quick to="/advertise" label="Advertise" sub="Campaigns" Icon={Megaphone} />
         <Quick to="/leaderboard" label="Rank" sub="Leaderboard" Icon={Trophy} />
         <Quick to="/ambassador" label="Invite & Earn" sub="Task Points" Icon={Users} />
       </section>
