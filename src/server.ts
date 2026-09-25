@@ -47,6 +47,37 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const url = new URL(request.url);
+      if (url.pathname === "/api/discord/callback" && request.method === "GET") {
+        const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+        const oauthError = url.searchParams.get("error");
+        const appUrl = process.env["PUBLIC_APP_URL"] || (process.env["VERCEL_PROJECT_PRODUCTION_URL"] ? "https://" + process.env["VERCEL_PROJECT_PRODUCTION_URL"] : "https://taskoraplusapp.vercel.app");
+        const redirect = (q: string) => Response.redirect(appUrl.replace(/\/$/, "") + "/connected?" + q, 302);
+        if (oauthError) return redirect("discord=error&message=" + encodeURIComponent("Discord authorization was cancelled."));
+        if (!code || !state) return redirect("discord=error&message=" + encodeURIComponent("Discord did not return a valid connection code."));
+        try {
+          const { verifyDiscordOAuthState } = await import("./lib/discord-oauth.server");
+          const userId = await verifyDiscordOAuthState(state);
+          if (!userId) return redirect("discord=error&message=" + encodeURIComponent("Discord connection expired. Please try again."));
+          const clientId = process.env["DISCORD_CLIENT_ID"];
+          const clientSecret = process.env["DISCORD_CLIENT_SECRET"];
+          if (!clientId || !clientSecret) return redirect("discord=error&message=" + encodeURIComponent("Discord connection is not configured on the server."));
+          const redirectUri = appUrl.replace(/\/$/, "") + "/api/discord/callback";
+          const tokenResponse = await fetch("https://discord.com/api/oauth2/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "authorization_code", code, redirect_uri: redirectUri }).toString() });
+          const tokenBody = await tokenResponse.json() as { access_token?: string; error_description?: string };
+          if (!tokenResponse.ok || !tokenBody.access_token) throw new Error(tokenBody.error_description || "Discord token exchange failed.");
+          const meResponse = await fetch("https://discord.com/api/users/@me", { headers: { authorization: "Bearer " + tokenBody.access_token } });
+          const me = await meResponse.json() as { id?: string; username?: string; global_name?: string; avatar?: string | null };
+          if (!meResponse.ok || !me.id) throw new Error("Discord account lookup failed.");
+          const { supabaseAdmin } = await import("./integrations/supabase/client.server");
+          const { error } = await supabaseAdmin.from("connected_accounts").upsert({ user_id: userId, platform: "discord", handle: me.global_name || me.username || me.id, profile_url: "https://discord.com/users/" + me.id, external_id: me.id, status: "verified", verified_at: new Date().toISOString(), meta: { source: "discord_oauth", username: me.username || null, global_name: me.global_name || null, avatar: me.avatar || null } }, { onConflict: "user_id,platform" });
+          if (error) throw new Error(error.message);
+          return redirect("discord=connected");
+        } catch (e) {
+          console.error("[discord-oauth]", e);
+          return redirect("discord=error&message=" + encodeURIComponent(e instanceof Error ? e.message : "Discord connection failed."));
+        }
+      }
       // Telegram webhook — accept common paths so bot registration always hits the handler
       if (
         url.pathname === "/api/telegram-webhook" ||
