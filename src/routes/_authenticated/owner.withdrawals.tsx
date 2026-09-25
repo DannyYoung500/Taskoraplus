@@ -2,6 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { reviewWithdrawal } from "@/lib/taskora-extra.functions";
 import { listPendingWithdrawalsWithRisk, ownerSetWalletFrozen } from "@/lib/owner-strong.functions";
+import {
+  batchMarkWithdrawalsPaid,
+  ownerAlertStuckWithdrawals,
+} from "@/lib/strong-wave.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/withdrawals")({
   loader: async () => {
@@ -42,15 +46,20 @@ function OwnerWithdrawals() {
   const [error, setError] = useState(initial.error);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [txHashes, setTxHashes] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const selectedIds = Object.entries(selected)
+    .filter(([, v]) => v)
+    .map(([k]) => k);
 
   async function act(id: string, decision: "paid" | "rejected" | "first_approve") {
     setBusyId(id);
     setError(null);
     try {
       const txHash = decision === "paid" ? (txHashes[id] || "").trim() || undefined : undefined;
-      await reviewWithdrawal({
-        data: { withdrawalId: id, decision, txHash },
-      });
+      await reviewWithdrawal({ data: { withdrawalId: id, decision, txHash } });
       if (decision === "first_approve") {
         setRows((prev) =>
           prev.map((row) =>
@@ -59,6 +68,11 @@ function OwnerWithdrawals() {
         );
       } else {
         setRows((prev) => prev.filter((row) => row.id !== id));
+        setSelected((prev) => {
+          const n = { ...prev };
+          delete n[id];
+          return n;
+        });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
@@ -74,9 +88,7 @@ function OwnerWithdrawals() {
       await ownerSetWalletFrozen({
         data: { userId, frozen: true, reason: "Frozen from withdrawals queue" },
       });
-      setRows((prev) =>
-        prev.map((r) => (r.id === rowId ? { ...r, wallet_frozen: true } : r)),
-      );
+      setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, wallet_frozen: true } : r)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Freeze failed");
     } finally {
@@ -84,15 +96,90 @@ function OwnerWithdrawals() {
     }
   }
 
+  async function batchPaid() {
+    if (!selectedIds.length) return;
+    setBatchBusy(true);
+    setMsg(null);
+    setError(null);
+    try {
+      const r = await batchMarkWithdrawalsPaid({ data: { ids: selectedIds } });
+      setMsg(`Batch: ${r.paid} paid · ${r.failed} failed`);
+      if (r.paid > 0) {
+        const okIds = new Set(r.results.filter((x) => x.ok).map((x) => x.id));
+        setRows((prev) => prev.filter((row) => !okIds.has(row.id)));
+        setSelected({});
+      }
+      if (r.failed > 0) {
+        const errs = r.results.filter((x) => !x.ok).map((x) => x.error).slice(0, 2);
+        setError(errs.join(" · ") || "Some failed");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Batch failed");
+    } finally {
+      setBatchBusy(false);
+    }
+  }
+
+  async function runStuckAlert() {
+    setBatchBusy(true);
+    setMsg(null);
+    try {
+      const r = await ownerAlertStuckWithdrawals();
+      setMsg(
+        r.count
+          ? `Stuck alert sent · ${r.count} pending ≥12h · ~$${r.totalUsd.toFixed(2)}`
+          : "No stuck withdrawals (≥12h)",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Stuck alert failed");
+    } finally {
+      setBatchBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-6 text-white">
       <h1 className="text-xl font-bold">Withdrawals</h1>
       <p className="mt-1 text-xs text-white/45">
-        Mark paid only after on-chain send. Dual-approval needs two different owners. Risk scores
-        auto-enrich. Every Paid mark posts public proof to your payment channel (configure under
-        Payout policy).
+        Mark paid only after on-chain send. Batch paid posts proofs per item. Stuck ≥12h can alert owners.
       </p>
-      {error ? <p className="mt-3 text-xs text-amber-300">{error}</p> : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={batchBusy || selectedIds.length === 0}
+          onClick={() => void batchPaid()}
+          className="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-3 py-2 text-[11px] font-black text-white disabled:opacity-40"
+        >
+          Batch mark paid ({selectedIds.length})
+        </button>
+        <button
+          type="button"
+          disabled={batchBusy}
+          onClick={() => void runStuckAlert()}
+          className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] font-bold text-amber-200 disabled:opacity-50"
+        >
+          Alert stuck ≥12h
+        </button>
+        <button
+          type="button"
+          disabled={rows.length === 0}
+          onClick={() => {
+            const all: Record<string, boolean> = {};
+            for (const r of rows) {
+              const dual = Boolean(r.requires_dual);
+              const stage = String(r.approval_stage ?? "pending");
+              const firstOk = stage === "first_ok" || stage === "ready";
+              if (!dual || firstOk) all[r.id] = true;
+            }
+            setSelected(all);
+          }}
+          className="rounded-xl border border-white/10 px-3 py-2 text-[11px] font-bold text-white/60"
+        >
+          Select ready
+        </button>
+      </div>
+      {msg ? <p className="mt-2 text-xs text-cyan-300">{msg}</p> : null}
+      {error ? <p className="mt-2 text-xs text-amber-300">{error}</p> : null}
       <div className="mt-4 space-y-3">
         {rows.length === 0 ? (
           <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm text-white/40">
@@ -105,7 +192,7 @@ function OwnerWithdrawals() {
             const firstOk = stage === "first_ok" || stage === "ready";
             const score = w.risk_score ?? null;
             const highRisk = score != null && score >= 40;
-
+            const canBatch = !dual || firstOk;
             return (
               <div
                 key={w.id}
@@ -114,9 +201,18 @@ function OwnerWithdrawals() {
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold">
+                  <label className="flex items-center gap-2 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      disabled={!canBatch}
+                      checked={Boolean(selected[w.id])}
+                      onChange={(e) =>
+                        setSelected((prev) => ({ ...prev, [w.id]: e.target.checked }))
+                      }
+                      className="size-4 rounded border-white/20"
+                    />
                     ${Number(w.amount).toFixed(2)} · {w.method}
-                  </p>
+                  </label>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     {dual ? (
                       <span
@@ -141,7 +237,7 @@ function OwnerWithdrawals() {
                   {(w as { username?: string }).username
                     ? ` · @${(w as { username?: string }).username}`
                     : ""}
-                  {w.wallet_frozen ? " · 🔒 frozen" : ""}
+                  {w.wallet_frozen ? " · frozen" : ""}
                 </p>
                 <p className="text-[10px] text-white/40">
                   {w.presence_label ?? "—"} · {w.country_line ?? "—"}
