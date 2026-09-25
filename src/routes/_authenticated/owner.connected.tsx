@@ -42,9 +42,9 @@ function OwnerConnectedPage() {
           rows.map((a) => (
             <div key={String(a.id)} className="rounded-2xl border border-white/8 bg-[#12141c] p-3.5">
               <p className="text-sm font-semibold capitalize">
-                {String(a.platform)} · {String(a.username ?? a.profile_url ?? "—")}
+                {String(a.platform)} · {String(a.handle ?? a.profile_url ?? "—")}
               </p>
-              <p className="text-[11px] text-white/40">{String(a.verification_status)}</p>
+              <p className="text-[11px] text-white/40">{String(a.status)}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {(["verified", "rejected", "revoked", "pending"] as const).map((s) => (
                   <button

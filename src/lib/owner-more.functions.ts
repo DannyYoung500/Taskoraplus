@@ -135,7 +135,7 @@ export const ownerListConnectedAccounts = createServerFn({ method: "POST" })
         .select("*, profiles:user_id(display_name, username, telegram_id)")
         .order("created_at", { ascending: false })
         .limit(200);
-      if (data.status && data.status !== "all") q = q.eq("verification_status", data.status);
+      if (data.status && data.status !== "all") q = q.eq("status", data.status);
       const { data: rows, error } = await q;
       if (error) return { accounts: [], error: error.message };
       return { accounts: rows ?? [], error: null as string | null };
@@ -151,51 +151,37 @@ export const ownerSetConnectedStatus = createServerFn({ method: "POST" })
     const db = await guard(context.userId);
     const { data: prev } = await (db as any)
       .from("connected_accounts")
-      .select("verification_status")
+      .select("status")
       .eq("id", data.id)
       .maybeSingle();
     const { error } = await (db as any)
       .from("connected_accounts")
       .update({
-        verification_status: data.status,
-        last_checked_at: new Date().toISOString(),
+        status: data.status,
+        verified_at: data.status === "verified" ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     await audit(context.userId, `connected.${data.status}`, {
       targetType: "connected_account",
       targetId: data.id,
-      previous: prev?.verification_status,
+      previous: prev?.status,
       next: data.status,
     });
     return { ok: true };
   });
 
+export const ownerSetStaffPermission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; permission: string }) => d)
+  .handler(async ({ data, context }) => { const db=await guard(context.userId); if(!data.userId||!data.permission) throw new Error("User and permission are required."); const {error}=await (db as any).from("staff_permissions").upsert({user_id:data.userId,permission:data.permission,granted_by:context.userId},{onConflict:"user_id,permission"}); if(error) throw new Error(error.message); await audit(context.userId,"staff.permission_grant",{targetType:"staff_permission",targetId:data.userId,next:data.permission}); return {ok:true}; });
+
+export const ownerRemoveStaffPermission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; permission: string }) => d)
+  .handler(async ({ data, context }) => { const db=await guard(context.userId); const {error}=await (db as any).from("staff_permissions").delete().eq("user_id",data.userId).eq("permission",data.permission); if(error) throw new Error(error.message); await audit(context.userId,"staff.permission_revoke",{targetType:"staff_permission",targetId:data.userId,next:data.permission}); return {ok:true}; });
+
 export const ownerListStaffPermissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const db = await guard(context.userId);
-    const { data: roles } = await db.from("user_roles").select("user_id, role");
-    const { data: perms } = await (db as any).from("staff_permissions").select("*");
-    return {
-      roles: roles ?? [],
-      permissions: perms ?? [],
-      catalog: [
-        "view_users",
-        "edit_users",
-        "suspend",
-        "view_wallet",
-        "approve_withdrawal",
-        "reject_withdrawal",
-        "adjust_balance",
-        "manage_tasks",
-        "moderate_proofs",
-        "manage_campaigns",
-        "change_economy",
-        "manage_fraud",
-        "manage_telegram_gate",
-        "view_audit",
-        "manage_roles",
-      ],
-    };
-  });
+  .handler(async ({ context }) => { const db=await guard(context.userId); const {data:roles,error:roleError}=await db.from("user_roles").select("user_id, role"); const {data:permissions,error:permissionError}=await (db as any).from("staff_permissions").select("user_id, permission, granted_by, created_at"); if(roleError)throw new Error(roleError.message); if(permissionError)throw new Error(permissionError.message); return {roles:roles??[],permissions:permissions??[],catalog:["view_users","edit_users","suspend","view_wallet","approve_withdrawal","reject_withdrawal","adjust_balance","manage_tasks","moderate_proofs","manage_campaigns","change_economy","manage_fraud","manage_telegram_gate","view_audit","manage_roles"]}; });

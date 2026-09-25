@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { ownerListDeposits } from "@/lib/owner-more.functions";
+import { ownerDeposits, ownerUpdateDeposit } from "@/lib/owner.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/deposits")({
   component: OwnerDepositsPage,
@@ -12,7 +12,7 @@ function OwnerDepositsPage() {
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    void ownerListDeposits()
+    void ownerDeposits()
       .then((r) => {
         setRows(r.deposits as never);
         if (r.error) setMsg(r.error);
@@ -35,7 +35,7 @@ function OwnerDepositsPage() {
       <div className="space-y-2">
         {rows.length === 0 ? (
           <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm text-white/45">
-            No deposits recorded. Provider webhooks are still a remaining item.
+            No deposits recorded. 
           </p>
         ) : (
           rows.map((d) => (
@@ -44,6 +44,7 @@ function OwnerDepositsPage() {
               <p className="text-[11px] text-white/45">
                 {String(d.status)} · {String(d.created_at)}
               </p>
+              {d.status !== "completed" ? <div className="mt-2 flex gap-1.5">{(["processing","completed","failed","cancelled"] as const).map((s) => <button key={s} type="button" className="rounded-lg border border-white/10 px-2 py-1 text-[10px] capitalize" onClick={() => void ownerUpdateDeposit({ data: { depositId: String(d.id), status: s } }).then(() => ownerDeposits()).then(setRows).catch((e) => setMsg(e instanceof Error ? e.message : "Update failed"))}>{s}</button>)}</div> : null}
             </div>
           ))
         )}

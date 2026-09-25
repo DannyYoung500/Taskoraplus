@@ -36,8 +36,7 @@ export const getAdvertiseEconomy = createServerFn({ method: "GET" }).middleware(
             tasker_unit_reward: Number(s.taskerUsd ?? 0.007),
             taskora_unit_margin: Number(s.taskoraUsd ?? 0.003),
             active: true,
-            pricing_model: "per_unit",
-            proof_mode: platform === "telegram" ? "bot_admin_or_screenshot" : "screenshot_optional",
+            pricing_model: "unit",
           });
         }
       }

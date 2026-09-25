@@ -30,6 +30,7 @@ import {
   SlidersHorizontal,
   MessageSquareHeart,
   Flag,
+  Gamepad2,
 } from "lucide-react";
 import { TASKORA_LOGO } from "@/lib/brand";
 
@@ -72,6 +73,7 @@ const SECTIONS: { label: string; items: Item[] }[] = [
     items: [
       { to: "/owner/monetization", title: "Providers", Icon: SlidersHorizontal },
       { to: "/owner/videos", title: "Watch & Earn", Icon: PlayCircle },
+      { to: "/owner/games", title: "Games Marketplace", Icon: Gamepad2 },
       { to: "/advertise", title: "Publish Task", Icon: Megaphone },
     ],
   },
