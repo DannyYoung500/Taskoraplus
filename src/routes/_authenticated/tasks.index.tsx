@@ -2,18 +2,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ClipboardCheck, ChevronRight } from "lucide-react";
 import { listTasks } from "@/lib/taskora.functions";
-import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
+import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle } from "@/lib/taskora-display";
 
 const CATEGORIES: { key: "all" | Platform; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "Telegram", label: "Telegram" },
-  { key: "YouTube", label: "YouTube" },
-  { key: "WhatsApp", label: "WhatsApp" },
-  { key: "X", label: "X" },
-  { key: "TikTok", label: "TikTok" },
-  { key: "Instagram", label: "Instagram" },
+  { key: "telegram", label: "Telegram" },
+  { key: "youtube", label: "YouTube" },
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "x", label: "X" },
+  { key: "tiktok", label: "TikTok" },
+  { key: "instagram", label: "Instagram" },
 ];
 
 export const Route = createFileRoute("/_authenticated/tasks/")({
@@ -28,6 +28,7 @@ export const Route = createFileRoute("/_authenticated/tasks/")({
 function TasksScreen() {
   const { rows } = Route.useLoaderData();
   const [filter, setFilter] = useState<"all" | Platform>("all");
+
   const tasks = rows.filter((t) => filter === "all" || t.platform === filter);
 
   return (
@@ -59,7 +60,9 @@ function TasksScreen() {
             type="button"
             onClick={() => setFilter(c.key)}
             className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-bold transition ${
-              filter === c.key ? "text-[#04101c]" : "border border-white/10 bg-[#0b1628] text-slate-400"
+              filter === c.key
+                ? "text-[#04101c]"
+                : "border border-white/10 bg-[#0b1628] text-slate-400"
             }`}
             style={filter === c.key ? { background: BLUE_GRAD } : undefined}
           >
@@ -85,25 +88,20 @@ function TasksScreen() {
               params={{ taskId: t.id }}
               className="flex items-center gap-3 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5 active:scale-[0.995]"
             >
-              <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/[0.04]">
-                <PlatformIcon platform={t.platform as Platform} size={24} />
-              </span>
+              <PlatformLogo platform={t.platform as Platform} size={44} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">{t.title}</p>
                 <p className="mt-0.5 text-[10px] text-slate-500">
-                  {t.platform}
+                  {platformLabel(t.platform as Platform)}
                   {t.advertiser ? ` · ${t.advertiser}` : ""}
                   {t.seconds ? ` · ${t.seconds}s` : ""}
                 </p>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-black text-cyan-200">+{formatUsd(Number(t.reward))}</p>
-                <span
-                  className="mt-1 inline-flex items-center gap-0.5 rounded-full px-2.5 py-1 text-[10px] font-black text-white"
-                  style={{ background: BLUE_GRAD }}
-                >
-                  Start <ChevronRight className="size-3" />
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-black text-cyan-200">
+                  {formatUsd(Number(t.reward))}
                 </span>
+                <ChevronRight className="size-4 text-slate-500" />
               </div>
             </Link>
           ))

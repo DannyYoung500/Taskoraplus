@@ -6,7 +6,7 @@ export const TASKORA_LOGO = "/file_00000000ed3c81f4aa87692163117fac.png";
 export const TASKORA_WELCOME_IMAGE = "/file_00000000f77c81f4ba94c0467d0c7dec.png";
 
 export const TASKORA_NAME = "TASKORA";
-export const TASKORA_TAGLINE = "Complete · Earn · Level Up";
+export const TASKORA_TAGLINE = "Complete · Earn · Rank Up";
 
 export const COLORS = {
   bg: "#0b1424",
