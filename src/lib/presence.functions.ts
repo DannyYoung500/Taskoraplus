@@ -33,6 +33,18 @@ export const touchPresence = createServerFn({ method: "POST" })
         /* ignore */
       }
       await supabaseAdmin.from("profiles").update(patch as never).eq("id", userId);
+      try {
+        const { getRequest } = await import("@tanstack/react-start/server");
+        const req = getRequest();
+        if (req?.headers) {
+          const { fingerprintFromHeaders, touchDeviceFingerprint } = await import("@/lib/strong-ops");
+          const fp = fingerprintFromHeaders(req.headers);
+          const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip");
+          await touchDeviceFingerprint({ userId, fingerprint: fp, ipHint: ip });
+        }
+      } catch {
+        /* soft */
+      }
       return { ok: true as const, skipped: false as const };
     } catch {
       return { ok: false as const, skipped: true as const };
