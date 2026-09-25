@@ -166,14 +166,14 @@ function PaymentSettingsPage() {
             <ChevronLeft className="size-4" />
           </Link>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">Money</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">Money</p>
             <h1 className="text-xl font-extrabold">Payment Settings</h1>
           </div>
         </div>
 
-        <div className="mb-4 rounded-3xl border border-emerald-400/20 bg-[#121f33] p-4">
+        <div className="mb-4 rounded-3xl border border-blue-400/20 bg-[#121f33] p-4">
           <div className="flex gap-3">
-            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-emerald-300" />
+            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-blue-300" />
             <div>
               <p className="text-sm font-bold">Crypto deposits & withdrawals</p>
               <p className="mt-1 text-[11px] leading-5 text-slate-500">
@@ -187,7 +187,7 @@ function PaymentSettingsPage() {
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="size-6 animate-spin text-emerald-300" />
+            <Loader2 className="size-6 animate-spin text-blue-300" />
           </div>
         ) : (
           <>
@@ -202,7 +202,7 @@ function PaymentSettingsPage() {
                     onClick={() => setSelected(key)}
                     className={`shrink-0 rounded-full border px-3 py-2 text-[10px] font-bold ${
                       selected === key
-                        ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-200"
+                        ? "border-blue-400/50 bg-blue-500/15 text-blue-200"
                         : "border-white/10 bg-[#121f33] text-slate-400"
                     }`}
                   >
@@ -220,7 +220,7 @@ function PaymentSettingsPage() {
                     Selected gateway
                   </p>
                   <h2 className="text-lg font-extrabold">{CRYPTO_LABELS[selected]}</h2>
-                  <p className="text-[9px] text-emerald-300">
+                  <p className="text-[9px] text-blue-300">
                     {configured ? (
                       <span className="inline-flex items-center gap-1">
                         <CheckCircle2 className="size-3" /> Configuration loaded
@@ -315,7 +315,7 @@ function PaymentSettingsPage() {
                 type="button"
                 disabled={busy}
                 onClick={() => void save()}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-extrabold text-[#07120d] disabled:opacity-60"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-4 py-3 text-sm font-extrabold text-[#07120d] disabled:opacity-60"
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 {busy ? "Saving…" : "Save Payment Settings"}
@@ -326,7 +326,7 @@ function PaymentSettingsPage() {
               ) : null}
 
               <div className="mt-4 rounded-2xl border border-white/10 bg-black/15 p-3 text-[10px] leading-5 text-slate-500">
-                <CreditCard className="mb-1 inline size-3.5 text-emerald-300" /> Credentials never
+                <CreditCard className="mb-1 inline size-3.5 text-blue-300" /> Credentials never
                 leave the server. After save, wire the webhook to credit deposits only after signed
                 confirmation from the gateway.
               </div>
@@ -369,7 +369,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-xs outline-none focus:border-emerald-400/40"
+        className="mt-1 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-xs outline-none focus:border-blue-400/40"
       />
     </label>
   );

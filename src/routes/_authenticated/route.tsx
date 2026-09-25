@@ -64,7 +64,7 @@ export const Route = createFileRoute("/_authenticated")({
   },
   pendingComponent: AuthenticatedPending,
   errorComponent: AuthenticatedError,
-  component: () => <div className="taskora-blue-shell"><Outlet /></div>,
+  component: () => <div className="taskora-blue-shell taskora-owner-aware-shell"><Outlet /></div>,
 });
 
 

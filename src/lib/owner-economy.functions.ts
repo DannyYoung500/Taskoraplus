@@ -29,7 +29,7 @@ function resolveSuggestedWebhookUrl(): string {
       ? `https://${process.env["VERCEL_PROJECT_PRODUCTION_URL"]}`
       : "") ||
     (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : "") ||
-    "https://taskoraplus.app";
+    "https://taskoraplusapp.vercel.app";
   return `${String(base).replace(/\/$/, "")}/api/telegram-webhook`;
 }
 

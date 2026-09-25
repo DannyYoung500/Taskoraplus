@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState } from "react";\nimport { OwnerShell } from "@/components/OwnerShell";
 import {
   ownerGetPayoutPolicy,
   ownerSetPayoutPolicy,
@@ -38,7 +38,7 @@ function PayoutPolicyPage() {
 
   if (!policy) {
     return (
-      <main className="mx-auto min-h-screen max-w-md bg-[#05070c] px-4 py-6 text-white">
+      <OwnerShell><main className="mx-auto w-full max-w-[1180px] px-4 py-6 text-white">
         <h1 className="text-xl font-bold">Payout policy</h1>
         <p className="mt-2 text-sm text-amber-200">{msg ?? "Load failed"}</p>
       </main>
@@ -92,7 +92,7 @@ function PayoutPolicyPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-6 text-white">
+    <OwnerShell><main className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 text-white">
       <h1 className="text-xl font-bold">Payout policy</h1>
       <p className="mt-1 text-xs text-white/45">
         Risk thresholds · daily WD cap · country allow/deny · public payment channel proof.
@@ -100,8 +100,8 @@ function PayoutPolicyPage() {
       {msg ? <p className="mt-3 text-xs text-amber-200">{msg}</p> : null}
 
       {/* Payment / proof channel */}
-      <section className="mt-5 rounded-2xl border border-cyan-500/25 bg-[#0a121c] p-4">
-        <h2 className="text-sm font-semibold text-cyan-200">Payment channel (payout proof)</h2>
+      <section className="mt-5 rounded-2xl border border-blue-400/25 bg-[#0b1d36] p-4">
+        <h2 className="text-sm font-semibold text-blue-200">Payment channel (payout proof)</h2>
         <p className="mt-1 text-[11px] text-white/45">
           Every time you mark a withdrawal <b>Paid</b>, TASKORA posts a public proof message here
           (amount, network, short address, tx hash + explorer link). Bot must be admin of the
@@ -113,18 +113,18 @@ function PayoutPolicyPage() {
             value={channelId}
             onChange={(e) => setChannelId(e.target.value)}
             placeholder="-100xxxxxxxxxx or @YourPaymentChannel"
-            className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-sm font-mono"
+            className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm font-mono"
           />
         </label>
         <p className="mt-1 text-[10px] text-white/35">
           Tip: forward a channel message to @userinfobot to get the numeric id. Env override:{" "}
-          <code className="text-cyan-300/80">TASKORA_PAYOUT_CHANNEL_ID</code>
+          <code className="text-blue-300/80">TASKORA_PAYOUT_CHANNEL_ID</code>
         </p>
         <button
           type="button"
           disabled={channelBusy}
           onClick={() => void saveChannel()}
-          className="mt-3 w-full rounded-xl border border-cyan-400/40 bg-cyan-500/15 py-2.5 text-sm font-semibold text-cyan-100 disabled:opacity-50"
+          className="mt-3 w-full rounded-xl border border-cyan-400/40 bg-blue-500/15 py-2.5 text-sm font-semibold text-cyan-100 disabled:opacity-50"
         >
           {channelBusy ? "Saving…" : "Save payment channel"}
         </button>

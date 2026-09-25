@@ -62,7 +62,7 @@ const SECTIONS: { label: string; items: Item[] }[] = [
       { to: "/owner/withdrawals", title: "Withdrawals", Icon: Wallet },
       { to: "/owner/deposits", title: "Deposits", Icon: ArrowDownCircle },
       { to: "/owner/ledger", title: "Ledger", Icon: BookOpen },
-      { to: "/owner/settings", title: "Economy · Gate · Webhook", Icon: Coins },
+      { to: "/owner/settings", title: "Economy · Gate · Webhook", Icon: Coins },\n      { to: "/owner/payout-policy", title: "Payout Policy", Icon: Shield },
       { to: "/owner/economy", title: "Platform Prices", Icon: Coins },
       { to: "/owner/fraud", title: "Fraud & Risk", Icon: ShieldAlert },
       { to: "/owner/payment-settings", title: "Payment Settings", Icon: CreditCard },
@@ -122,7 +122,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
       {open ? (
         <aside className="fixed inset-y-0 left-0 z-50 flex w-[min(100%,300px)] flex-col border-r border-white/10 bg-[#0a1220] shadow-2xl">
           <div className="flex items-center gap-2 border-b border-white/10 px-3 py-3">
-            <img src={TASKORA_LOGO} alt="" className="size-8 rounded-full object-cover ring-1 ring-lime-400/40" />
+            <img src={TASKORA_LOGO} alt="" className="size-8 rounded-full object-cover ring-1 ring-blue-400/40" />
             <span className="flex-1 text-sm font-extrabold tracking-wide" style={{ color: "#60a5fa" }}>
               TASKORA →
             </span>

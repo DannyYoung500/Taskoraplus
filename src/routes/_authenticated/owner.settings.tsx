@@ -89,7 +89,7 @@ function OwnerSettings() {
         if (eco) setEconomy(eco);
         if (wh) {
           setWebhook(wh);
-          if (wh.url) setWebhookUrlInput(wh.url);
+          setWebhookUrlInput(wh.url || wh.suggestedUrl || "https://taskoraplusapp.vercel.app/api/telegram-webhook");
         }
       } catch (e) {
         setMessage(e instanceof Error ? e.message : "Could not load settings.");
@@ -313,7 +313,7 @@ function OwnerSettings() {
       ? "text-emerald-300 border-emerald-400/30 bg-emerald-400/10"
       : statusLabel === "DISABLED"
         ? "text-white/50 border-white/10 bg-white/5"
-        : "text-amber-300 border-amber-400/30 bg-amber-400/10";
+        : "text-blue-300 border-amber-400/30 bg-blue-400/10";
 
   if (loading) {
     return (
@@ -324,7 +324,7 @@ function OwnerSettings() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
+    <main className="mx-auto min-h-screen w-full max-w-[1180px] bg-[#07152b] px-4 pb-28 pt-5 text-white">
       <div className="mb-4 flex items-center gap-2">
         <Link to="/owner" className="rounded-full border border-white/10 p-2 text-white/60">
           <ChevronLeft className="size-4" />
@@ -336,7 +336,7 @@ function OwnerSettings() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-1 rounded-2xl border border-white/10 bg-[#12141c] p-1">
+      <div className="mb-4 flex gap-1 rounded-2xl border border-white/10 bg-[#0b1d36] p-1">
         {(
           [
             ["economy", "Economy", Coins],
@@ -371,8 +371,8 @@ function OwnerSettings() {
 
       {tab === "economy" && economy ? (
         <section className="space-y-3">
-          <div className="rounded-3xl border border-amber-400/20 bg-[#12141c] p-4">
-            <h2 className="text-base font-bold text-amber-200">Command Center · Economy</h2>
+          <div className="rounded-3xl border border-blue-400/20 bg-[#12141c] p-4">
+            <h2 className="text-base font-bold text-blue-200">Command Center · Economy</h2>
             <p className="mt-1 text-[11px] text-white/40">
               Live limits, fees, pauses. Changes apply to new deposits, withdrawals and tasks.
             </p>
@@ -480,7 +480,7 @@ function OwnerSettings() {
             <Row label="Current URL" value={webhook?.url || "Not set"} />
             <Row label="Pending updates" value={String(webhook?.pending ?? 0)} />
             {webhook?.lastError ? (
-              <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-200">
+              <p className="rounded-xl border border-amber-400/20 bg-blue-500/10 px-3 py-2 text-[11px] text-amber-200">
                 Last error: {webhook.lastError}
               </p>
             ) : null}
@@ -495,14 +495,14 @@ function OwnerSettings() {
             <label className="block text-xs text-white/55">
               Webhook HTTPS URL
               <input
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/40"
+                className="mt-1 w-full rounded-xl border border-white/10 bg-[#061226]/80 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/40"
                 value={webhookUrlInput}
                 onChange={(e) => setWebhookUrlInput(e.target.value)}
                 placeholder="https://your-app.vercel.app/api/telegram-webhook"
               />
             </label>
             <p className="mt-2 text-[10px] text-white/35">
-              Leave blank to use MINI_APP_URL + /api/telegram-webhook
+              Production default: https://taskoraplusapp.vercel.app/api/telegram-webhook. Use REGISTER WEBHOOK to restore it in Telegram.
             </p>
           </div>
 
@@ -544,7 +544,7 @@ function OwnerSettings() {
             </span>
           </div>
 
-          <section className="rounded-3xl border border-amber-300/15 bg-[#12141c] p-4">
+          <section className="rounded-3xl border border-blue-300/15 bg-[#12141c] p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold">Gate enforcement</h2>
@@ -599,7 +599,7 @@ function OwnerSettings() {
               </div>
             ) : (
               (gate?.requiredChats ?? []).map((c, i) => (
-                <div key={`chat-${i}`} className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-3">
+                <div key={`chat-${i}`} className="mt-3 rounded-2xl border border-white/10 bg-[#061226]/80 p-3">
                   <div className="flex items-start gap-3">
                     {c.photoUrl ? (
                       <img
