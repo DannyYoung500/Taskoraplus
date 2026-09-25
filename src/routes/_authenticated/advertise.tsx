@@ -371,14 +371,6 @@ function AdvertisePage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold text-white/55">Verification</p>
-            <p className="mt-1 text-[11px] leading-snug text-white/45">
-              {service.id === "yt_watch" || platform === "telegram" || platform === "discord"
-                ? "Automatically verified by Taskora. No screenshot is required."
-                : "Screenshot verification is required and reviewed before reward release."}
-            </p>
-          </div>
         </section>
 
         ) : null}
