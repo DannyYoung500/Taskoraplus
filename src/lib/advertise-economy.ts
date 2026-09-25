@@ -20,7 +20,7 @@ export const ADVERTISE_SERVICES: AdvertiseService[] = [
   {serviceId:"yt_views",platform:"youtube",serviceName:"YouTube Views",taskType:"view",minQuantity:500,maxQuantity:100000,customerUnitPrice:.003,taskerUnitReward:.0021,taskoraUnitMargin:.0009,pricingModel:"unit"},
   {serviceId:"yt_likes",platform:"youtube",serviceName:"YouTube Likes",taskType:"like",minQuantity:100,maxQuantity:50000,customerUnitPrice:.015,taskerUnitReward:.0105,taskoraUnitMargin:.0045,pricingModel:"unit"},
   {serviceId:"yt_comments",platform:"youtube",serviceName:"YouTube Comments",taskType:"comment",minQuantity:20,maxQuantity:5000,customerUnitPrice:.03,taskerUnitReward:.021,taskoraUnitMargin:.009,pricingModel:"unit"},
-  {serviceId:"yt_watch",platform:"youtube",serviceName:"YouTube Watch (per second)",taskType:"watch_second",minQuantity:1,maxQuantity:3600,customerUnitPrice:.0001,taskerUnitReward:.00007,taskoraUnitMargin:.00003,pricingModel:"watch_second"},
+  {serviceId:"yt_watch",platform:"youtube",serviceName:"YouTube Watch",taskType:"watch",minQuantity:1,maxQuantity:7200,customerUnitPrice:.0003,taskerUnitReward:.00021,taskoraUnitMargin:.00009,pricingModel:"watch_second"},
   {serviceId:"tt_followers",platform:"tiktok",serviceName:"TikTok Followers",taskType:"follow",minQuantity:100,maxQuantity:10000,customerUnitPrice:.018,taskerUnitReward:.0126,taskoraUnitMargin:.0054,pricingModel:"unit"},
   {serviceId:"tt_likes",platform:"tiktok",serviceName:"TikTok Likes",taskType:"like",minQuantity:100,maxQuantity:50000,customerUnitPrice:.01,taskerUnitReward:.007,taskoraUnitMargin:.003,pricingModel:"unit"},
   {serviceId:"tt_views",platform:"tiktok",serviceName:"TikTok Views",taskType:"view",minQuantity:500,maxQuantity:100000,customerUnitPrice:.002,taskerUnitReward:.0014,taskoraUnitMargin:.0006,pricingModel:"unit"},
@@ -77,7 +77,7 @@ export const ADVERTISE_SERVICES: AdvertiseService[] = [
 export const ADVERTISE_PLATFORMS = [...new Set(ADVERTISE_SERVICES.map((s) => s.platform))];
 
 export function calculateAdvertiseOrder(service: AdvertiseService, quantity: number, watchSeconds = 0) {
-  const units = service.pricingModel === "watch_second" ? Math.max(1, Math.floor(watchSeconds)) : Math.max(1, Math.floor(quantity));
+  const units = service.pricingModel === "watch_second" ? Math.max(1, Math.floor(watchSeconds)) * Math.max(1, Math.floor(quantity)) : Math.max(1, Math.floor(quantity));
   return {
     customerTotal: Number((service.customerUnitPrice * units).toFixed(8)),
     taskerBudget: Number((service.taskerUnitReward * units).toFixed(8)),
