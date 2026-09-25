@@ -245,7 +245,7 @@ function AdvertisePage() {
               ))}
             </div>
           </div>
-
+        </section>
         ) : null}
 
           {service.id === "yt_watch" ? (
