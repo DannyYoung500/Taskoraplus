@@ -104,8 +104,6 @@ export const applyReferral = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!inviter) throw new Error("That invite code doesn't exist.");
 
-    // Link only — Task Points paid after invitee completes first *verified* task (anti-farm).
-    // Never credits USDT on invite alone.
     await supabaseAdmin.from("profiles").update({ referred_by: inviter.id }).eq("id", userId);
 
     const { data: settingsRow } = await supabaseAdmin
@@ -122,7 +120,6 @@ export const applyReferral = createServerFn({ method: "POST" })
       ),
     );
 
-    // Small signup link bonus in Task Points only (capped); main reward is deferred verified invite.
     const linkBonus = Math.min(25, Math.floor(referralPoints * 0.1));
     let taskPointTotal = 0;
     if (linkBonus > 0) {
@@ -156,35 +153,70 @@ export const ownerCreateTask = createServerFn({ method: "POST" })
       platform: string;
       title: string;
       advertiser: string;
-      reward: number;
+      reward?: number;
       slots: number;
       steps: string[];
       proof: "auto" | "screenshot" | "username";
       link?: string | undefined;
+      serviceId?: string | undefined;
+      watchSeconds?: number | undefined;
     }) => d,
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (!(data.reward > 0) || !(data.slots > 0) || !data.title.trim()) {
+    if (!(data.slots > 0) || !data.title.trim()) {
       throw new Error("Invalid task configuration.");
     }
 
+    // Catalog is source of truth — never trust browser reward
+    let reward = Number(data.reward ?? 0);
+    let pricingMeta: Record<string, unknown> | null = null;
+    if (data.serviceId) {
+      const { resolveLockedPricing } = await import("@/lib/pricing-authority");
+      const locked = await resolveLockedPricing({
+        serviceId: data.serviceId,
+        qty: data.slots,
+        watchSeconds: data.watchSeconds,
+      });
+      reward = locked.workerUnit;
+      pricingMeta = {
+        service_id: locked.serviceId,
+        customer_unit: locked.customerUnit,
+        worker_unit: locked.workerUnit,
+        taskora_unit: locked.taskoraUnit,
+        watch_seconds: locked.watchSeconds ?? null,
+        split: "70/30",
+      };
+    }
+    if (!(reward > 0)) throw new Error("Catalog price is invalid for this service.");
+
+    const row: Record<string, unknown> = {
+      platform: data.platform,
+      title: data.title.trim(),
+      advertiser: data.advertiser.trim() || "TASKORA",
+      reward,
+      slots_left: data.slots,
+      steps: data.steps.length ? data.steps : ["Complete the required action", "Return and submit proof"],
+      proof: data.proof,
+      link: data.link ?? null,
+      is_active: true,
+    };
+    if (pricingMeta) row.meta = pricingMeta;
+
     const { data: task, error } = await supabaseAdmin
       .from("tasks")
-      .insert({
-        platform: data.platform as never,
-        title: data.title.trim(),
-        advertiser: data.advertiser.trim() || "TASKORA",
-        reward: data.reward,
-        slots_left: data.slots,
-        steps: data.steps.length ? data.steps : ["Complete the required action", "Return and submit proof"],
-        proof: data.proof,
-        link: data.link ?? null,
-        is_active: true,
-      })
+      .insert(row as never)
       .select("*")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (String(error.message).toLowerCase().includes("meta")) {
+        delete row.meta;
+        const r2 = await supabaseAdmin.from("tasks").insert(row as never).select("*").single();
+        if (r2.error) throw new Error(r2.error.message);
+        return r2.data;
+      }
+      throw new Error(error.message);
+    }
     return task;
   });
