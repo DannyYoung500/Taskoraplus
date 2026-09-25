@@ -396,7 +396,7 @@ function AdvertisePage() {
               <span>{formatUsd(earnerPayouts)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/50">Platform fee ({Math.round(PLATFORM_FEE * 100)}%)</span>
+              <span className="text-white/50">Taskora fee (30%)</span>
               <span>{formatUsd(platformFee)}</span>
             </div>
             <div className="flex justify-between">
