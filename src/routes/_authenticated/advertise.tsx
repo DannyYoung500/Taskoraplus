@@ -18,6 +18,7 @@ import {
 } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
 import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { TASKORA_LOGO, COLORS } from "@/lib/brand";
 import {
   SERVICES,
@@ -47,8 +48,10 @@ function AdvertisePage() {
 
   const [link, setLink] = useState("");
   const [qty, setQty] = useState(50);
-  const [watchSeconds, setWatchSeconds] = useState(60);
-  const [notes, setNotes] = useState("");
+  const [watchMinutes, setWatchMinutes] = useState(1);
+  const [watchSeconds, setWatchSeconds] = useState(0);
+  const [videoMode, setVideoMode] = useState<"upload" | "url">("upload");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [warning, setWarning] = useState("");
@@ -88,11 +91,13 @@ function AdvertisePage() {
     const s = getCatalogPrice(raw);
     setService(s);
     setQty(s.minQty);
-    setWatchSeconds(s.id === "yt_watch" ? 60 : 0);
+    setWatchMinutes(1);
+    setWatchSeconds(0);
+    setVideoMode("upload");
+    setVideoFile(null);
     setTitle("");
     setInstructions(s.defaultSteps.join("\n"));
     setWarning(s.defaultWarning);
-    setNotes("");
     setLink("");
     setFeatured(false);
     setMsg(null);
@@ -109,53 +114,52 @@ function AdvertisePage() {
 
   const qtyNum = Math.max(1, Number(qty) || 1);
   const isWatchService = service?.id === "yt_watch";
-  const requiredWatchSeconds = isWatchService ? Math.max(1, Number(watchSeconds) || 1) : 0;
+  const requiredWatchSeconds = isWatchService ? Math.max(1, watchMinutes * 60 + watchSeconds) : 0;
   const rewardNum = service ? Number(service.taskerUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
+  const advertiserPerCompletion = service ? Number(service.fromUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
+  const taskoraPerCompletion = service ? Number(service.taskoraUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
   const earnerPayouts = rewardNum * qtyNum;
-  const platformFee = service ? Number(service.taskoraUsd) * (isWatchService ? requiredWatchSeconds : 1) * qtyNum : 0;
-  const featureFee = featured ? FEATURE_FEE_USD : 0;
-  const total = earnerPayouts + platformFee + featureFee;
+  const platformFee = taskoraPerCompletion * qtyNum;
+  const total = advertiserPerCompletion * qtyNum;
   const insufficient = balance < total;
+
+  async function uploadWatchVideo() {
+    if (!videoFile) return null;
+    if (!videoFile.type.startsWith("video/")) throw new Error("Please choose a video file.");
+    if (videoFile.size > 500 * 1024 * 1024) throw new Error("Video must be 500 MB or smaller.");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Your session expired. Please sign in again.");
+    const ext = (videoFile.name.split(".").pop() || "mp4").replace(/[^a-z0-9]/gi, "").toLowerCase() || "mp4";
+    const path = user.id + "/" + crypto.randomUUID() + "." + ext;
+    const { error } = await supabase.storage.from("taskora-videos").upload(path, videoFile, { contentType: videoFile.type, upsert: false });
+    if (error) throw new Error(error.message);
+    return supabase.storage.from("taskora-videos").getPublicUrl(path).data.publicUrl;
+  }
 
   async function placeOrder() {
     if (!platform || !service) return;
-    if (!link.trim()) {
-      setMsg("Target URL is required.");
-      return;
-    }
-    if (!title.trim()) {
-      setMsg("Task title is required.");
-      return;
-    }
-    if (qtyNum < service.minQty || qtyNum > service.maxQty) {
-      setMsg(`Quantity must be between ${service.minQty} and ${service.maxQty}.`);
-      return;
-    }
-    if (isWatchService && (requiredWatchSeconds < 1 || requiredWatchSeconds > 3600)) {
-      setMsg("Required watch time must be between 1 and 3600 seconds.");
-      return;
-    }
-    setBusy(true);
-    setMsg(null);
+    if (isWatchService && videoMode === "upload" && !videoFile) { setMsg("Upload the video you want to put into Taskora."); return; }
+    if (isWatchService && videoMode === "url" && !link.trim()) { setMsg("Enter the video URL."); return; }
+    if (!isWatchService && !link.trim()) { setMsg("Target URL is required."); return; }
+    if (!isWatchService && !title.trim()) { setMsg("Task title is required."); return; }
+    if (qtyNum < service.minQty || qtyNum > service.maxQty) { setMsg(`Quantity must be between ${service.minQty} and ${service.maxQty}.`); return; }
+    if (isWatchService && (requiredWatchSeconds < 1 || requiredWatchSeconds > 7200)) { setMsg("Watch time must be between 00:01 and 120:00."); return; }
+    setBusy(true); setMsg(null);
     try {
-      const result = await createAdvertiseCampaign({
-        data: {
-          serviceId: service.id,
-          title: title.trim(),
-          link: link.trim(),
-          quantity: qtyNum,
-          watchSeconds: service.id === "yt_watch" ? requiredWatchSeconds : undefined,
-        },
-      });
-      const task = result.task;
-      setMsg(`Order placed \u00b7 ${task.id.slice(0, 8)}\u2026 Live when activated.`);
-      setService(null);
-      setPlatform(null);
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Order failed");
-    } finally {
-      setBusy(false);
-    }
+      const finalLink = isWatchService && videoMode === "upload" ? await uploadWatchVideo() : link.trim();
+      if (!finalLink) throw new Error("Video could not be uploaded.");
+      const result = await createAdvertiseCampaign({ data: {
+        serviceId: service.id,
+        title: isWatchService ? undefined : title.trim(),
+        link: finalLink,
+        quantity: qtyNum,
+        watchSeconds: isWatchService ? requiredWatchSeconds : undefined,
+        videoSource: isWatchService ? (videoMode === "upload" ? "taskora_upload" : "external_url") : undefined,
+      }});
+      setMsg(`Campaign created · ${result.task.id.slice(0, 8)}… Waiting for activation.`);
+      setService(null); setPlatform(null);
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Order failed"); }
+    finally { setBusy(false); }
   }
 
   if (platform && service) {
@@ -246,24 +250,47 @@ function AdvertisePage() {
           </div>
 
           {service.id === "yt_watch" ? (
-            <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 p-3">
-              <label className="mb-1.5 block text-[11px] font-semibold text-sky-100">Required watch time</label>
-              <input
-                value={String(watchSeconds)}
-                onChange={(e) => setWatchSeconds(Math.max(1, Number(e.target.value) || 1))}
-                inputMode="numeric"
-                className="w-full rounded-xl border border-sky-400/20 bg-black/20 px-3.5 py-3 text-sm font-bold text-white outline-none focus:border-sky-300/60"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[30, 60, 120, 300, 600].map((seconds) => (
-                  <button key={seconds} type="button" onClick={() => setWatchSeconds(seconds)} className="rounded-lg border border-sky-400/20 bg-white/[0.04] px-3 py-2 text-[10px] font-bold text-sky-100">
-                    {seconds}s
-                  </button>
-                ))}
+            <div className="space-y-3 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3">
+              <div>
+                <p className="text-sm font-black text-blue-100">Your video</p>
+                <p className="mt-1 text-[10px] text-blue-100/60">Post your own video to Taskora or provide a video URL.</p>
               </div>
-              <p className="mt-1.5 text-[10px] leading-snug text-sky-100/60">
-                Each completion must reach this duration. Verification is automatic; no screenshot is submitted for Watch &amp; Earn.
-              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setVideoMode("upload")} className={`rounded-xl border px-3 py-3 text-xs font-bold ${videoMode === "upload" ? "border-blue-400/50 bg-blue-500/20 text-blue-100" : "border-white/10 bg-black/20 text-white/60"}`}>Upload video</button>
+                <button type="button" onClick={() => setVideoMode("url")} className={`rounded-xl border px-3 py-3 text-xs font-bold ${videoMode === "url" ? "border-blue-400/50 bg-blue-500/20 text-blue-100" : "border-white/10 bg-black/20 text-white/60"}`}>Video URL</button>
+              </div>
+              {videoMode === "upload" ? (
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-blue-400/30 bg-black/20 p-4">
+                  <Upload className="size-5 text-blue-300" />
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{videoFile?.name || "Choose your video"}</p><p className="text-[10px] text-slate-500">MP4/WebM/MOV · max 500 MB</p></div>
+                  <input type="file" accept="video/*" className="hidden" onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)} />
+                </label>
+              ) : <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://… video URL" className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm outline-none focus:border-blue-400/50" />}
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold text-blue-100">Required watch time</label>
+                <p className="mb-2 text-[10px] text-blue-100/60">Minutes and seconds are converted to total seconds automatically.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="rounded-xl border border-white/10 bg-black/20 p-3"><span className="text-[10px] text-slate-500">Minutes</span><input type="number" min={0} max={120} value={watchMinutes} onChange={(e) => setWatchMinutes(Math.max(0, Math.min(120, Number(e.target.value) || 0)))} className="mt-1 w-full bg-transparent text-lg font-black outline-none" /></label>
+                  <label className="rounded-xl border border-white/10 bg-black/20 p-3"><span className="text-[10px] text-slate-500">Seconds</span><input type="number" min={0} max={59} value={watchSeconds} onChange={(e) => setWatchSeconds(Math.max(0, Math.min(59, Number(e.target.value) || 0)))} className="mt-1 w-full bg-transparent text-lg font-black outline-none" /></label>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">{[[0,30],[1,0],[2,0],[5,0],[10,0],[30,0],[60,0],[120,0]].map(([m,s]) => <button key={m+":"+s} type="button" onClick={() => {setWatchMinutes(m);setWatchSeconds(s);}} className="rounded-lg border border-blue-400/15 bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-bold text-blue-100">{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}</button>)}</div>
+                <p className="mt-2 text-center text-lg font-black text-blue-200">{String(Math.floor(requiredWatchSeconds / 60)).padStart(2,"0")}:{String(requiredWatchSeconds % 60).padStart(2,"0")}</p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold text-blue-100">Number of completions</label>
+                <input value={String(qty)} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm outline-none" />
+              </div>
+              <div className="rounded-xl border border-blue-400/15 bg-black/15 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-100/60">Locked pricing</p>
+                <div className="mt-2 space-y-1.5 text-xs">
+                  <div className="flex justify-between"><span className="text-white/50">Advertiser / completion</span><b>${formatUsd(advertiserPerCompletion)}</b></div>
+                  <div className="flex justify-between"><span className="text-white/50">User reward / completion</span><b className="text-blue-200">${formatUsd(rewardNum)}</b></div>
+                  <div className="flex justify-between"><span className="text-white/50">Taskora fee / completion</span><b>${formatUsd(taskoraPerCompletion)}</b></div>
+                  <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white/50">Total campaign</span><b className="text-lg text-blue-200">${formatUsd(total)}</b></div>
+                </div>
+                <p className="mt-2 text-[10px] leading-relaxed text-blue-100/60">70% is locked as the worker reward and 30% is Taskora's fee. The user reward does not change after publication.</p>
+              </div>
+              <p className="rounded-xl border border-blue-400/15 bg-blue-500/5 p-2.5 text-[10px] text-blue-100/70">Verification: automatic watch-time verification. No screenshot for Watch.</p>
             </div>
           ) : null}
 
@@ -353,9 +380,7 @@ function AdvertisePage() {
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
             <p className="text-[11px] font-semibold text-white/55">Verification</p>
             <p className="mt-1 text-[11px] leading-snug text-white/45">
-              {service.id === "yt_watch" || platform === "telegram" || platform === "discord"
-                ? "Automatically verified by Taskora. No screenshot is required."
-                : "Screenshot verification is required and reviewed before reward release."}
+              {platform === "telegram" || platform === "discord" ? "Automatic verification with screenshot fallback." : "Screenshot verification is required and reviewed before reward release."}
             </p>
           </div>
 
