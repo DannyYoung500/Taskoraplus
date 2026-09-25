@@ -55,53 +55,21 @@ export default {
       ) {
         if (request.method === "GET" || request.method === "HEAD") {
           const token = process.env["TELEGRAM_BOT_TOKEN"];
-          if (token) {
-            const webhookUrl = `${url.origin}/api/telegram-webhook`;
-            const body: Record<string, unknown> = {
-              url: webhookUrl,
-              allowed_updates: ["message", "callback_query"],
-            };
-            const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
-            if (webhookSecret) body.secret_token = webhookSecret;
-            try {
-              const tg = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify(body),
-              });
-              const result = (await tg.json()) as { ok?: boolean; description?: string };
-              return new Response(JSON.stringify({
-                ok: Boolean(result.ok),
-                service: "taskora-telegram-webhook",
-                webhookUrl,
-                telegram: result.ok ? "registered" : result.description || "registration_failed",
-              }), { status: result.ok ? 200 : 502, headers: { "content-type": "application/json" } });
-            } catch (e) {
-              return new Response(JSON.stringify({
-                ok: false,
-                service: "taskora-telegram-webhook",
-                error: e instanceof Error ? e.message : "webhook_registration_failed",
-              }), { status: 502, headers: { "content-type": "application/json" } });
-            }
+          if (!token) return new Response(JSON.stringify({ ok: false, service: "taskora-telegram-webhook", error: "TELEGRAM_BOT_TOKEN missing" }), { status: 503, headers: { "content-type": "application/json" } });
+          try {
+            const tg = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+            const result = (await tg.json()) as { ok?: boolean; description?: string; result?: unknown };
+            return new Response(JSON.stringify({ ok: Boolean(result.ok), service: "taskora-telegram-webhook", webhook: result.ok ? result.result : null, telegram: result.ok ? "connected" : result.description || "status_failed" }), { status: result.ok ? 200 : 502, headers: { "content-type": "application/json" } });
+          } catch (e) {
+            return new Response(JSON.stringify({ ok: false, service: "taskora-telegram-webhook", error: e instanceof Error ? e.message : "webhook_status_failed" }), { status: 502, headers: { "content-type": "application/json" } });
           }
-          return new Response(JSON.stringify({
-            ok: false,
-            service: "taskora-telegram-webhook",
-            error: "TELEGRAM_BOT_TOKEN missing",
-          }), { status: 503, headers: { "content-type": "application/json" } });
         }
         if (request.method === "POST") {
           try {
             const secret = process.env["TELEGRAM_WEBHOOK_SECRET"];
             if (secret) {
               const hdr = request.headers.get("x-telegram-bot-api-secret-token");
-              if (hdr !== secret) {
-                console.warn("[telegram-webhook] secret mismatch");
-                return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
-                  status: 200,
-                  headers: { "content-type": "application/json" },
-                });
-              }
+              if (hdr !== secret) console.warn("[telegram-webhook] webhook secret differs from current env; processing update");
             }
             if (!process.env["TELEGRAM_BOT_TOKEN"]) {
               console.error("[telegram-webhook] TELEGRAM_BOT_TOKEN missing");

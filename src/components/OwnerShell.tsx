@@ -87,7 +87,6 @@ const SECTIONS: { label: string; items: Item[] }[] = [
   {
     label: "System",
     items: [
-      { to: "/owner/settings", title: "Telegram Gate · Webhook", Icon: Lock },
       { to: "/owner/roles", title: "Roles", Icon: Shield },
       { to: "/owner/flags", title: "Flags", Icon: Flag },
       { to: "/owner/audit", title: "Audit Log", Icon: ScrollText },
@@ -97,7 +96,7 @@ const SECTIONS: { label: string; items: Item[] }[] = [
   },
 ];
 
-const LIME = "#a3e635";
+const ACTIVE = "#3b82f6";
 
 export function OwnerShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -119,12 +118,12 @@ export function OwnerShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md bg-[#0b1424] text-slate-100">
+    <div className="mx-auto flex min-h-screen w-full max-w-[1440px] bg-[#07152b] text-slate-100">
       {open ? (
         <aside className="fixed inset-y-0 left-0 z-50 flex w-[min(100%,300px)] flex-col border-r border-white/10 bg-[#0a1220] shadow-2xl">
           <div className="flex items-center gap-2 border-b border-white/10 px-3 py-3">
             <img src={TASKORA_LOGO} alt="" className="size-8 rounded-full object-cover ring-1 ring-lime-400/40" />
-            <span className="flex-1 text-sm font-extrabold tracking-wide" style={{ color: LIME }}>
+            <span className="flex-1 text-sm font-extrabold tracking-wide" style={{ color: "#60a5fa" }}>
               TASKORA →
             </span>
             <button
@@ -169,7 +168,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
                               ? "font-semibold text-[#0b1424]"
                               : "text-slate-300 hover:bg-white/5"
                           }`}
-                          style={active ? { background: LIME } : undefined}
+                          style={active ? { background: ACTIVE } : undefined}
                         >
                           <Icon className="size-4 shrink-0 opacity-90" />
                           <span className="truncate">{item.title}</span>
