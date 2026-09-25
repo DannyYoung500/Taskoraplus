@@ -19,7 +19,8 @@ import {
   PlatformLogo,
   type Platform,
 } from "@/components/PlatformIcon";
-import { ownerCreateTask, getDashboard } from "@/lib/taskora.functions";
+import { getDashboard } from "@/lib/taskora.functions";
+import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
 import { TASKORA_LOGO, COLORS } from "@/lib/brand";
 import {
   SERVICES,
@@ -32,12 +33,11 @@ import {
 export const Route = createFileRoute("/_authenticated/advertise")({
   head: () => ({ meta: [{ title: "Advertise \u2014 TASKORA" }] }),
   loader: async () => {
-    try {
-      const dash = await getDashboard();
-      return { balance: Number(dash?.balance ?? 0) };
-    } catch {
-      return { balance: 0 };
-    }
+    const [dashResult, servicesResult] = await Promise.allSettled([getDashboard(), listAdvertiseServices()]);
+    return {
+      balance: dashResult.status === "fulfilled" ? Number(dashResult.value?.balance ?? 0) : 0,
+      catalog: servicesResult.status === "fulfilled" ? servicesResult.value : [],
+    };
   },
   component: AdvertisePage,
 });
@@ -46,7 +46,7 @@ type ProofType = "screenshot" | "text" | "link";
 type Difficulty = "easy" | "medium" | "hard";
 
 function AdvertisePage() {
-  const { balance } = Route.useLoaderData();
+  const { balance, catalog } = Route.useLoaderData();
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [service, setService] = useState<ServiceDef | null>(null);
 
@@ -75,10 +75,29 @@ function AdvertisePage() {
     return map;
   }, []);
 
-  function openService(s: ServiceDef) {
+  function getCatalogPrice(s: ServiceDef) {
+    const row = (catalog as Array<Record<string, unknown>>).find((x) => String(x.service_id) === s.id);
+    if (!row) return s;
+    return {
+      ...s,
+      fromUsd: Number(row.customer_unit_price ?? s.fromUsd),
+      taskerUsd: Number(row.tasker_unit_reward ?? s.taskerUsd),
+      taskoraUsd: Number(row.taskora_unit_margin ?? s.taskoraUsd),
+      minQty: Number(row.min_quantity ?? s.minQty),
+      maxQty: Number(row.max_quantity ?? s.maxQty),
+    };
+  }
+
+  function formatUsd(value: number) {
+    if (Math.abs(value) < 0.01 && value !== 0) return `${value.toFixed(6)}`;
+    return `${value.toFixed(2)}`;
+  }
+
+  function openService(raw: ServiceDef) {
+    const s = getCatalogPrice(raw);
     setService(s);
     setQty(s.minQty);
-    setRewardPer(String(s.fromUsd));
+    setRewardPer(String(s.taskerUsd));
     setTitle("");
     setDescription("");
     setInstructions(s.defaultSteps.join("\n"));
@@ -119,7 +138,7 @@ function AdvertisePage() {
     });
   }
 
-  const rewardNum = Math.max(0.01, Number(rewardPer) || 0);
+  const rewardNum = service ? Number(service.taskerUsd) : 0;
   const qtyNum = Math.max(1, Number(qty) || 1);
   const earnerPayouts = rewardNum * qtyNum;
   const platformFee = earnerPayouts * PLATFORM_FEE;
@@ -500,11 +519,11 @@ function AdvertisePage() {
             </div>
             <div className="flex justify-between">
               <span className="text-white/50">Earner payouts</span>
-              <span>${earnerPayouts.toFixed(2)}</span>
+              <span>{formatUsd(earnerPayouts)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/50">Platform fee ({Math.round(PLATFORM_FEE * 100)}%)</span>
-              <span>${platformFee.toFixed(2)}</span>
+              <span>{formatUsd(platformFee)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/50">Estimated delivery</span>
@@ -513,12 +532,12 @@ function AdvertisePage() {
             {featured ? (
               <div className="flex justify-between">
                 <span className="text-white/50">Feature fee</span>
-                <span>${featureFee.toFixed(2)}</span>
+                <span>{formatUsd(featureFee)}</span>
               </div>
             ) : null}
             <div className="flex justify-between border-t border-white/10 pt-2.5 text-base font-bold">
               <span>Total</span>
-              <span className="text-emerald-300">${total.toFixed(2)}</span>
+              <span className="text-emerald-300">{formatUsd(total)}</span>
             </div>
           </div>
 
@@ -597,7 +616,7 @@ function AdvertisePage() {
                 <p className="text-sm font-semibold">{s.title}</p>
                 <p className="mt-0.5 text-[11px] text-white/45">{s.desc}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="font-bold text-emerald-300">From ${s.fromUsd.toFixed(2)}</span>
+                  <span className="font-bold text-emerald-300">{s.id === "yt_watch" ? `${formatUsd(s.fromUsd)} / second` : `${formatUsd(s.fromUsd)} / ${s.unit.replace(/s$/, "")}`}</span>
                   <span className="text-white/25">\u00b7</span>
                   <span className="text-white/45">
                     {s.minQty} \u2013 {s.maxQty.toLocaleString()} {s.unit}
