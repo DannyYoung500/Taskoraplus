@@ -5,19 +5,16 @@ import {
   PlayCircle,
   Users,
   Bell,
-  Megaphone,
   Crown,
   ChevronRight,
   CalendarCheck,
   WalletCards,
-  Gamepad2,
   Flame,
   Star,
   Trophy,
 } from "lucide-react";
 import { listTasks, getDashboard, dailyCheckin } from "@/lib/taskora.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
-import { GameBrandRow } from "@/components/GameIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
 
@@ -206,24 +203,6 @@ function HomePage() {
         <Quick to="/watch-earn" label="Watch & Earn" sub="Watch Videos" Icon={PlayCircle} />
         <Quick to="/leaderboard" label="Rank" sub="Leaderboard" Icon={Trophy} />
         <Quick to="/ambassador" label="Invite & Earn" sub="Task Points" Icon={Users} />
-      </section>
-
-      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-cyan-400/25 bg-gradient-to-r from-[#0c1a30] to-[#07101f] p-3.5">
-        <div className="mb-3 flex items-center gap-3">
-          <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-            <Gamepad2 className="size-6" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="rounded bg-cyan-400 px-1.5 py-0.5 text-[8px] font-black text-[#04101c]">NEW</span>
-              <p className="text-sm font-black">Play Games, Earn More!</p>
-            </div>
-            <p className="mt-0.5 text-[10px] text-slate-400">
-              Supported titles · rewards from real Task Points & ledger only.
-            </p>
-          </div>
-        </div>
-        <GameBrandRow size={42} />
       </section>
 
       <section className="mb-3.5 overflow-hidden rounded-[20px] border border-amber-400/35 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
