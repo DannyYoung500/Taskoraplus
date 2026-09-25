@@ -23,14 +23,48 @@ function TaskDetail() {
   const [proofText, setProofText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [useScreenshot, setUseScreenshot] = useState(false);
+  const [autoStatus, setAutoStatus] = useState<string | null>(null);
   const platform = task.platform as Platform;
+  const isTelegramJoin =
+    String(task.platform).toLowerCase() === "telegram" ||
+    /t\.me\//i.test(String(task.link ?? "")) ||
+    String(task.proof) === "auto";
+  const isWatch =
+    String(task.proof) === "auto" &&
+    /watch/i.test(String(task.title ?? "")) &&
+    !isTelegramJoin;
+  const rewardDisplay = `$${Number(task.reward).toFixed(6)}`;
 
-  async function onSubmit() {
+  async function onAutoVerifyTelegram() {
+    setBusy(true);
+    setError(null);
+    setAutoStatus("Checking membership…");
+    try {
+      await submitTaskGuarded({
+        data: { taskId: task.id, proofText: "auto:telegram_membership" },
+      });
+      setSubmitted(true);
+      setAutoStatus("Verified · membership confirmed");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Auto-verify failed");
+      setAutoStatus(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSubmitScreenshot() {
     setBusy(true);
     setError(null);
     try {
+      if (!proofText.trim()) throw new Error("Add a screenshot URL or proof note.");
       await submitTaskGuarded({
-        data: { taskId: task.id, proofText: proofText.trim() || undefined },
+        data: {
+          taskId: task.id,
+          proofText: proofText.trim(),
+          proofUrl: proofText.trim().startsWith("http") ? proofText.trim() : undefined,
+        },
       });
       setSubmitted(true);
     } catch (e) {
@@ -57,10 +91,13 @@ function TaskDetail() {
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <Meta label="Reward" value={`$${Number(task.reward).toFixed(2)}`} Icon={ShieldCheck} />
-          <Meta label="Time" value={`${task.seconds}s`} Icon={Clock3} />
+          <Meta label="Reward" value={rewardDisplay} Icon={ShieldCheck} />
+          <Meta label="Time" value={`${task.seconds ?? "—"}s`} Icon={Clock3} />
           <Meta label="Slots left" value={`${task.slots_left}`} Icon={Users} />
         </div>
+        <p className="mt-2 text-center text-[10px] text-muted-foreground">
+          Locked catalog reward · same amount credited on approval
+        </p>
       </div>
 
       <section className="card-surface mt-4 p-4">
@@ -84,24 +121,58 @@ function TaskDetail() {
 
       <section className="card-surface mt-4 p-4">
         <h2 className="text-sm font-bold">Verification</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {String(task.platform).toLowerCase() === "telegram" || /t\.me\//i.test(String(task.link ?? ""))
-            ? "Telegram join tasks auto-verify via bot membership (bot must be admin). Rate limit: 12 / hour."
-            : "Pending until owner verifies. Rate limit: 12 submissions / hour."}
-        </p>
-        <input
-          value={proofText}
-          onChange={(e) => setProofText(e.target.value)}
-          placeholder={
-            task.proof === "username"
-              ? "@yourusername"
-              : String(task.platform).toLowerCase() === "telegram"
-                ? "@channel or leave blank if already joined"
-                : "Proof note or screenshot URL"
-          }
-          className="mt-3 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm"
-        />
-        {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
+        {isTelegramJoin && !useScreenshot ? (
+          <>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Automatic membership check via Telegram bot (bot must be admin). Screenshot is optional — only if you choose it. No soft fallback.
+            </p>
+            {autoStatus ? <p className="mt-2 text-xs text-emerald-400">{autoStatus}</p> : null}
+            {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
+            <button
+              type="button"
+              disabled={busy || submitted}
+              onClick={() => void onAutoVerifyTelegram()}
+              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {busy ? "Verifying…" : "Verify membership (auto)"}
+            </button>
+            <button
+              type="button"
+              disabled={submitted}
+              onClick={() => {
+                setUseScreenshot(true);
+                setError(null);
+              }}
+              className="mt-2 w-full rounded-2xl border border-white/15 py-2.5 text-xs font-bold text-white/70"
+            >
+              Choose screenshot verification instead
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isWatch
+                ? "Watch verification is automatic after required watch time in the player."
+                : useScreenshot
+                  ? "Screenshot path selected. Reward only after review."
+                  : "Pending until owner verifies."}
+            </p>
+            {!isWatch ? (
+              <input
+                value={proofText}
+                onChange={(e) => setProofText(e.target.value)}
+                placeholder="Screenshot URL or proof note"
+                className="mt-3 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm"
+              />
+            ) : null}
+            {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
+            {useScreenshot ? (
+              <button type="button" className="mt-2 text-[11px] text-cyan-300" onClick={() => setUseScreenshot(false)}>
+                ← Back to automatic membership check
+              </button>
+            ) : null}
+          </>
+        )}
       </section>
 
       <div className="fixed inset-x-0 bottom-[68px] z-30 mx-auto max-w-md px-4 pb-2">
@@ -109,13 +180,13 @@ function TaskDetail() {
           <div className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3.5 text-sm font-semibold">
             <CheckCircle2 className="size-4" /> Submitted — awaiting verification
           </div>
-        ) : (
+        ) : isTelegramJoin && !useScreenshot ? null : (
           <button
             disabled={busy}
-            onClick={() => (started ? onSubmit() : setStarted(true))}
+            onClick={() => (started ? void onSubmitScreenshot() : setStarted(true))}
             className="bg-green-grad w-full rounded-2xl px-4 py-3.5 text-sm font-bold text-primary-foreground disabled:opacity-60"
           >
-            {busy ? "Submitting…" : started ? "Submit for verification" : `Start task · $${Number(task.reward).toFixed(2)}`}
+            {busy ? "Submitting…" : started ? "Submit for verification" : `Start task · ${rewardDisplay}`}
           </button>
         )}
       </div>
@@ -135,7 +206,7 @@ function Meta({
   return (
     <div className="rounded-2xl bg-secondary px-2 py-3">
       <Icon className="mx-auto size-4 text-primary" />
-      <p className="mt-1.5 text-sm font-bold leading-none">{value}</p>
+      <p className="mt-1.5 text-[11px] font-bold leading-none break-all">{value}</p>
       <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
     </div>
   );
