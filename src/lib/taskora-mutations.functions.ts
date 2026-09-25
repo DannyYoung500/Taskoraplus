@@ -82,13 +82,23 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     if (!proofText && !proofUrl) {
       throw new Error("Add proof text or a proof link/screenshot URL.");
     }
-    const { error } = await supabaseAdmin.from("submissions").insert({
+    let proofHash: string | null = null;
+    try {
+      const { assertProofNotRecycled } = await import("@/lib/strong-ops");
+      const r = await assertProofNotRecycled({ proofText, proofUrl, userId });
+      proofHash = r.proofHash;
+    } catch (e) {
+      if (e instanceof Error && e.message.toLowerCase().includes("proof")) throw e;
+    }
+    const row: Record<string, unknown> = {
       user_id: userId,
       task_id: task.id,
       status: "pending",
       proof_text: proofText || null,
       proof_url: proofUrl || null,
-    });
+    };
+    if (proofHash) row.proof_hash = proofHash;
+    const { error } = await supabaseAdmin.from("submissions").insert(row);
     if (error) throw new Error(error.message);
     await supabaseAdmin
       .from("tasks")
@@ -111,6 +121,42 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    try {
+      const { assertAddressAllowlisted } = await import("@/lib/strong-ops");
+      await assertAddressAllowlisted({ userId, address });
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("24") || e.message.includes("cool") || e.message.includes("wait") || e.message.includes("Address saved"))) {
+        throw e;
+      }
+    }
+
+    try {
+      const { data: profFp } = await supabaseAdmin
+        .from("profiles")
+        .select("device_fp")
+        .eq("id", userId)
+        .maybeSingle();
+      const fp = (profFp as { device_fp?: string } | null)?.device_fp;
+      if (fp) {
+        const { data: cluster } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("device_fp", fp)
+          .limit(12);
+        const n = (cluster ?? []).length;
+        if (n >= 4 && data.amount > 10) {
+          throw new Error(
+            "Withdrawal limited: multiple accounts detected on this device. Contact support or withdraw ≤ $10.",
+          );
+        }
+        if (n >= 6) {
+          throw new Error("Withdrawal blocked: device linked to too many accounts. Contact support.");
+        }
+      }
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("device") || e.message.includes("Withdrawal"))) throw e;
+    }
 
     let minWd = RULES.minWithdrawalUsd;
     let payoutsPaused = false;
@@ -229,7 +275,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       kind: "withdrawal",
     });
 
-    // Notify owners on dual / large withdrawals
     if (requiresDual || data.amount >= dualThreshold) {
       try {
         const { data: prof } = await supabaseAdmin
