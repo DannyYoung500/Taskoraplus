@@ -13,9 +13,11 @@ import {
   Gamepad2,
   Flame,
   Star,
+  Trophy,
 } from "lucide-react";
 import { listTasks, getDashboard, dailyCheckin } from "@/lib/taskora.functions";
-import { PlatformIcon, type Platform } from "@/components/PlatformIcon";
+import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
+import { GameBrandRow } from "@/components/GameIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
 
@@ -199,12 +201,29 @@ function HomePage() {
         </Link>
       </section>
 
-      <section className="mb-3.5 grid grid-cols-5 gap-1.5">
+      <section className="mb-3.5 grid grid-cols-4 gap-1.5">
         <Quick to="/tasks" label="Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
         <Quick to="/watch-earn" label="Watch & Earn" sub="Watch Videos" Icon={PlayCircle} />
-        <Quick to="/games" label="Games" sub="Play & Earn" Icon={Gamepad2} badge="NEW" />
-        <Quick to="/advertise" label="Advertise" sub="Campaigns" Icon={Megaphone} />
-        <Quick to="/ambassador" label="Invite & Earn" sub="XP & Commission" Icon={Users} />
+        <Quick to="/leaderboard" label="Rank" sub="Leaderboard" Icon={Trophy} />
+        <Quick to="/ambassador" label="Invite & Earn" sub="Task Points" Icon={Users} />
+      </section>
+
+      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-cyan-400/25 bg-gradient-to-r from-[#0c1a30] to-[#07101f] p-3.5">
+        <div className="mb-3 flex items-center gap-3">
+          <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
+            <Gamepad2 className="size-6" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="rounded bg-cyan-400 px-1.5 py-0.5 text-[8px] font-black text-[#04101c]">NEW</span>
+              <p className="text-sm font-black">Play Games, Earn More!</p>
+            </div>
+            <p className="mt-0.5 text-[10px] text-slate-400">
+              Supported titles · rewards from real Task Points & ledger only.
+            </p>
+          </div>
+        </div>
+        <GameBrandRow size={42} />
       </section>
 
       <section className="mb-3.5 overflow-hidden rounded-[20px] border border-amber-400/35 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
@@ -213,7 +232,7 @@ function HomePage() {
             <Star className="size-6 fill-amber-300 text-amber-300" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black">Task Point</p>
+            <p className="text-sm font-black">Task Points</p>
             <p className="text-2xl font-black text-amber-200">{displayTaskPoints.toLocaleString()}</p>
           </div>
           <div className="text-right">
@@ -271,51 +290,11 @@ function HomePage() {
           </Link>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <DailyCard
-            to="/tasks"
-            title="Complete 3 Tasks"
-            reward="+100 TP"
-            progress={`${taskProgress}/3`}
-            pct={(taskProgress / 3) * 100}
-            Icon={ClipboardCheck}
-          />
-          <DailyCard
-            to="/watch-earn"
-            title="Watch 5 Videos"
-            reward="+50 TP"
-            progress="0/5"
-            pct={0}
-            Icon={PlayCircle}
-          />
-          <DailyCard
-            to="/ambassador"
-            title="Invite 1 Friend"
-            reward="+200 TP"
-            progress="0/1"
-            pct={0}
-            Icon={Users}
-          />
+          <DailyCard to="/tasks" title="Complete 3 Tasks" reward="+100 TP" progress={`${taskProgress}/3`} pct={(taskProgress / 3) * 100} Icon={ClipboardCheck} />
+          <DailyCard to="/watch-earn" title="Watch 5 Videos" reward="+50 TP" progress="0/5" pct={0} Icon={PlayCircle} />
+          <DailyCard to="/ambassador" title="Invite 1 Friend" reward="+200 TP" progress="0/1" pct={0} Icon={Users} />
         </div>
       </section>
-
-      <Link
-        to="/games"
-        className="mb-3.5 flex items-center gap-3 overflow-hidden rounded-[20px] border border-blue-400/25 bg-gradient-to-r from-[#0c1a30] to-[#07101f] p-3.5 active:scale-[0.995]"
-      >
-        <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-          <Gamepad2 className="size-7" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="rounded bg-cyan-400 px-1.5 py-0.5 text-[8px] font-black text-[#04101c]">NEW</span>
-            <p className="text-sm font-black">Taskora Tap Rush</p>
-          </div>
-          <p className="mt-0.5 text-[10px] text-slate-400">
-            30 seconds of skill play · earn Task Points · daily cap 100 TP
-          </p>
-        </div>
-        <ChevronRight className="size-5 shrink-0 text-cyan-300" />
-      </Link>
 
       <section>
         <div className="mb-2 flex items-center justify-between">
@@ -342,13 +321,11 @@ function HomePage() {
                 params={{ taskId: t.id }}
                 className="flex items-center gap-3 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3 active:scale-[0.995]"
               >
-                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/[0.04]">
-                  <PlatformIcon platform={t.platform as Platform} size={22} />
-                </span>
+                <PlatformLogo platform={t.platform as Platform} size={42} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold">{t.title}</p>
                   <p className="text-[10px] text-slate-500">
-                    {t.platform} · +{formatUsd(t.reward)}
+                    {platformLabel(t.platform as Platform)} · +{formatUsd(t.reward)}
                   </p>
                 </div>
                 <span
