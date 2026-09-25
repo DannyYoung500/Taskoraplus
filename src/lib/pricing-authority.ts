@@ -111,7 +111,7 @@ export async function resolveLockedPricing(opts: {
   let watchSeconds: number | undefined;
 
   if (cat.unit === "seconds" || cat.taskType === "watch" || opts.serviceId.includes("watch")) {
-    const secs = Math.max(1, Math.min(7200, Math.floor(opts.watchSeconds ?? 60)));
+    const secs = Math.max(1, Math.min(28800, Math.floor(opts.watchSeconds ?? 60)));
     watchSeconds = secs;
     const rate = await loadWatchRatePerSecond();
     customerUnit = rate * secs;
