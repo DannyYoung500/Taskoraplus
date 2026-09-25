@@ -47,6 +47,7 @@ function AdvertisePage() {
 
   const [link, setLink] = useState("");
   const [qty, setQty] = useState(50);
+  const [watchSeconds, setWatchSeconds] = useState(60);
   const [notes, setNotes] = useState("");
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -87,6 +88,7 @@ function AdvertisePage() {
     const s = getCatalogPrice(raw);
     setService(s);
     setQty(s.minQty);
+    setWatchSeconds(s.id === "yt_watch" ? 60 : 0);
     setTitle("");
     setInstructions(s.defaultSteps.join("\n"));
     setWarning(s.defaultWarning);
@@ -107,10 +109,10 @@ function AdvertisePage() {
 
   const qtyNum = Math.max(1, Number(qty) || 1);
   const isWatchService = service?.id === "yt_watch";
-  const requiredWatchSeconds = isWatchService ? qtyNum : 0;
+  const requiredWatchSeconds = isWatchService ? Math.max(1, Number(watchSeconds) || 1) : 0;
   const rewardNum = service ? Number(service.taskerUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
-  const earnerPayouts = rewardNum * (isWatchService ? 1 : qtyNum);
-  const platformFee = service ? Number(service.taskoraUsd) * (isWatchService ? requiredWatchSeconds : 1) * (isWatchService ? 1 : qtyNum) : 0;
+  const earnerPayouts = rewardNum * qtyNum;
+  const platformFee = service ? Number(service.taskoraUsd) * (isWatchService ? requiredWatchSeconds : 1) * qtyNum : 0;
   const featureFee = featured ? FEATURE_FEE_USD : 0;
   const total = earnerPayouts + platformFee + featureFee;
   const insufficient = balance < total;
@@ -129,6 +131,10 @@ function AdvertisePage() {
       setMsg(`Quantity must be between ${service.minQty} and ${service.maxQty}.`);
       return;
     }
+    if (isWatchService && (requiredWatchSeconds < 1 || requiredWatchSeconds > 3600)) {
+      setMsg("Required watch time must be between 1 and 3600 seconds.");
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
@@ -138,7 +144,7 @@ function AdvertisePage() {
           title: title.trim(),
           link: link.trim(),
           quantity: qtyNum,
-          watchSeconds: service.id === "yt_watch" ? qtyNum : undefined,
+          watchSeconds: service.id === "yt_watch" ? requiredWatchSeconds : undefined,
         },
       });
       const task = result.task;
@@ -210,7 +216,7 @@ function AdvertisePage() {
 
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
-              Quantity ({unitLabel})
+              {isWatchService ? "Number of completions" : `Quantity (${unitLabel})`}
             </label>
             <input
               value={String(qty)}
@@ -241,9 +247,23 @@ function AdvertisePage() {
 
           {service.id === "yt_watch" ? (
             <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 p-3">
-              <p className="text-[11px] font-semibold text-sky-100">Required watch time</p>
-              <p className="mt-1 text-sm font-bold text-white">{qtyNum.toLocaleString()} seconds</p>
-              <p className="mt-1 text-[10px] text-sky-100/60">Verified automatically while the earner watches in the Taskora player. No screenshot proof.</p>
+              <label className="mb-1.5 block text-[11px] font-semibold text-sky-100">Required watch time</label>
+              <input
+                value={String(watchSeconds)}
+                onChange={(e) => setWatchSeconds(Math.max(1, Number(e.target.value) || 1))}
+                inputMode="numeric"
+                className="w-full rounded-xl border border-sky-400/20 bg-black/20 px-3.5 py-3 text-sm font-bold text-white outline-none focus:border-sky-300/60"
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[30, 60, 120, 300, 600].map((seconds) => (
+                  <button key={seconds} type="button" onClick={() => setWatchSeconds(seconds)} className="rounded-lg border border-sky-400/20 bg-white/[0.04] px-3 py-2 text-[10px] font-bold text-sky-100">
+                    {seconds}s
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] leading-snug text-sky-100/60">
+                Each completion must reach this duration. Verification is automatic; no screenshot is submitted for Watch &amp; Earn.
+              </p>
             </div>
           ) : null}
 
