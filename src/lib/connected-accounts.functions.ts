@@ -7,9 +7,9 @@ const BIO_PLATFORMS=new Set(["x","tiktok","instagram","whatsapp","facebook","red
 function makeLink(code?:string|null, telegramId?:number|null) {
   const id=String(code||telegramId||"").trim();
   if(!id) throw new Error("Your Taskora referral ID is not ready yet. Please try again.");
-  return \`https://t.me/\${BOT}/?startapp=\${encodeURIComponent(id)}\`;
+  return `https://t.me/${BOT}/?startapp=${encodeURIComponent(id)}`;
 }
-function makeMessage(link:string) { return \`🚀 I earn money every day on TASKORA! Join me and start earning too 👇\n\${link}\`; }
+function makeMessage(link:string) { return `🚀 I earn money every day on TASKORA! Join me and start earning too 👇\n${link}`; }
 async function save(userId:string,platform:string,values:Record<string,unknown>) {
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
   const {data,error}=await supabaseAdmin.from("connected_accounts").upsert({user_id:userId,platform:platform as never,...values},{onConflict:"user_id,platform"}).select("*").single();
