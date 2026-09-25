@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, ChevronRight, Shield, CheckCircle2, Copy, Gamepad2, X, ArrowRight, ExternalLink } from "lucide-react";
+import { Bell, ChevronRight, Shield, CheckCircle2, Copy, Gamepad2, X, ArrowRight } from "lucide-react";
 import { beginDiscordConnect, getConnectedVerificationInfo, listConnectedAccounts, startPublicProfileVerification, verifyPublicProfile, verifyYouTubeChannel } from "@/lib/connected-accounts.functions";
 import { CONNECTABLE_PLATFORMS } from "@/lib/taskora-data";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
