@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { validateBotWelcomePhoto } from "@/lib/bot-welcome-photo";
 
-/** Dynamic import keeps owner-guard.server out of the client graph. */
 async function admin() {
   const m = await import("@/lib/owner-guard.server");
   return m.admin();
@@ -233,7 +232,6 @@ export const ownerUploadBotWelcomePhoto = createServerFn({ method: "POST" })
     const photo = validateBotWelcomePhoto(data.data_url);
     const bytes = Uint8Array.from(atob(photo.base64), (char) => char.charCodeAt(0));
     const path = `welcome/${Date.now()}-${crypto.randomUUID()}.${photo.contentType === "image/png" ? "png" : "jpg"}`;
-
     const { data: bucket } = await db.storage.getBucket("bot-welcome");
     if (!bucket) {
       const { error: createError } = await db.storage.createBucket("bot-welcome", {
@@ -245,14 +243,12 @@ export const ownerUploadBotWelcomePhoto = createServerFn({ method: "POST" })
         throw new Error(`Could not create welcome photo storage: ${createError.message}`);
       }
     }
-
     const { error: uploadError } = await db.storage.from("bot-welcome").upload(path, bytes, {
       contentType: photo.contentType,
       cacheControl: "31536000",
       upsert: false,
     });
     if (uploadError) throw new Error(`Welcome photo upload failed: ${uploadError.message}`);
-
     const { data: publicUrl } = db.storage.from("bot-welcome").getPublicUrl(path);
     const { error: saveError } = await db.from("bot_welcome_settings").upsert({
       id: true,
@@ -261,7 +257,6 @@ export const ownerUploadBotWelcomePhoto = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     });
     if (saveError) throw new Error(saveError.message);
-
     await audit({
       adminId: context.userId,
       action: "bot_welcome.photo_uploaded",
@@ -296,12 +291,7 @@ export const ownerSaveBotWelcomeDraft = createServerFn({ method: "POST" })
     if (data.enabled != null) payload.enabled = Boolean(data.enabled);
     const { error } = await db.from("bot_welcome_settings").upsert({ id: true, ...payload });
     if (error) throw new Error(error.message);
-    await audit({
-      adminId: context.userId,
-      action: "bot_welcome.draft_saved",
-      targetType: "bot_welcome",
-      targetId: "true",
-    });
+    await audit({ adminId: context.userId, action: "bot_welcome.draft_saved", targetType: "bot_welcome", targetId: "true" });
     return { ok: true };
   });
 
@@ -310,20 +300,13 @@ export const ownerPublishBotWelcome = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => d)
   .handler(async ({ context }) => {
     const db = await guard(context.userId);
-    const { data: cur, error: readErr } = await db
-      .from("bot_welcome_settings")
-      .select("*")
-      .eq("id", true)
-      .maybeSingle();
+    const { data: cur, error: readErr } = await db.from("bot_welcome_settings").select("*").eq("id", true).maybeSingle();
     if (readErr) throw new Error(readErr.message);
-    const draftMsg =
-      (cur?.draft_message_text as string) || (cur?.message_text as string) || DEFAULT_MESSAGE;
+    const draftMsg = (cur?.draft_message_text as string) || (cur?.message_text as string) || DEFAULT_MESSAGE;
     const draftBtns = normalizeButtons(cur?.draft_buttons ?? cur?.buttons ?? DEFAULT_BUTTONS);
     const draftPhoto = (cur?.draft_photo_url as string | null) ?? null;
-    const draftCommunity =
-      (cur?.draft_community_url as string) || (cur?.community_url as string) || "https://t.me/Taskoraplus";
-    const draftMini =
-      (cur?.draft_mini_app_url as string | null) ?? (cur?.mini_app_url as string | null) ?? null;
+    const draftCommunity = (cur?.draft_community_url as string) || (cur?.community_url as string) || "https://t.me/Taskoraplus";
+    const draftMini = (cur?.draft_mini_app_url as string | null) ?? (cur?.mini_app_url as string | null) ?? null;
     const { error } = await db.from("bot_welcome_settings").upsert({
       id: true,
       previous_photo_url: cur?.photo_url ?? null,
@@ -340,12 +323,7 @@ export const ownerPublishBotWelcome = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     });
     if (error) throw new Error(error.message);
-    await audit({
-      adminId: context.userId,
-      action: "bot_welcome.published",
-      targetType: "bot_welcome",
-      targetId: "true",
-    });
+    await audit({ adminId: context.userId, action: "bot_welcome.published", targetType: "bot_welcome", targetId: "true" });
     return { ok: true, published_at: new Date().toISOString() };
   });
 
@@ -354,11 +332,7 @@ export const ownerRestoreBotWelcome = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => d)
   .handler(async ({ context }) => {
     const db = await guard(context.userId);
-    const { data: cur, error: readErr } = await db
-      .from("bot_welcome_settings")
-      .select("*")
-      .eq("id", true)
-      .maybeSingle();
+    const { data: cur, error: readErr } = await db.from("bot_welcome_settings").select("*").eq("id", true).maybeSingle();
     if (readErr) throw new Error(readErr.message);
     if (!cur?.previous_message_text) throw new Error("No previous version to restore.");
     const { error } = await db.from("bot_welcome_settings").upsert({
@@ -371,12 +345,7 @@ export const ownerRestoreBotWelcome = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     });
     if (error) throw new Error(error.message);
-    await audit({
-      adminId: context.userId,
-      action: "bot_welcome.restored_to_draft",
-      targetType: "bot_welcome",
-      targetId: "true",
-    });
+    await audit({ adminId: context.userId, action: "bot_welcome.restored_to_draft", targetType: "bot_welcome", targetId: "true" });
     return { ok: true };
   });
 
@@ -385,30 +354,15 @@ export const ownerPreviewBotWelcome = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => d)
   .handler(async ({ context }) => {
     const db = await guard(context.userId);
-    const { data: profile } = await db
-      .from("profiles")
-      .select("telegram_id, username, display_name")
-      .eq("id", context.userId)
-      .maybeSingle();
-    if (!profile?.telegram_id) {
-      throw new Error("Your profile has no telegram_id — open the Mini App once first.");
-    }
-    await sendWelcomeToChat({
-      chatId: profile.telegram_id,
-      username: profile.username,
-      firstName: profile.display_name,
-      useDraft: true,
-    });
+    const { data: profile } = await db.from("profiles").select("telegram_id, username, display_name").eq("id", context.userId).maybeSingle();
+    if (!profile?.telegram_id) throw new Error("Your profile has no telegram_id — open the Mini App once first.");
+    await sendWelcomeToChat({ chatId: profile.telegram_id, username: profile.username, firstName: profile.display_name, useDraft: true });
     return { ok: true };
   });
 
 export type TelegramUpdate = {
   update_id?: number;
-  message?: {
-    text?: string;
-    chat?: { id: number };
-    from?: { id: number; username?: string; first_name?: string };
-  };
+  message?: { text?: string; chat?: { id: number }; from?: { id: number; username?: string; first_name?: string } };
   callback_query?: unknown;
   chat_member?: unknown;
   my_chat_member?: unknown;
@@ -416,13 +370,46 @@ export type TelegramUpdate = {
 
 export async function handleTelegramUpdate(update: TelegramUpdate) {
   const msg = update.message;
-  if (!msg?.text || !msg.chat?.id) return { handled: false };
-  if (!msg.text.trim().startsWith("/start")) return { handled: false };
-  await sendWelcomeToChat({
-    chatId: msg.chat.id,
-    username: msg.from?.username,
-    firstName: msg.from?.first_name,
-    useDraft: false,
-  });
-  return { handled: true };
+  if (!msg?.chat?.id) return { handled: false, reason: "no_chat" };
+  const text = (msg.text ?? "").trim();
+  const isStart = /^\/start(?:@\w+)?(?:\s|$)/i.test(text);
+  if (!isStart) return { handled: false, reason: "not_start" };
+  if (!process.env["TELEGRAM_BOT_TOKEN"]) {
+    console.error("[handleTelegramUpdate] TELEGRAM_BOT_TOKEN missing");
+    return { handled: false, reason: "no_token" };
+  }
+  try {
+    await sendWelcomeToChat({
+      chatId: msg.chat.id,
+      username: msg.from?.username,
+      firstName: msg.from?.first_name,
+      useDraft: false,
+    });
+    return { handled: true, reason: "welcome_sent" };
+  } catch (e) {
+    console.error("[handleTelegramUpdate] sendWelcome failed", e);
+    try {
+      const token = process.env["TELEGRAM_BOT_TOKEN"]!;
+      const mini =
+        process.env["MINI_APP_URL"] ||
+        process.env["VITE_MINI_APP_URL"] ||
+        process.env["PUBLIC_APP_URL"] ||
+        "";
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: msg.chat.id,
+          text: "Welcome to TASKORA. Open the Mini App to earn.",
+          reply_markup: mini
+            ? { inline_keyboard: [[{ text: "🚀 OPEN TASKORA", web_app: { url: mini } }]] }
+            : undefined,
+        }),
+      });
+      return { handled: true, reason: "fallback_sent" };
+    } catch (e2) {
+      console.error("[handleTelegramUpdate] fallback failed", e2);
+      return { handled: false, reason: e instanceof Error ? e.message : "send_failed" };
+    }
+  }
 }
