@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";\nimport { OwnerShell } from "@/components/OwnerShell";
+import { useState } from "react";
+import { OwnerShell } from "@/components/OwnerShell";
 import {
   ownerGetPayoutPolicy,
   ownerSetPayoutPolicy,
