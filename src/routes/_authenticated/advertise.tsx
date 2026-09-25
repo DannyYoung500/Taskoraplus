@@ -5,9 +5,6 @@ import {
   Clock,
   CheckCircle2,
   Sparkles,
-  Camera,
-  Type,
-  Link2,
   AlertTriangle,
   Rocket,
   ShieldCheck,
@@ -42,8 +39,6 @@ export const Route = createFileRoute("/_authenticated/advertise")({
   component: AdvertisePage,
 });
 
-type ProofType = "screenshot" | "text" | "link";
-type Difficulty = "easy" | "medium" | "hard";
 
 function AdvertisePage() {
   const { balance, catalog } = Route.useLoaderData();
@@ -54,13 +49,8 @@ function AdvertisePage() {
   const [qty, setQty] = useState(50);
   const [notes, setNotes] = useState("");
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
   const [warning, setWarning] = useState("");
-  const [rewardPer, setRewardPer] = useState("");
-  const [proofs, setProofs] = useState<ProofType[]>(["screenshot"]);
-  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
-  const [screenshotsRequired, setScreenshotsRequired] = useState(1);
   const [featured, setFeatured] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -97,16 +87,11 @@ function AdvertisePage() {
     const s = getCatalogPrice(raw);
     setService(s);
     setQty(s.minQty);
-    setRewardPer(String(s.taskerUsd));
     setTitle("");
-    setDescription("");
     setInstructions(s.defaultSteps.join("\n"));
     setWarning(s.defaultWarning);
     setNotes("");
     setLink("");
-    setProofs(["screenshot"]);
-    setDifficulty("easy");
-    setScreenshotsRequired(1);
     setFeatured(false);
     setMsg(null);
   }
@@ -115,33 +100,17 @@ function AdvertisePage() {
     setTitle(t);
   }
 
-  function applyDescTemplate() {
-    if (!service || !platform) return;
-    const meta = PLATFORM_META[platform];
-    setDescription(
-      `Complete this ${meta.label} task: ${service.title}. Follow the steps carefully and submit clear proof.`,
-    );
-  }
-
   function applyInstrTemplate() {
     if (!service) return;
     setInstructions(service.defaultSteps.join("\n"));
   }
 
-  function toggleProof(p: ProofType) {
-    setProofs((prev) => {
-      if (prev.includes(p)) {
-        if (prev.length === 1) return prev;
-        return prev.filter((x) => x !== p);
-      }
-      return [...prev, p];
-    });
-  }
-
-  const rewardNum = service ? Number(service.taskerUsd) : 0;
   const qtyNum = Math.max(1, Number(qty) || 1);
-  const earnerPayouts = rewardNum * qtyNum;
-  const platformFee = earnerPayouts * PLATFORM_FEE;
+  const isWatchService = service?.id === "yt_watch";
+  const requiredWatchSeconds = isWatchService ? qtyNum : 0;
+  const rewardNum = service ? Number(service.taskerUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
+  const earnerPayouts = rewardNum * (isWatchService ? 1 : qtyNum);
+  const platformFee = service ? Number(service.taskoraUsd) * (isWatchService ? requiredWatchSeconds : 1) * (isWatchService ? 1 : qtyNum) : 0;
   const featureFee = featured ? FEATURE_FEE_USD : 0;
   const total = earnerPayouts + platformFee + featureFee;
   const insufficient = balance < total;
@@ -163,29 +132,16 @@ function AdvertisePage() {
     setBusy(true);
     setMsg(null);
     try {
-      const steps = instructions
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const proof =
-        proofs.includes("screenshot") && proofs.length === 1
-          ? "screenshot"
-          : proofs.includes("link")
-            ? "username"
-            : "screenshot";
-
-      const task = await ownerCreateTask({
+      const result = await createAdvertiseCampaign({
         data: {
-          platform,
+          serviceId: service.id,
           title: title.trim(),
-          advertiser: "TASKORA",
-          reward: rewardNum,
-          slots: qtyNum,
-          steps: steps.length > 0 ? steps : service.defaultSteps,
-          proof: platform === "telegram" && service.taskType === "join" ? "auto" : proof,
           link: link.trim(),
+          quantity: qtyNum,
+          watchSeconds: service.id === "yt_watch" ? qtyNum : undefined,
         },
       });
+      const task = result.task;
       setMsg(`Order placed \u00b7 ${task.id.slice(0, 8)}\u2026 Live when activated.`);
       setService(null);
       setPlatform(null);
@@ -283,6 +239,14 @@ function AdvertisePage() {
             </div>
           </div>
 
+          {service.id === "yt_watch" ? (
+            <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 p-3">
+              <p className="text-[11px] font-semibold text-sky-100">Required watch time</p>
+              <p className="mt-1 text-sm font-bold text-white">{qtyNum.toLocaleString()} seconds</p>
+              <p className="mt-1 text-[10px] text-sky-100/60">Verified automatically while the earner watches in the Taskora player. No screenshot proof.</p>
+            </div>
+          ) : null}
+
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
               Notes <span className="font-normal text-white/30">(optional)</span>
@@ -339,24 +303,6 @@ function AdvertisePage() {
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <label className="text-[11px] font-semibold text-white/55">
-                Description <span className="font-normal text-white/30">(optional)</span>
-              </label>
-              <button type="button" onClick={applyDescTemplate} className="text-[10px] font-bold text-emerald-400">
-                \u2726 Use a template
-              </button>
-            </div>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Describe what earners need to do\u2026"
-              className="w-full resize-none rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm outline-none transition focus:border-sky-400/50"
-            />
-          </div>
-
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-[11px] font-semibold text-white/55">
                 Instructions <span className="font-normal text-white/30">(optional)</span>
               </label>
               <button type="button" onClick={applyInstrTemplate} className="text-[10px] font-bold text-emerald-400">
@@ -384,101 +330,23 @@ function AdvertisePage() {
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
-              Reward per person (USDT) <span className="text-red-400">*</span>
-            </label>
-            <input
-              value={rewardPer}
-              onChange={(e) => setRewardPer(e.target.value)}
-              inputMode="decimal"
-              placeholder={String(service.fromUsd)}
-              className="w-full rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm outline-none transition focus:border-sky-400/50"
-            />
-            <p className="mt-1.5 text-[10px] text-white/35">
-              Suggested: ${service.fromUsd.toFixed(2)} per {singularUnit}. A{" "}
-              {Math.round(PLATFORM_FEE * 100)}% platform fee is added on top.
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold text-white/55">Verification</p>
+            <p className="mt-1 text-[11px] leading-snug text-white/45">
+              {service.id === "yt_watch" || platform === "telegram" || platform === "discord"
+                ? "Automatically verified by Taskora. No screenshot is required."
+                : "Screenshot verification is required and reviewed before reward release."}
             </p>
           </div>
 
-          <div>
-            <p className="mb-2 text-[11px] font-semibold text-white/55">Proof requirements</p>
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  { id: "screenshot" as const, label: "Screenshot", Icon: Camera },
-                  { id: "text" as const, label: "Text/Comment", Icon: Type },
-                  { id: "link" as const, label: "Link/URL", Icon: Link2 },
-                ] as const
-              ).map(({ id, label, Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => toggleProof(id)}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[11px] font-bold transition active:scale-95 ${
-                    proofs.includes(id)
-                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                      : "border border-white/10 bg-white/[0.04] text-white/55"
-                  }`}
-                >
-                  <Icon className="size-3.5" />
-                  {label}
-                </button>
-              ))}
-            </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold text-white/55">Verification</p>
+            <p className="mt-1 text-[11px] leading-snug text-white/45">
+              {service.id === "yt_watch" || platform === "telegram" || platform === "discord"
+                ? "Automatically verified by Taskora. No screenshot is required."
+                : "Screenshot verification is required and reviewed before reward release."}
+            </p>
           </div>
-
-          <div>
-            <p className="mb-2 text-[11px] font-semibold text-white/55">Difficulty</p>
-            <div className="flex gap-2">
-              {(
-                [
-                  { id: "easy" as const, label: "Easy" },
-                  { id: "medium" as const, label: "Medium" },
-                  { id: "hard" as const, label: "Hard" },
-                ] as const
-              ).map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setDifficulty(d.id)}
-                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition active:scale-95 ${
-                    difficulty === d.id
-                      ? d.id === "easy"
-                        ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/60"
-                        : d.id === "medium"
-                          ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/60"
-                          : "bg-red-500/20 text-red-300 ring-1 ring-red-400/60"
-                      : "border border-white/10 bg-white/[0.04] text-white/40"
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {proofs.includes("screenshot") ? (
-            <div>
-              <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
-                Screenshots required
-              </label>
-              <select
-                value={screenshotsRequired}
-                onChange={(e) => setScreenshotsRequired(Number(e.target.value))}
-                className="w-full rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm outline-none"
-              >
-                {[1, 2, 3].map((n) => (
-                  <option key={n} value={n}>
-                    {n} screenshot{n > 1 ? "s" : ""}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1.5 text-[10px] leading-snug text-white/35">
-                Use 2\u20133 for multi-step verification. Higher numbers may slow task uptake.
-              </p>
-            </div>
-          ) : null}
         </section>
 
         <label
