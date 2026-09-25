@@ -23,8 +23,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { TASKORA_LOGO, COLORS } from "@/lib/brand";
 import {
   SERVICES,
-  PLATFORM_FEE,
-  FEATURE_FEE_USD,
   QTY_UNIT_LABEL,
   type ServiceDef,
 } from "@/lib/advertise-services";
@@ -295,9 +293,6 @@ function AdvertisePage() {
             </div>
           ) : null}
 
-          </div>
-        </section>
-
         {!isWatchService ? (
         <section
           className="mb-3 space-y-4 rounded-2xl border p-4"
@@ -397,12 +392,12 @@ function AdvertisePage() {
             <div className="flex justify-between">
               <span className="text-white/50">{service.title}</span>
               <span className="font-medium">
-                {qtyNum.toLocaleString()} {unitLabel}
+                {qtyNum.toLocaleString()} {isWatchService ? "completions" : unitLabel}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/50">Reward per person</span>
-              <span>${rewardNum.toFixed(2)}</span>
+              <span>${formatUsd(rewardNum)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/50">Earner payouts</span>
