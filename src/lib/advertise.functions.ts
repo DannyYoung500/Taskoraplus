@@ -9,7 +9,7 @@ export const listAdvertiseServices=createServerFn({method:"GET"}).handler(async(
 });
 
 export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
-.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string})=>d)
+.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number})=>d)
 .handler(async({data,context})=>{
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
   const [{data:service,error:serviceError},{data:economy,error:economyError}]=await Promise.all([
@@ -25,6 +25,8 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const minWatch=Number(economy?.youtube_watch_min_seconds??1);
   const maxWatch=Number(economy?.youtube_watch_max_seconds??7200);
   const watchSeconds=service.pricing_model==="watch_second"?Math.floor(Number(data.watchSeconds??0)):0;
+  const detectedVideoDuration=service.pricing_model==="watch_second"?Math.floor(Number(data.videoDurationSeconds??0)):0;
+  if(service.pricing_model==="watch_second"&&detectedVideoDuration>0&&watchSeconds>detectedVideoDuration) throw new Error(`Watch duration cannot exceed the detected YouTube video length (${Math.floor(detectedVideoDuration/60)}m ${detectedVideoDuration%60}s).`);
   if(service.pricing_model==="watch_second"&&(watchSeconds<minWatch||watchSeconds>maxWatch)) throw new Error(`Watch duration must be between ${minWatch} and ${maxWatch} seconds.`);
   const target=String(data.link||"").trim();
   if(!/^https?:\/\//i.test(target)) throw new Error("Enter a valid video or target URL.");
