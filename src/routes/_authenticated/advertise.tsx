@@ -128,7 +128,7 @@ function AdvertisePage() {
     };
   }, [ytId]);
 
-  const detectedMaxSeconds = videoDuration ? Math.min(videoDuration, 7200) : 7200;
+  const detectedMaxSeconds = videoDuration ? Math.min(videoDuration, 10800) : 10800;
   function setWatchDurationParts(minutes: number, seconds: number) {
     const total = Math.max(1, Math.min(detectedMaxSeconds, Math.floor(minutes) * 60 + Math.floor(seconds)));
     setWatchMinutes(Math.floor(total / 60));
@@ -230,7 +230,7 @@ function AdvertisePage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-[10px] text-white/40">Minutes</label>
-                  <input value={watchMinutes} onChange={(e) => setWatchDurationParts(Number(e.target.value) || 0, watchSeconds)} type="number" min={0} max={Math.min(120, Math.floor(detectedMaxSeconds / 60))} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+                  <input value={watchMinutes} onChange={(e) => setWatchDurationParts(Number(e.target.value) || 0, watchSeconds)} type="number" min={0} max={Math.min(180, Math.floor(detectedMaxSeconds / 60))} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[10px] text-white/40">Seconds</label>
@@ -295,7 +295,7 @@ function AdvertisePage() {
         <div className="pointer-events-none absolute -right-6 -top-6 size-28 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute -bottom-8 left-10 size-24 rounded-full bg-white/10" />
         <p className="inline-flex items-center gap-1.5 rounded-full bg-black/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white"><CheckCircle2 className="size-3" /> 100% real engagement</p>
-        <h1 className="mt-3 text-2xl font-extrabold tracking-tight">Organic Boost</h1>
+        <h1 className="mt-3 text-2xl font-extrabold tracking-tight">Advertise on Taskora</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-white/90">Real engagement from active TASKORA members. Genuine followers, likes and comments from real people.</p>
         <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/80"><Sparkles className="size-3.5" /> Powered by verified taskers</p>
       </div>
