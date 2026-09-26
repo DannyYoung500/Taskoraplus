@@ -57,3 +57,74 @@ export const ownerSetNotificationSettings = createServerFn({ method: "POST" }).m
     await audit({ adminId: context.userId, action: "telegram_notifications.update", targetType: "settings", targetId: "taskora_notification_settings", next: { hasPayoutImage: Boolean(imageUrl) } }).catch(() => undefined);
     return saved;
   });
+
+
+export const cronOpsDigest = createServerFn({ method: "POST" })
+  .handler(async () => {
+    // Auth: CRON_SECRET / TASKORA_CRON_SECRET / LOVABLE_CRON_SECRET via header
+    try {
+      const { getRequest } = await import("@tanstack/react-start/server");
+      const req = getRequest();
+      const secret =
+        process.env["CRON_SECRET"] ??
+        process.env["TASKORA_CRON_SECRET"] ??
+        process.env["LOVABLE_CRON_SECRET"] ??
+        "";
+      const hdr =
+        req?.headers?.get("x-cron-secret") ??
+        req?.headers?.get("authorization") ??
+        "";
+      const okCron =
+        Boolean(secret) &&
+        (hdr === secret || hdr === `Bearer ${secret}` || hdr.endsWith(secret));
+      if (!okCron) {
+        throw new Error("cron_auth_required");
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message === "cron_auth_required") throw e;
+      throw new Error("Cron auth failed.");
+    }
+
+    // Reuse digest builder by calling the same logic inline
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { ONLINE_MS } = await import("@/lib/locale-geo");
+    const now = Date.now();
+    const since24 = new Date(now - 86_400_000).toISOString();
+    const [profilesRes, wdRes, subRes, flagsRes] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("id, last_active_at, created_at, country_code")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabaseAdmin.from("withdrawals").select("id, amount", { count: "exact" }).eq("status", "pending"),
+      supabaseAdmin.from("submissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabaseAdmin.from("fraud_flags").select("id", { count: "exact", head: true }).eq("status", "open"),
+    ]);
+    const rows = profilesRes.data ?? [];
+    let online = 0;
+    let new24h = 0;
+    for (const p of rows) {
+      const last = (p as { last_active_at?: string | null }).last_active_at;
+      if (last) {
+        const t = new Date(last).getTime();
+        if (Number.isFinite(t) && now - t <= ONLINE_MS) online += 1;
+      }
+      const created = (p as { created_at?: string }).created_at;
+      if (created && created >= since24) new24h += 1;
+    }
+    const pendingWd = wdRes.count ?? 0;
+    const pendingAmt = (wdRes.data ?? []).reduce(
+      (s, w) => s + Number((w as { amount?: number }).amount ?? 0),
+      0,
+    );
+    const msg =
+      `📊 <b>TASKORA Cron Digest</b>\n` +
+      `Online: <b>${online}</b> · New 24h: <b>${new24h}</b>\n` +
+      `Pending WD: <b>${pendingWd}</b> ($${pendingAmt.toFixed(2)})\n` +
+      `Pending reviews: <b>${subRes.count ?? 0}</b> · Fraud: <b>${flagsRes.count ?? 0}</b>\n` +
+      `Time: ${new Date().toISOString()}`;
+    const { sendOwnerHtml } = await import("@/lib/notify-owner");
+    await sendOwnerHtml(msg);
+    return { ok: true, online, new24h, pendingWd, pendingAmt };
+  });
+
