@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap, PlayCircle } from "lucide-react";
 import { PLATFORM_META, PLATFORM_ORDER, CATEGORY_LABELS, PlatformLogo, type Platform } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
 import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
 import { SERVICES, type ServiceDef } from "@/lib/advertise-services";
-import { extractYoutubeId, youtubeWatchUrl } from "@/lib/youtube-url";
+import { extractYoutubeId, youtubeEmbedSrc, youtubeWatchUrl } from "@/lib/youtube-url";
 
 export const Route = createFileRoute("/_authenticated/advertise")({
   head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }),
@@ -67,7 +67,7 @@ function AdvertisePage() {
 
   const qtyNum = Math.max(1, Math.floor(Number(qty) || 1));
   const isWatch = service?.id === "yt_watch";
-  const watchTotalSeconds = isWatch ? Math.max(1, watchMinutes * 60 + watchSeconds) : 0;
+  const watchTotalSeconds = isWatch ? Math.max(1, Math.floor(watchMinutes) * 60 + Math.floor(watchSeconds)) : 0;
   const unitCustomer = service ? Number(service.fromUsd) * (isWatch ? watchTotalSeconds : 1) : 0;
   const total = unitCustomer * qtyNum;
   const insufficient = balance < total;
@@ -87,8 +87,8 @@ function AdvertisePage() {
       setMsg(`Quantity must be between ${service.minQty.toLocaleString()} and ${service.maxQty.toLocaleString()}.`);
       return;
     }
-    if (isWatch && (watchTotalSeconds < 1 || watchTotalSeconds > 28800)) {
-      setMsg("Watch time must be between 00:01 and 480:00.");
+    if (isWatch && (watchTotalSeconds < 1 || watchTotalSeconds > 7200)) {
+      setMsg("Watch time must be between 00:01 and 120:00.");
       return;
     }
     if (insufficient) {
@@ -142,10 +142,35 @@ function AdvertisePage() {
           </div>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Campaign title (optional)" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
           <input value={link} onChange={(e) => setLink(e.target.value)} placeholder={service.linkPlaceholder} className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+          {isWatch && ytId ? (
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+              <div className="flex items-center justify-between border-b border-white/8 px-3 py-2">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/50"><PlayCircle className="size-3.5 text-red-400" /> YouTube preview</span>
+                <span className="text-[10px] text-emerald-300">Valid video URL</span>
+              </div>
+              <div className="aspect-video w-full bg-black">
+                <iframe title="YouTube video preview" src={youtubeEmbedSrc(ytId)} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+              </div>
+              <div className="px-3 py-2 text-[10px] leading-relaxed text-white/40">Preview only. The campaign will use this exact YouTube video URL for verified watch-time tasks.</div>
+            </div>
+          ) : null}
           {isWatch ? (
-            <div className="grid grid-cols-2 gap-2">
-              <input value={watchMinutes} onChange={(e) => setWatchMinutes(Math.max(0, Number(e.target.value) || 0))} type="number" min={0} max={480} placeholder="Minutes" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none" />
-              <input value={watchSeconds} onChange={(e) => setWatchSeconds(Math.min(59, Math.max(0, Number(e.target.value) || 0)))} type="number" min={0} max={59} placeholder="Seconds" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none" />
+            <div className="rounded-2xl border border-sky-400/15 bg-sky-400/5 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-sky-200/70">Required watch time</label>
+                <span className="text-xs font-extrabold text-sky-300">{Math.floor(watchTotalSeconds / 60)}m {watchTotalSeconds % 60}s</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[10px] text-white/40">Minutes</label>
+                  <input value={watchMinutes} onChange={(e) => setWatchMinutes(Math.min(120, Math.max(0, Math.floor(Number(e.target.value) || 0))))} type="number" min={0} max={120} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] text-white/40">Seconds</label>
+                  <input value={watchSeconds} onChange={(e) => setWatchSeconds(Math.min(59, Math.max(0, Math.floor(Number(e.target.value) || 0))))} type="number" min={0} max={59} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+                </div>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-white/40">Choose any duration from 00:01 up to 120:00. The final value is charged per qualifying second.</p>
             </div>
           ) : (
             <div>
