@@ -1,34 +1,139 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Clock, CheckCircle2, Sparkles, AlertTriangle, Rocket, ShieldCheck } from "lucide-react";
-import { PLATFORM_META, PLATFORM_ORDER, CATEGORY_LABELS, PlatformLogo, type Platform } from "@/components/PlatformIcon";
-import { getDashboard } from "@/lib/taskora.functions";
-import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
-import { TASKORA_LOGO, COLORS } from "@/lib/brand";
-import { SERVICES, QTY_UNIT_LABEL, type ServiceDef } from "@/lib/advertise-services";
-import { extractYoutubeId, youtubeEmbedSrc, youtubeWatchUrl } from "@/lib/youtube-url";
+import { ArrowLeft, Clock, CheckCircle2, Sparkles } from "lucide-react";
+import {
+  PLATFORM_META,
+  PLATFORM_ORDER,
+  CATEGORY_LABELS,
+  PlatformLogo,
+  type Platform,
+} from "@/components/PlatformIcon";
+import { ownerCreateTask } from "@/lib/taskora.functions";
 
 export const Route = createFileRoute("/_authenticated/advertise")({
   head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }),
-  loader: async () => {
-    const [dashResult, servicesResult] = await Promise.allSettled([getDashboard(), listAdvertiseServices()]);
-    return {
-      balance: dashResult.status === "fulfilled" ? Number(dashResult.value?.balance ?? 0) : 0,
-      catalog: servicesResult.status === "fulfilled" ? servicesResult.value : [],
-    };
-  },
   component: AdvertisePage,
 });
 
+type ServiceDef = {
+  id: string;
+  taskType: string;
+  title: string;
+  desc: string;
+  fromUsd: number;
+  rangeLabel: string;
+  delivery: string;
+};
+
+const SERVICES: Record<Platform, ServiceDef[]> = {
+  instagram: [
+    { id: "ig_followers", taskType: "follow", title: "Instagram Followers", desc: "Real followers on your Instagram account", fromUsd: 0.75, rangeLabel: "50 – 10,000 followers", delivery: "~48h" },
+    { id: "ig_likes", taskType: "like", title: "Instagram Likes", desc: "Real likes on your Instagram post", fromUsd: 0.5, rangeLabel: "50 – 50,000 likes", delivery: "~24h" },
+    { id: "ig_comments", taskType: "comment", title: "Instagram Comments", desc: "Real comments on your Instagram post", fromUsd: 0.25, rangeLabel: "10 – 5,000 comments", delivery: "~48h" },
+    { id: "ig_views", taskType: "view", title: "Instagram Video Views", desc: "Real views on your Instagram video or reel", fromUsd: 0.5, rangeLabel: "100 – 100,000 views", delivery: "~24h" },
+  ],
+  youtube: [
+    { id: "yt_subs", taskType: "subscribe", title: "YouTube Subscribers", desc: "Real subscribers on your YouTube channel", fromUsd: 1.0, rangeLabel: "50 – 10,000 subscribers", delivery: "~72h" },
+    { id: "yt_views", taskType: "view", title: "YouTube Views", desc: "Real views on your YouTube video", fromUsd: 0.8, rangeLabel: "100 – 100,000 views", delivery: "~48h" },
+    { id: "yt_likes", taskType: "like", title: "YouTube Likes", desc: "Real likes on your YouTube video", fromUsd: 0.6, rangeLabel: "50 – 50,000 likes", delivery: "~48h" },
+    { id: "yt_comments", taskType: "comment", title: "YouTube Comments", desc: "Real comments on your YouTube video", fromUsd: 0.3, rangeLabel: "10 – 5,000 comments", delivery: "~72h" },
+  ],
+  tiktok: [
+    { id: "tt_followers", taskType: "follow", title: "TikTok Followers", desc: "Real followers on your TikTok account", fromUsd: 0.75, rangeLabel: "50 – 10,000 followers", delivery: "~48h" },
+    { id: "tt_likes", taskType: "like", title: "TikTok Likes", desc: "Real likes on your TikTok video", fromUsd: 0.4, rangeLabel: "50 – 50,000 likes", delivery: "~24h" },
+    { id: "tt_views", taskType: "view", title: "TikTok Views", desc: "Real views on your TikTok video", fromUsd: 0.5, rangeLabel: "100 – 100,000 views", delivery: "~24h" },
+    { id: "tt_comments", taskType: "comment", title: "TikTok Comments", desc: "Real comments on your TikTok video", fromUsd: 0.3, rangeLabel: "10 – 5,000 comments", delivery: "~48h" },
+  ],
+  x: [
+    { id: "x_followers", taskType: "follow", title: "X Followers", desc: "Real followers on your X account", fromUsd: 0.9, rangeLabel: "50 – 10,000 followers", delivery: "~48h" },
+    { id: "x_likes", taskType: "like", title: "X Likes", desc: "Real likes on your X post", fromUsd: 0.5, rangeLabel: "50 – 50,000 likes", delivery: "~24h" },
+    { id: "x_reposts", taskType: "repost", title: "X Reposts", desc: "Real reposts on your X post", fromUsd: 0.75, rangeLabel: "50 – 50,000 reposts", delivery: "~24h" },
+    { id: "x_comments", taskType: "comment", title: "X Comments", desc: "Real comments on your X post", fromUsd: 0.3, rangeLabel: "10 – 5,000 comments", delivery: "~48h" },
+  ],
+  facebook: [
+    { id: "fb_page", taskType: "like", title: "Facebook Page Likes", desc: "Real likes on your Facebook page", fromUsd: 0.75, rangeLabel: "50 – 10,000 likes", delivery: "~48h" },
+    { id: "fb_post", taskType: "like", title: "Facebook Post Likes", desc: "Real likes on your Facebook post", fromUsd: 0.5, rangeLabel: "50 – 50,000 likes", delivery: "~24h" },
+    { id: "fb_followers", taskType: "follow", title: "Facebook Followers", desc: "Real followers on your Facebook profile", fromUsd: 0.7, rangeLabel: "50 – 10,000 followers", delivery: "~48h" },
+    { id: "fb_comments", taskType: "comment", title: "Facebook Comments", desc: "Real comments on your Facebook post", fromUsd: 0.3, rangeLabel: "10 – 5,000 comments", delivery: "~48h" },
+  ],
+  linkedin: [
+    { id: "li_followers", taskType: "follow", title: "LinkedIn Followers", desc: "Real followers on your LinkedIn profile or company page", fromUsd: 1.25, rangeLabel: "50 – 10,000 followers", delivery: "~72h" },
+    { id: "li_likes", taskType: "like", title: "LinkedIn Post Likes", desc: "Real likes on your LinkedIn post", fromUsd: 0.75, rangeLabel: "50 – 10,000 likes", delivery: "~48h" },
+    { id: "li_comments", taskType: "comment", title: "LinkedIn Comments", desc: "Real comments on your LinkedIn post", fromUsd: 0.4, rangeLabel: "10 – 2,000 comments", delivery: "~72h" },
+  ],
+  threads: [
+    { id: "th_followers", taskType: "follow", title: "Threads Followers", desc: "Real followers on your Threads account", fromUsd: 0.75, rangeLabel: "50 – 10,000 followers", delivery: "~48h" },
+    { id: "th_likes", taskType: "like", title: "Threads Likes", desc: "Real likes on your Threads post", fromUsd: 0.5, rangeLabel: "50 – 50,000 likes", delivery: "~24h" },
+    { id: "th_reposts", taskType: "repost", title: "Threads Reposts", desc: "Real reposts on your Threads post", fromUsd: 0.6, rangeLabel: "50 – 20,000 reposts", delivery: "~48h" },
+  ],
+  telegram: [
+    { id: "tg_members", taskType: "join", title: "Telegram Channel Members", desc: "Real members for your Telegram channel", fromUsd: 0.6, rangeLabel: "50 – 10,000 members", delivery: "~48h" },
+    { id: "tg_group", taskType: "join", title: "Telegram Group Members", desc: "Real members for your Telegram group", fromUsd: 0.55, rangeLabel: "50 – 10,000 members", delivery: "~48h" },
+  ],
+  whatsapp: [
+    { id: "wa_channel", taskType: "join", title: "WhatsApp Channel Growth", desc: "Real followers for your WhatsApp channel", fromUsd: 0.7, rangeLabel: "50 – 5,000 members", delivery: "~72h" },
+    { id: "wa_group", taskType: "join", title: "WhatsApp Group Members", desc: "Real members for your WhatsApp group", fromUsd: 0.65, rangeLabel: "50 – 5,000 members", delivery: "~72h" },
+  ],
+  discord: [
+    { id: "dc_members", taskType: "join", title: "Discord Server Members", desc: "Real members for your Discord server", fromUsd: 0.7, rangeLabel: "50 – 10,000 members", delivery: "~48h" },
+    { id: "dc_boost", taskType: "join", title: "Discord Engagement", desc: "Active engagement in your server", fromUsd: 0.5, rangeLabel: "50 – 5,000 actions", delivery: "~48h" },
+  ],
+  spotify: [
+    { id: "sp_plays", taskType: "view", title: "Spotify Plays", desc: "Real plays on your Spotify track", fromUsd: 0.5, rangeLabel: "100 – 100,000 plays", delivery: "~48h" },
+    { id: "sp_followers", taskType: "follow", title: "Spotify Followers", desc: "Real followers on your Spotify profile", fromUsd: 0.7, rangeLabel: "50 – 10,000 followers", delivery: "~72h" },
+    { id: "sp_playlist", taskType: "follow", title: "Playlist Promotion", desc: "Add your track to curated playlists", fromUsd: 1.0, rangeLabel: "1 – 50 playlists", delivery: "~96h" },
+    { id: "sp_saves", taskType: "like", title: "Spotify Saves", desc: "Real saves on your Spotify track", fromUsd: 0.4, rangeLabel: "50 – 20,000 saves", delivery: "~48h" },
+  ],
+  soundcloud: [
+    { id: "sc_plays", taskType: "view", title: "SoundCloud Plays", desc: "Real plays on your SoundCloud track", fromUsd: 0.45, rangeLabel: "100 – 100,000 plays", delivery: "~48h" },
+    { id: "sc_followers", taskType: "follow", title: "SoundCloud Followers", desc: "Real followers on your SoundCloud", fromUsd: 0.6, rangeLabel: "50 – 10,000 followers", delivery: "~72h" },
+    { id: "sc_likes", taskType: "like", title: "SoundCloud Likes", desc: "Real likes on your track", fromUsd: 0.4, rangeLabel: "50 – 50,000 likes", delivery: "~48h" },
+  ],
+  audiomack: [
+    { id: "am_plays", taskType: "view", title: "Audiomack Plays", desc: "Real plays on your Audiomack track", fromUsd: 0.45, rangeLabel: "100 – 100,000 plays", delivery: "~48h" },
+    { id: "am_followers", taskType: "follow", title: "Audiomack Followers", desc: "Real followers on Audiomack", fromUsd: 0.55, rangeLabel: "50 – 10,000 followers", delivery: "~72h" },
+    { id: "am_likes", taskType: "like", title: "Audiomack Likes", desc: "Real likes on your track", fromUsd: 0.35, rangeLabel: "50 – 50,000 likes", delivery: "~48h" },
+  ],
+  app_review: [
+    { id: "ar_ios", taskType: "review", title: "iOS App Reviews", desc: "Real reviews on the App Store", fromUsd: 1.5, rangeLabel: "5 – 500 reviews", delivery: "~96h" },
+    { id: "ar_android", taskType: "review", title: "Android App Reviews", desc: "Real reviews on Google Play", fromUsd: 1.4, rangeLabel: "5 – 500 reviews", delivery: "~96h" },
+    { id: "ar_ratings", taskType: "review", title: "App Ratings", desc: "Star ratings for your mobile app", fromUsd: 1.0, rangeLabel: "10 – 1,000 ratings", delivery: "~72h" },
+  ],
+  google: [
+    { id: "gb_reviews", taskType: "review", title: "Google Business Reviews", desc: "Real Google Business reviews", fromUsd: 1.2, rangeLabel: "5 – 200 reviews", delivery: "~96h" },
+    { id: "gb_seo", taskType: "view", title: "Local SEO Boost", desc: "Visibility boost for your Google listing", fromUsd: 2.0, rangeLabel: "1 package", delivery: "~7d" },
+  ],
+  website: [
+    { id: "web_traffic", taskType: "view", title: "Website Traffic", desc: "Real visitors to your website or landing page", fromUsd: 0.3, rangeLabel: "100 – 100,000 visits", delivery: "~48h" },
+    { id: "web_signups", taskType: "join", title: "Website Sign-ups", desc: "Real user registrations on your website", fromUsd: 0.4, rangeLabel: "10 – 5,000 sign-ups", delivery: "~72h" },
+    { id: "web_clicks", taskType: "view", title: "Link Clicks", desc: "Real clicks on your link or ad", fromUsd: 0.25, rangeLabel: "50 – 50,000 clicks", delivery: "~24h" },
+  ],
+  survey: [
+    { id: "sv_responses", taskType: "join", title: "Survey Responses", desc: "Real people to complete your online survey", fromUsd: 0.5, rangeLabel: "10 – 5,000 responses", delivery: "~72h" },
+    { id: "sv_votes", taskType: "like", title: "Poll Votes", desc: "Real votes on your online poll or contest", fromUsd: 0.5, rangeLabel: "50 – 50,000 votes", delivery: "~24h" },
+  ],
+  pinterest: [
+    { id: "pin_followers", taskType: "follow", title: "Pinterest Followers", desc: "Real followers on your Pinterest account", fromUsd: 0.75, rangeLabel: "50 – 10,000 followers", delivery: "~72h" },
+    { id: "pin_saves", taskType: "like", title: "Pinterest Repins/Saves", desc: "Real saves on your Pinterest pin", fromUsd: 0.5, rangeLabel: "50 – 50,000 saves", delivery: "~48h" },
+  ],
+  reddit: [
+    { id: "rd_upvotes", taskType: "like", title: "Reddit Upvotes", desc: "Real upvotes on your Reddit post", fromUsd: 0.4, rangeLabel: "50 – 10,000 upvotes", delivery: "~48h" },
+    { id: "rd_comments", taskType: "comment", title: "Reddit Comments", desc: "Real comments on your Reddit post", fromUsd: 0.35, rangeLabel: "10 – 2,000 comments", delivery: "~72h" },
+  ],
+  twitch: [
+    { id: "tw_followers", taskType: "follow", title: "Twitch Followers", desc: "Real followers on your Twitch channel", fromUsd: 0.8, rangeLabel: "50 – 10,000 followers", delivery: "~48h" },
+    { id: "tw_views", taskType: "view", title: "Twitch Views", desc: "Real views on your Twitch stream/VOD", fromUsd: 0.55, rangeLabel: "100 – 50,000 views", delivery: "~48h" },
+    { id: "tw_chat", taskType: "comment", title: "Twitch Chat Engagement", desc: "Active chat during your stream", fromUsd: 0.6, rangeLabel: "50 – 5,000 messages", delivery: "~24h" },
+  ],
+};
+
 function AdvertisePage() {
-  const { balance, catalog } = Route.useLoaderData();
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [service, setService] = useState<ServiceDef | null>(null);
-  const [link, setLink] = useState("");
-  const [qty, setQty] = useState(50);
-  const [watchMinutes, setWatchMinutes] = useState(1);
-  const [watchSeconds, setWatchSeconds] = useState(0);
   const [title, setTitle] = useState("");
+  const [link, setLink] = useState("");
+  const [reward, setReward] = useState("");
+  const [slots, setSlots] = useState("100");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -42,195 +147,165 @@ function AdvertisePage() {
     return map;
   }, []);
 
-  function getCatalogPrice(s: ServiceDef) {
-    const row = (catalog as Array<Record<string, unknown>>).find((x) => String(x.service_id) === s.id);
-    if (!row) return s;
-    return {
-      ...s,
-      fromUsd: Number(row.customer_unit_price ?? s.fromUsd),
-      taskerUsd: Number(row.tasker_unit_reward ?? s.taskerUsd),
-      taskoraUsd: Number(row.taskora_unit_margin ?? s.taskoraUsd),
-      minQty: Number(row.min_quantity ?? s.minQty),
-      maxQty: Number(row.max_quantity ?? s.maxQty),
-    };
-  }
-
-  function formatUsd(value: number) {
-    if (Math.abs(value) < 0.01 && value !== 0) return `${value.toFixed(6)}`;
-    return `${value.toFixed(2)}`;
-  }
-
-  function openService(raw: ServiceDef) {
-    const s = getCatalogPrice(raw);
-    setService(s);
-    setQty(s.minQty);
-    setWatchMinutes(1);
-    setWatchSeconds(0);
-    setTitle("");
-    setLink("");
-    setMsg(null);
-  }
-
-  const qtyNum = Math.max(1, Number(qty) || 1);
-  const isWatchService = service?.id === "yt_watch";
-  const requiredWatchSeconds = isWatchService ? Math.max(1, watchMinutes * 60 + watchSeconds) : 0;
-  const rewardNum = service ? Number(service.taskerUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
-  const advertiserPerCompletion = service ? Number(service.fromUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
-  const taskoraPerCompletion = service ? Number(service.taskoraUsd) * (isWatchService ? requiredWatchSeconds : 1) : 0;
-  const total = advertiserPerCompletion * qtyNum;
-  const insufficient = balance < total;
-  const ytId = isWatchService ? extractYoutubeId(link) : null;
-
-  async function placeOrder() {
+  async function publish() {
     if (!platform || !service) return;
-    if (!link.trim()) {
-      setMsg(isWatchService ? "Paste a YouTube video URL." : "Target URL is required.");
-      return;
-    }
-    if (isWatchService && !ytId) {
-      setMsg("Paste a valid YouTube URL (youtube.com or youtu.be). Link only — no upload.");
-      return;
-    }
-    if (!isWatchService && !title.trim()) {
-      setMsg("Task title is required.");
-      return;
-    }
-    if (qtyNum < service.minQty || qtyNum > service.maxQty) {
-      setMsg(`Quantity must be between ${service.minQty} and ${service.maxQty}.`);
-      return;
-    }
-    if (isWatchService && (requiredWatchSeconds < 1 || requiredWatchSeconds > 28800)) {
-      setMsg("Watch time must be between 00:01 and 480:00 (8 hours).");
-      return;
-    }
     setBusy(true);
     setMsg(null);
     try {
-      const finalLink = ytId ? youtubeWatchUrl(ytId) : link.trim();
-      const result = await createAdvertiseCampaign({
+      const r = Number(reward || service.fromUsd);
+      const s = Math.max(1, Number(slots) || 100);
+      const task = await ownerCreateTask({
         data: {
-          serviceId: service.id,
-          title: isWatchService ? undefined : title.trim(),
-          link: finalLink,
-          quantity: qtyNum,
-          watchSeconds: isWatchService ? requiredWatchSeconds : undefined,
-          videoSource: isWatchService ? "external_url" : undefined,
+          platform,
+          title: title.trim() || service.title,
+          advertiser: "TASKORA",
+          reward: r,
+          slots: s,
+          steps: ["Open the target link", `Complete: ${service.taskType}`, "Return and submit proof"],
+          proof: platform === "telegram" ? "auto" : "screenshot",
+          link: link.trim() || undefined,
         },
       });
-      setMsg(`Campaign created · ${result.task.id.slice(0, 8)}… Waiting for activation.`);
+      setMsg(`Published · ${task.id.slice(0, 8)}… Live in marketplace when active.`);
       setService(null);
       setPlatform(null);
+      setTitle("");
+      setLink("");
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Order failed");
+      setMsg(e instanceof Error ? e.message : "Publish failed (owner role required)");
     } finally {
       setBusy(false);
     }
   }
 
+  // —— Service detail / order form ——
   if (platform && service) {
     const meta = PLATFORM_META[platform];
     return (
-      <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-32 pt-4 text-white" style={{ background: COLORS.bg }}>
-        <button type="button" onClick={() => setService(null)} className="mb-3 inline-flex items-center gap-1.5 text-xs text-white/50">
-          <ArrowLeft className="size-3.5" /> Back to Services
+      <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
+        <button
+          type="button"
+          onClick={() => setService(null)}
+          className="mb-3 inline-flex items-center gap-1.5 text-xs text-white/50"
+        >
+          <ArrowLeft className="size-3.5" /> Back to {meta.label}
         </button>
+
         <div className={`mb-4 overflow-hidden rounded-2xl bg-gradient-to-r ${meta.bg} p-4`}>
           <div className="flex items-center gap-3">
-            <PlatformLogo platform={platform} size={36} />
+            <PlatformLogo platform={platform} size={48} />
             <div>
-              <p className="text-base font-bold">{service.title}</p>
-              <p className="text-[11px] text-white/90">{service.desc}</p>
+              <p className="text-sm font-bold">{service.title}</p>
+              <p className="text-[11px] text-white/80">{service.desc}</p>
             </div>
           </div>
         </div>
 
-        {isWatchService ? (
-          <div className="mb-3 space-y-3 rounded-xl border border-blue-400/20 bg-blue-500/10 p-3">
-            <p className="text-sm font-black text-blue-100">Your YouTube video</p>
-            <p className="text-[10px] text-blue-100/60">Paste a YouTube link only — no upload.</p>
-            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm outline-none" />
-            <div className="overflow-hidden rounded-xl border border-blue-400/20 bg-black/40">
-              <p className="border-b border-white/10 px-3 py-1.5 text-[10px] font-bold uppercase text-blue-200/70">Live preview</p>
-              {ytId ? (
-                <div className="relative aspect-video w-full bg-black">
-                  <iframe title="YouTube preview" src={youtubeEmbedSrc(ytId)} className="absolute inset-0 h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-                </div>
-              ) : (
-                <p className="px-3 py-8 text-center text-[12px] text-white/35">Paste youtube.com or youtu.be to preview</p>
-              )}
+        <div className="space-y-3 rounded-2xl border border-white/10 bg-[#12141c] p-4">
+          <div className="flex items-center justify-between text-xs text-white/45">
+            <span className="inline-flex items-center gap-1">
+              <Clock className="size-3.5" /> {service.delivery} delivery
+            </span>
+            <span>{service.rangeLabel}</span>
+          </div>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Campaign title (optional)"
+            className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40"
+          />
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="Target URL (profile, post, video…)"
+            className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40"
+          />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/40">Reward / user</label>
+              <input
+                value={reward}
+                onChange={(e) => setReward(e.target.value)}
+                placeholder={`From $${service.fromUsd.toFixed(2)}`}
+                inputMode="decimal"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40"
+              />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <span className="text-[10px] text-slate-500">Minutes (max 480)</span>
-                <input type="number" min={0} max={480} value={watchMinutes} onChange={(e) => setWatchMinutes(Math.max(0, Math.min(480, Number(e.target.value) || 0)))} className="mt-1 w-full bg-transparent text-lg font-black outline-none" />
-              </label>
-              <label className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <span className="text-[10px] text-slate-500">Seconds</span>
-                <input type="number" min={0} max={59} value={watchSeconds} onChange={(e) => setWatchSeconds(Math.max(0, Math.min(59, Number(e.target.value) || 0)))} className="mt-1 w-full bg-transparent text-lg font-black outline-none" />
-              </label>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {[[0,30],[1,0],[2,0],[5,0],[10,0],[15,0],[30,0],[60,0],[120,0],[180,0],[240,0],[360,0],[480,0]].map(([m,s]) => (
-                <button key={`${m}:${s}`} type="button" onClick={() => { setWatchMinutes(m); setWatchSeconds(s); }} className="rounded-lg border border-blue-400/15 bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-bold text-blue-100">
-                  {String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}
-                </button>
-              ))}
-            </div>
-            <p className="text-center text-lg font-black text-blue-200">{String(Math.floor(requiredWatchSeconds / 60)).padStart(2,"0")}:{String(requiredWatchSeconds % 60).padStart(2,"0")}</p>
-            <input value={String(qty)} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} inputMode="numeric" placeholder="Completions" className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm outline-none" />
-            <div className="rounded-xl border border-blue-400/15 bg-black/15 p-3 text-xs space-y-1.5">
-              <div className="flex justify-between"><span className="text-white/50">Advertiser / completion</span><b>${formatUsd(advertiserPerCompletion)}</b></div>
-              <div className="flex justify-between"><span className="text-white/50">Worker (70%)</span><b className="text-blue-200">${formatUsd(rewardNum)}</b></div>
-              <div className="flex justify-between"><span className="text-white/50">Taskora (30%)</span><b>${formatUsd(taskoraPerCompletion)}</b></div>
-              <div className="flex justify-between border-t border-white/10 pt-2"><span>Total × {qtyNum}</span><b className="text-lg text-blue-200">${formatUsd(total)}</b></div>
+            <div className="flex-1">
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/40">Slots</label>
+              <input
+                value={slots}
+                onChange={(e) => setSlots(e.target.value)}
+                inputMode="numeric"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40"
+              />
             </div>
           </div>
-        ) : (
-          <section className="mb-3 space-y-3 rounded-2xl border p-4" style={{ background: COLORS.surface, borderColor: COLORS.border }}>
-            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder={service.linkPlaceholder} className="w-full rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm outline-none" />
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title" className="w-full rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm outline-none" />
-            <input value={String(qty)} onChange={(e) => setQty(Math.max(0, Number(e.target.value) || 0))} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm outline-none" />
-            <div className="flex flex-wrap gap-1.5">
-              {service.qtyChips.map((c) => (
-                <button key={c} type="button" onClick={() => setQty(c)} className={`rounded-lg px-3 py-2 text-xs font-bold ${qty === c ? "bg-emerald-500 text-white" : "border border-white/10 text-white/60"}`}>{c.toLocaleString()}</button>
-              ))}
-            </div>
-            <div className="text-sm space-y-1">
-              <div className="flex justify-between"><span className="text-white/50">Worker reward</span><span>${formatUsd(rewardNum)}</span></div>
-              <div className="flex justify-between font-bold"><span>Total</span><span className="text-blue-200">${formatUsd(total)}</span></div>
-            </div>
-          </section>
-        )}
-
-        {insufficient ? <p className="mb-2 text-xs text-red-300">Wallet ${balance.toFixed(2)} insufficient</p> : null}
-        <button type="button" disabled={busy || insufficient} onClick={() => void placeOrder()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 py-3.5 text-sm font-bold text-white disabled:opacity-40">
-          <Rocket className="size-4" />{busy ? "Placing…" : `Place Order · $${total.toFixed(2)}`}
-        </button>
-        {msg ? <p className="mt-2 text-center text-xs text-amber-200/90">{msg}</p> : null}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void publish()}
+            className="w-full rounded-2xl bg-gradient-to-r from-sky-400 to-blue-500 py-3.5 text-sm font-bold text-[#0a0c12] disabled:opacity-50"
+          >
+            {busy ? "Publishing…" : "Publish campaign"}
+          </button>
+          {msg ? <p className="text-center text-xs text-amber-200/90">{msg}</p> : null}
+        </div>
       </main>
     );
   }
 
+  // —— Platform services list ——
   if (platform) {
     const meta = PLATFORM_META[platform];
     const list = SERVICES[platform] ?? [];
     return (
-      <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-5 text-white" style={{ background: COLORS.bg }}>
-        <button type="button" onClick={() => setPlatform(null)} className="mb-3 inline-flex items-center gap-1.5 text-xs text-white/50"><ArrowLeft className="size-3.5" /> All Platforms</button>
-        <div className={`mb-4 rounded-2xl bg-gradient-to-r ${meta.bg} p-4`}>
+      <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
+        <button
+          type="button"
+          onClick={() => setPlatform(null)}
+          className="mb-3 inline-flex items-center gap-1.5 text-xs text-white/50"
+        >
+          <ArrowLeft className="size-3.5" /> All Platforms
+        </button>
+
+        <div className={`mb-4 overflow-hidden rounded-2xl bg-gradient-to-r ${meta.bg} p-4`}>
           <div className="flex items-center gap-3">
-            <PlatformLogo platform={platform} size={40} />
-            <div><p className="font-bold">{meta.label} Services</p><p className="text-[11px] text-white/90">{meta.blurb}</p></div>
+            <PlatformLogo platform={platform} size={52} />
+            <div>
+              <p className="text-base font-bold">{meta.label} Services</p>
+              <p className="text-[11px] text-white/85">{meta.blurb}</p>
+            </div>
           </div>
         </div>
+
+        <p className="mb-3 text-xs text-white/45">Select a service to grow your {meta.label} presence</p>
+
         <div className="space-y-2.5">
           {list.map((s) => (
-            <button key={s.id} type="button" onClick={() => openService(s)} className="flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left" style={{ background: COLORS.surface, borderColor: COLORS.border }}>
-              <PlatformLogo platform={platform} size={28} />
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                setService(s);
+                setReward(String(s.fromUsd));
+                setMsg(null);
+              }}
+              className="flex w-full items-start gap-3 rounded-2xl border border-white/8 bg-[#12141c] p-3.5 text-left transition active:scale-[0.99]"
+            >
+              <PlatformLogo platform={platform} size={40} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{s.title}</p>
-                <p className="text-[11px] text-white/45">{s.desc}</p>
-                <p className="mt-1 text-[11px] font-bold text-emerald-300">{s.id === "yt_watch" ? `${formatUsd(s.fromUsd)} / second` : `${formatUsd(s.fromUsd)} / unit`}</p>
+                <p className="mt-0.5 text-[11px] text-white/45">{s.desc}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="font-bold text-emerald-300">From ${s.fromUsd.toFixed(2)}</span>
+                  <span className="text-white/35">·</span>
+                  <span className="text-white/45">{s.rangeLabel}</span>
+                  <span className="text-white/35">·</span>
+                  <span className="inline-flex items-center gap-1 text-white/45">
+                    <Clock className="size-3" /> {s.delivery}
+                  </span>
+                </div>
               </div>
             </button>
           ))}
@@ -239,31 +314,72 @@ function AdvertisePage() {
     );
   }
 
+  // —— Platform grid (EarnIT-style) ——
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-5 text-white" style={{ background: COLORS.bg }}>
-      <div className="mb-5 rounded-3xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-5">
-        <img src={TASKORA_LOGO} alt="TASKORA" className="size-11 rounded-xl object-cover" />
-        <h1 className="mt-3 text-2xl font-extrabold">Grow with TASKORA</h1>
-        <p className="mt-1.5 text-sm text-white/90">Real engagement. Platform-matched tasks only.</p>
+    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
+      {/* Hero banner */}
+      <div className="relative mb-5 overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 p-5 shadow-lg">
+        <div className="pointer-events-none absolute -right-6 -top-6 size-28 rounded-full bg-white/10" />
+        <div className="pointer-events-none absolute -bottom-8 left-10 size-24 rounded-full bg-white/10" />
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-black/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+          <CheckCircle2 className="size-3" /> 100% real engagement
+        </p>
+        <h1 className="mt-3 text-2xl font-extrabold tracking-tight">Organic Boost</h1>
+        <p className="mt-1.5 text-sm leading-relaxed text-white/90">
+          Real engagement from active TASKORA members. Genuine followers, likes and comments from real people.
+        </p>
+        <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/80">
+          <Sparkles className="size-3.5" /> Powered by verified taskers
+        </p>
       </div>
+
       <h2 className="text-lg font-bold">Choose a platform</h2>
+      <p className="mt-0.5 text-xs text-white/45">Pick the social platform you want to grow</p>
+
       {[...grouped.entries()].map(([cat, platforms]) => (
         <section key={cat} className="mt-5">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">{CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS]}</p>
+          <div className="mb-2.5 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/40">
+              {CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS]}
+            </p>
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/40">
+              {platforms.length}
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2.5">
             {platforms.map((p) => {
               const m = PLATFORM_META[p];
               return (
-                <button key={p} type="button" onClick={() => setPlatform(p)} className="rounded-2xl border p-3.5 text-left" style={{ background: COLORS.surface, borderColor: COLORS.border }}>
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => {
+                    setPlatform(p);
+                    setMsg(null);
+                  }}
+                  className="flex flex-col items-start rounded-2xl border border-white/8 bg-[#12141c] p-3.5 text-left transition active:scale-[0.98]"
+                >
                   <PlatformLogo platform={p} size={48} />
                   <p className="mt-3 text-sm font-bold">{m.label}</p>
+                  <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-white/40">{m.blurb}</p>
+                  <span
+                    className="mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    style={{ color: m.color, backgroundColor: `${m.color}18` }}
+                  >
+                    {m.services} services
+                  </span>
                 </button>
               );
             })}
           </div>
         </section>
       ))}
-      {msg ? <p className="mt-4 text-xs text-amber-200">{msg}</p> : null}
+
+      {msg ? (
+        <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-200/90">
+          {msg}
+        </p>
+      ) : null}
     </main>
   );
 }
