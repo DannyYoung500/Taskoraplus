@@ -162,6 +162,7 @@ function AdvertisePage() {
           link: ytId ? youtubeWatchUrl(ytId) : link.trim(),
           quantity: qtyNum,
           watchSeconds: isWatch ? watchTotalSeconds : undefined,
+          videoDurationSeconds: isWatch ? videoDuration ?? undefined : undefined,
           videoSource: isWatch ? "external_url" : undefined,
         },
       });
