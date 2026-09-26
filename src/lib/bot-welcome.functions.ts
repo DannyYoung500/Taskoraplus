@@ -68,9 +68,39 @@ function normalizeButtons(raw: unknown): WelcomeButton[] {
     });
 }
 
-function personalize(text: string, username?: string | null, firstName?: string | null) {
+function personalize(
+  text: string,
+  username?: string | null,
+  firstName?: string | null,
+  inviterName?: string | null,
+) {
   const handle = username ? `@${username.replace(/^@/, "")}` : firstName || "friend";
-  return text.replace(/@username/gi, handle);
+  const displayName = firstName?.trim() || handle;
+  const inviter = inviterName?.trim() || "a friend";
+  return text
+    .replace(/@username/gi, handle)
+    .replace(/\\{\\{first_name\\}\\}/gi, displayName)
+    .replace(/\\{\\{inviter\\}\\}/gi, inviter);
+}
+
+async function getInviterName(referralCode?: string | null) {
+  const code = referralCode?.trim();
+  if (!code) return null;
+
+  const db = await admin();
+  const { data } = await db
+    .from("profiles")
+    .select("display_name, username")
+    .eq("referral_code", code)
+    .maybeSingle();
+
+  if (!data) return null;
+  return (
+    (typeof data.display_name === "string" && data.display_name.trim()) ||
+    (typeof data.username === "string" && data.username.trim()
+      ? `@${data.username.replace(/^@/, "")}`
+      : null)
+  );
 }
 
 type TgBtn =
@@ -135,6 +165,7 @@ export async function sendWelcomeToChat(opts: {
   username?: string | null;
   firstName?: string | null;
   useDraft?: boolean;
+  referralCode?: string | null;
 }) {
   const db = await admin();
   const { data } = await db.from("bot_welcome_settings").select("*").eq("id", true).maybeSingle();
@@ -167,7 +198,13 @@ export async function sendWelcomeToChat(opts: {
     }
   }
 
-  const text = personalize(message, opts.username, opts.firstName);
+  const inviterName = await getInviterName(opts.referralCode);
+  const personalizedMessage = personalize(message, opts.username, opts.firstName, inviterName);
+  const text = inviterName
+    ? personalizedMessage
+    : personalizedMessage
+        .replace(/^\s*\{\{inviter\}\}.*(?:\r?\n|$)/gim, "")
+        .replace(/\n{3,}/g, "\n\n");
   const reply_markup = buildInlineKeyboard(buttons, mini, community);
 
   if (photoFileId || photoUrl) {
@@ -379,10 +416,12 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
     return { handled: false, reason: "no_token" };
   }
   try {
+    const startPayload = text.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i)?.[1]?.trim() || null;
     await sendWelcomeToChat({
       chatId: msg.chat.id,
       username: msg.from?.username,
       firstName: msg.from?.first_name,
+      referralCode: startPayload,
       useDraft: false,
     });
     return { handled: true, reason: "welcome_sent" };
