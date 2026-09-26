@@ -1,0 +1,217 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * TASKORA — Premium Navy Blue (Telegram-native dark)
+ * Inspired by Telegram dark (#17212b) + mobile navy 2026 palettes
+ * Primary blue #3B82F6 · surfaces #0B1424 / #121F33
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-3xl: calc(var(--radius) + 20px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-navy: var(--navy);
+  --color-navy-foreground: var(--navy-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.35), 0 8px 24px oklch(0 0 0 / 0.28);
+  --shadow-raised: 0 12px 36px oklch(0 0 0 / 0.45);
+  --shadow-glow: 0 0 28px oklch(0.62 0.16 250 / 0.35);
+
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 1rem;
+
+  --background: #06152d;
+  --foreground: #f1f5f9;
+
+  --card: #0b2040;
+  --card-foreground: #f1f5f9;
+  --popover: #0b2040;
+  --popover-foreground: #f1f5f9;
+
+  /* Premium blue primary */
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+
+  --navy: #0b1424;
+  --navy-foreground: #f1f5f9;
+
+  /* Keep --gold token mapped to blue so old class names stay coherent */
+  --gold: #60a5fa;
+  --gold-foreground: #0b1424;
+
+  --secondary: #0e2b52;
+  --secondary-foreground: #e2e8f0;
+  --muted: #0e2b52;
+  --muted-foreground: #94a3b8;
+  --accent: #123d73;
+  --accent-foreground: #93c5fd;
+
+  --success: #34d399;
+  --success-foreground: #022c22;
+  --warning: #fbbf24;
+  --warning-foreground: #422006;
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
+
+  --border: rgba(59, 130, 246, 0.18);
+  --input: rgba(59, 130, 246, 0.18);
+  --ring: #60a5fa;
+
+  --gradient-brand: linear-gradient(145deg, #071a36 0%, #06152d 52%, #123d73 100%);
+  --gradient-green: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%);
+  --gradient-gold: linear-gradient(135deg, #93c5fd 0%, #3b82f6 45%, #1d4ed8 100%);
+  --gradient-sheen: linear-gradient(180deg, rgba(96, 165, 250, 0.10) 0%, rgba(96, 165, 250, 0) 100%);
+}
+
+.dark {
+  --background: #0b1424;
+  --foreground: #f1f5f9;
+  --card: #121f33;
+  --card-foreground: #f1f5f9;
+  --popover: #121f33;
+  --popover-foreground: #f1f5f9;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1a2a42;
+  --secondary-foreground: #e2e8f0;
+  --accent: #1e3a5f;
+  --accent-foreground: #93c5fd;
+  --border: rgba(148, 163, 184, 0.14);
+  --input: rgba(148, 163, 184, 0.16);
+  --ring: #3b82f6;
+}
+
+@utility bg-brand {
+  background-image: var(--gradient-brand);
+}
+
+@utility bg-green-grad {
+  background-image: var(--gradient-gold);
+}
+
+@utility bg-gold-grad {
+  background-image: var(--gradient-gold);
+}
+
+@utility shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+@utility shadow-raised {
+  box-shadow: var(--shadow-raised);
+}
+
+@utility shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+@utility card-surface {
+  background-color: var(--color-card);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    color-scheme: dark;
+    background-color: #0b1424;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  img,
+  svg {
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+
+.taskora-blue-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(37, 99, 235, 0.20), transparent 34%),
+    radial-gradient(circle at 0% 20%, rgba(14, 116, 210, 0.12), transparent 30%),
+    linear-gradient(180deg, #06152d 0%, #071a36 48%, #06152d 100%);
+}
+.taskora-blue-shell input,
+.taskora-blue-shell textarea,
+.taskora-blue-shell select {
+  border-color: rgba(59,130,246,.24) !important;
+  background-color: rgba(6,21,45,.78) !important;
+}
+.taskora-blue-shell button:not([disabled]):hover {
+  border-color: rgba(96,165,250,.42);
+}
+.taskora-blue-shell [class*="border-emerald-"],
+.taskora-blue-shell [class*="border-green-"],
+.taskora-blue-shell [class*="border-lime-"] {
+  border-color: rgba(59,130,246,.28) !important;
+}
+.taskora-blue-shell [class*="text-emerald-"],
+.taskora-blue-shell [class*="text-green-"],
+.taskora-blue-shell [class*="text-lime-"] {
+  color: #93c5fd !important;
+}
+.taskora-blue-shell [class*="bg-emerald-"],
+.taskora-blue-shell [class*="bg-green-"],
+.taskora-blue-shell [class*="bg-lime-"] {
+  background-color: rgba(37,99,235,.14) !important;
+}
