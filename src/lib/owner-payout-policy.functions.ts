@@ -111,7 +111,10 @@ export const ownerSetPayoutPresentation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
     const { setPayoutPresentation } = await import("@/lib/notify-owner");
-    const result = await setPayoutPresentation({ messageTemplate: data.message_template, imageDataUrl: data.payout_image_data_url, imageFileName: data.payout_image_file_name });
+    const presentation: { messageTemplate: string; imageDataUrl?: string; imageFileName?: string } = { messageTemplate: data.message_template };
+    if (data.payout_image_data_url) presentation.imageDataUrl = data.payout_image_data_url;
+    if (data.payout_image_file_name) presentation.imageFileName = data.payout_image_file_name;
+    const result = await setPayoutPresentation(presentation);
     await audit({ adminId: context.userId, action: "payout_proof.presentation_update", targetType: "settings", targetId: "payout_proof_settings", next: { hasImage: Boolean(result.payout_image_url), messageTemplate: result.message_template } }).catch(() => undefined);
     return result;
   });
