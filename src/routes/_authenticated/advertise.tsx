@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap, PlayCircle } from "lucide-react";
 import { PLATFORM_META, PLATFORM_ORDER, CATEGORY_LABELS, PlatformLogo, type Platform } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
@@ -28,6 +28,9 @@ function AdvertisePage() {
   const [qty, setQty] = useState(100);
   const [watchMinutes, setWatchMinutes] = useState(1);
   const [watchSeconds, setWatchSeconds] = useState(0);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const youtubePlayerRef = useRef<any>(null);
+  const youtubeHostRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -60,6 +63,7 @@ function AdvertisePage() {
     setQty(s.minQty);
     setWatchMinutes(1);
     setWatchSeconds(0);
+    setVideoDuration(null);
     setTitle("");
     setLink("");
     setMsg(null);
