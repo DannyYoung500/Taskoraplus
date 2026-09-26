@@ -79,8 +79,8 @@ function personalize(
   const inviter = inviterName?.trim() || "a friend";
   return text
     .replace(/@username/gi, handle)
-    .replace(/\\{\\{first_name\\}\\}/gi, displayName)
-    .replace(/\\{\\{inviter\\}\\}/gi, inviter);
+    .replace(/\{\{first_name\}\}/gi, displayName)
+    .replace(/\{\{inviter\}\}/gi, inviter);
 }
 
 async function getInviterName(referralCode?: string | null) {
