@@ -19,7 +19,7 @@ async function tg(method: string, body: Record<string, unknown>) {
 
 async function claim(key: string, userId?: string | null) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.from("telegram_notification_log").insert({ event_key: key, user_id: userId || null, status: "sending" } as never).select("id").maybeSingle();
+  const { data, error } = await (supabaseAdmin as any).from("telegram_notification_log").insert({ event_key: key, user_id: userId || null, status: "sending" } as never).select("id").maybeSingle();
   if (error && /duplicate|unique/i.test(error.message)) return null;
   if (error) throw new Error(error.message);
   return data?.id ?? null;
@@ -28,7 +28,7 @@ async function claim(key: string, userId?: string | null) {
 async function finish(id: string | null, status: "sent" | "failed", messageId?: number | null, error?: string) {
   if (!id) return;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  await supabaseAdmin.from("telegram_notification_log").update({ status, telegram_message_id: messageId ?? null, error_message: error?.slice(0, 500) ?? null, sent_at: status === "sent" ? new Date().toISOString() : null } as never).eq("id", id);
+  await (supabaseAdmin as any).from("telegram_notification_log").update({ status, telegram_message_id: messageId ?? null, error_message: error?.slice(0, 500) ?? null, sent_at: status === "sent" ? new Date().toISOString() : null } as never).eq("id", id);
 }
 
 async function userChatId(userId: string) {
@@ -98,7 +98,7 @@ export const notifyWithdrawalRejected = async (userId: string, row: any, reason:
 
 export async function notifyWithdrawalPaid(userId: string, row: any) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: settings } = await supabaseAdmin.from("taskora_notification_settings").select("payout_image_url,payout_message_template").eq("id", true).maybeSingle();
+  const { data: settings } = await (supabaseAdmin as any).from("taskora_notification_settings").select("payout_image_url,payout_message_template").eq("id", true).maybeSingle();
   const tx = String(row.tx_hash ?? "");
   const text = String(settings?.payout_message_template || "✅ <b>Payout Successful!</b>\\n\\n💰 Amount: #amount USDT\\n📍 Network: #method\\n🧾 Ref: #reference\\n\\n🎉 Payment completed successfully.\\n🕐 Time: #time")
     .replaceAll("#amount", Number(row.amount ?? 0).toFixed(2)).replaceAll("#method", esc(row.method || "USDT"))

@@ -29,7 +29,7 @@ export const ownerSetPayoutPolicy = createServerFn({ method: "POST" }).middlewar
 export const ownerGetNotificationSettings = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   await assertOwner(context.userId);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.from("taskora_notification_settings").select("*").eq("id", true).maybeSingle();
+  const { data, error } = await (supabaseAdmin as any).from("taskora_notification_settings").select("*").eq("id", true).maybeSingle();
   if (error) throw new Error(error.message);
   return data;
 });
@@ -52,7 +52,7 @@ export const ownerSetNotificationSettings = createServerFn({ method: "POST" }).m
     }
     const next: Record<string, unknown> = { payout_message_template: String(data.payout_message_template || "").slice(0, 3800), updated_at: new Date().toISOString() };
     if (imageUrl) { next.payout_image_url = imageUrl; next.payout_image_file_name = String(data.payout_image_file_name || "payout-image").slice(0, 120); }
-    const { data: saved, error } = await supabaseAdmin.from("taskora_notification_settings").upsert({ id: true, ...next }, { onConflict: "id" }).select("*").single();
+    const { data: saved, error } = await (supabaseAdmin as any).from("taskora_notification_settings").upsert({ id: true, ...next }, { onConflict: "id" }).select("*").single();
     if (error) throw new Error(error.message);
     await audit({ adminId: context.userId, action: "telegram_notifications.update", targetType: "settings", targetId: "taskora_notification_settings", next: { hasPayoutImage: Boolean(imageUrl) } }).catch(() => undefined);
     return saved;
