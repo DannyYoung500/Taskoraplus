@@ -5,8 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * TASKORA design system — navy / cyan enterprise
- * Telegram Mini App native · clean · dense · consistent
+ * TASKORA — Premium Navy Blue (Telegram-native dark)
+ * Inspired by Telegram dark (#17212b) + mobile navy 2026 palettes
+ * Primary blue #3B82F6 · surfaces #0B1424 / #121F33
  */
 
 @theme inline {
@@ -47,7 +48,7 @@
 
   --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.35), 0 8px 24px oklch(0 0 0 / 0.28);
   --shadow-raised: 0 12px 36px oklch(0 0 0 / 0.45);
-  --shadow-glow: 0 0 28px oklch(0.7 0.12 230 / 0.22);
+  --shadow-glow: 0 0 28px oklch(0.62 0.16 250 / 0.35);
 
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
@@ -55,68 +56,65 @@
 :root {
   --radius: 1rem;
 
-  /* Navy / cyan enterprise (Mini App) */
-  --background: oklch(0.11 0.025 255);
-  --foreground: oklch(0.97 0.005 240);
+  --background: #06152d;
+  --foreground: #f1f5f9;
 
-  --card: oklch(0.16 0.03 255);
-  --card-foreground: oklch(0.97 0.005 240);
-  --popover: oklch(0.16 0.03 255);
-  --popover-foreground: oklch(0.97 0.005 240);
+  --card: #0b2040;
+  --card-foreground: #f1f5f9;
+  --popover: #0b2040;
+  --popover-foreground: #f1f5f9;
 
-  /* Cyan-blue primary */
-  --primary: oklch(0.72 0.14 230);
-  --primary-foreground: oklch(0.14 0.03 255);
+  /* Premium blue primary */
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
 
-  --navy: oklch(0.14 0.03 255);
-  --navy-foreground: oklch(0.97 0.005 240);
+  --navy: #0b1424;
+  --navy-foreground: #f1f5f9;
 
-  /* Gold aliased to cyan for legacy class names */
-  --gold: oklch(0.72 0.14 230);
-  --gold-foreground: oklch(0.14 0.03 255);
+  /* Keep --gold token mapped to blue so old class names stay coherent */
+  --gold: #60a5fa;
+  --gold-foreground: #0b1424;
 
-  --secondary: oklch(0.2 0.03 255);
-  --secondary-foreground: oklch(0.92 0.01 240);
-  --muted: oklch(0.2 0.03 255);
-  --muted-foreground: oklch(0.68 0.02 250);
-  --accent: oklch(0.28 0.06 230);
-  --accent-foreground: oklch(0.9 0.06 230);
+  --secondary: #0e2b52;
+  --secondary-foreground: #e2e8f0;
+  --muted: #0e2b52;
+  --muted-foreground: #94a3b8;
+  --accent: #123d73;
+  --accent-foreground: #93c5fd;
 
-  --success: oklch(0.72 0.15 150);
-  --success-foreground: oklch(0.16 0.03 150);
-  --warning: oklch(0.8 0.14 78);
-  --warning-foreground: oklch(0.22 0.05 70);
-  --destructive: oklch(0.62 0.2 25);
-  --destructive-foreground: oklch(0.98 0.01 20);
+  --success: #34d399;
+  --success-foreground: #022c22;
+  --warning: #fbbf24;
+  --warning-foreground: #422006;
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
 
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.72 0.14 230);
+  --border: rgba(59, 130, 246, 0.18);
+  --input: rgba(59, 130, 246, 0.18);
+  --ring: #60a5fa;
 
-  --gradient-brand: linear-gradient(145deg, oklch(0.16 0.04 255) 0%, oklch(0.12 0.03 255) 55%, oklch(0.28 0.08 230) 100%);
-  --gradient-green: linear-gradient(135deg, #93c5fd 0%, #3b82f6 45%, #1d4ed8 100%);
+  --gradient-brand: linear-gradient(145deg, #071a36 0%, #06152d 52%, #123d73 100%);
+  --gradient-green: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%);
   --gradient-gold: linear-gradient(135deg, #93c5fd 0%, #3b82f6 45%, #1d4ed8 100%);
-  --gradient-sheen: linear-gradient(180deg, oklch(1 0 0 / 0.08) 0%, oklch(1 0 0 / 0) 100%);
+  --gradient-sheen: linear-gradient(180deg, rgba(96, 165, 250, 0.10) 0%, rgba(96, 165, 250, 0) 100%);
 }
 
 .dark {
-  --background: oklch(0.11 0.025 255);
-  --foreground: oklch(0.97 0.005 240);
-  --card: oklch(0.16 0.03 255);
-  --card-foreground: oklch(0.97 0.005 240);
-  --popover: oklch(0.16 0.03 255);
-  --popover-foreground: oklch(0.97 0.005 240);
-  --primary: oklch(0.72 0.14 230);
-  --primary-foreground: oklch(0.14 0.03 255);
-  --secondary: oklch(0.2 0.03 255);
-  --secondary-foreground: oklch(0.92 0.01 240);
-  --muted: oklch(0.2 0.03 255);
-  --muted-foreground: oklch(0.68 0.02 250);
-  --accent: oklch(0.28 0.06 230);
-  --accent-foreground: oklch(0.9 0.06 230);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.72 0.14 230);
+  --background: #0b1424;
+  --foreground: #f1f5f9;
+  --card: #121f33;
+  --card-foreground: #f1f5f9;
+  --popover: #121f33;
+  --popover-foreground: #f1f5f9;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1a2a42;
+  --secondary-foreground: #e2e8f0;
+  --accent: #1e3a5f;
+  --accent-foreground: #93c5fd;
+  --border: rgba(148, 163, 184, 0.14);
+  --input: rgba(148, 163, 184, 0.16);
+  --ring: #3b82f6;
 }
 
 @utility bg-brand {
@@ -145,7 +143,7 @@
 
 @utility card-surface {
   background-color: var(--color-card);
-  border: 1px solid oklch(1 0 0 / 8%);
+  border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-soft);
 }
@@ -153,43 +151,67 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   html {
     -webkit-tap-highlight-color: transparent;
     color-scheme: dark;
+    background-color: #0b1424;
   }
 
   body {
-    background-color: #030814;
+    background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
   }
+
+  img,
+  svg {
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
-/* Shared page chrome — keeps every screen aligned */
-.tk-page {
-  margin-left: auto;
-  margin-right: auto;
-  min-height: 100vh;
-  width: 100%;
-  max-width: 28rem;
-  overflow-x: hidden;
-  background-color: #030814;
-  padding: 0.75rem 0.875rem 7rem;
-  color: #fff;
-}
 
-.tk-card {
-  border-radius: 1rem;
-  border: 1px solid rgba(56, 189, 248, 0.12);
-  background-color: #0b1628;
+.taskora-blue-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(37, 99, 235, 0.20), transparent 34%),
+    radial-gradient(circle at 0% 20%, rgba(14, 116, 210, 0.12), transparent 30%),
+    linear-gradient(180deg, #06152d 0%, #071a36 48%, #06152d 100%);
 }
-
-.tk-chip-active {
-  background-image: linear-gradient(135deg, #93c5fd, #3b82f6, #1d4ed8);
-  color: #04101c;
-  font-weight: 800;
+.taskora-blue-shell input,
+.taskora-blue-shell textarea,
+.taskora-blue-shell select {
+  border-color: rgba(59,130,246,.24) !important;
+  background-color: rgba(6,21,45,.78) !important;
+}
+.taskora-blue-shell button:not([disabled]):hover {
+  border-color: rgba(96,165,250,.42);
+}
+.taskora-blue-shell [class*="border-emerald-"],
+.taskora-blue-shell [class*="border-green-"],
+.taskora-blue-shell [class*="border-lime-"] {
+  border-color: rgba(59,130,246,.28) !important;
+}
+.taskora-blue-shell [class*="text-emerald-"],
+.taskora-blue-shell [class*="text-green-"],
+.taskora-blue-shell [class*="text-lime-"] {
+  color: #93c5fd !important;
+}
+.taskora-blue-shell [class*="bg-emerald-"],
+.taskora-blue-shell [class*="bg-green-"],
+.taskora-blue-shell [class*="bg-lime-"] {
+  background-color: rgba(37,99,235,.14) !important;
 }

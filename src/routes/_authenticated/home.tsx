@@ -10,46 +10,24 @@ import {
   ChevronRight,
   CalendarCheck,
   WalletCards,
-  Gamepad2,
   Flame,
   Star,
   Trophy,
 } from "lucide-react";
 import { listTasks, getDashboard, dailyCheckin } from "@/lib/taskora.functions";
-import { getPublicPlatformStats } from "@/lib/strong-wave.functions";
-import { countActiveAnnouncements } from "@/lib/announcements.functions";
-import { getPublicFeatures, getDailyQuestProgress, type DailyTaskDef } from "@/lib/owner-economy.functions";
-import { touchPresence } from "@/lib/presence.functions";
-import { claimDailyQuest } from "@/lib/quests.functions";
-import { hapticSuccess, hapticError, hapticLight } from "@/lib/telegram-native";
-import { PlatformIcon, PlatformLogo, type Platform } from "@/components/PlatformIcon";
-import { GameBrandRow } from "@/components/GameIcon";
+import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
 
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
-    const [tasks, dash, features, questProgress, notifCount, , stats] = await Promise.all([
+    const [tasks, dash] = await Promise.all([
       listTasks().catch(() => []),
       getDashboard().catch(() => null),
-      getPublicFeatures().catch(() => ({
-        games_enabled: false,
-        daily_tasks: [] as DailyTaskDef[],
-        daily_checkin_points: 25,
-        referral_points: 100,
-      })),
-      getDailyQuestProgress().catch(() => [] as { id: string; done: number; target: number; pct: number; complete: boolean }[]),
-      countActiveAnnouncements().catch(() => 0),
-      touchPresence().catch(() => null),
-      getPublicPlatformStats().catch(() => ({ verifiedToday: 0, paidWeekUsd: 0 })),
     ]);
     return {
       tasks: tasks.filter((task) => !isDemoTaskTitle(task.title)).slice(0, 8),
       dash,
-      features,
-      questProgress,
-      notifCount: Number(notifCount ?? 0),
-      stats: stats ?? { verifiedToday: 0, paidWeekUsd: 0 },
     };
   },
   component: HomePage,
@@ -65,10 +43,7 @@ function levelFromPoints(points: number) {
 }
 
 function HomePage() {
-  const { tasks, dash, features, questProgress, notifCount, stats } = Route.useLoaderData();
-  const progressMap = new Map((questProgress ?? []).map((p) => [p.id, p]));
-  const gamesOn = Boolean(features?.games_enabled);
-  const dailyQuests = (features?.daily_tasks ?? []).filter((d) => d.enabled !== false);
+  const { tasks, dash } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
   const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
   const balance = rawBalance <= 0.00005 ? 0 : Math.max(0, rawBalance);
@@ -105,49 +80,21 @@ function HomePage() {
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [displayTaskPoints, setDisplayTaskPoints] = useState(taskPoints);
   const [checkBusy, setCheckBusy] = useState(false);
-  const [claimedQuests, setClaimedQuests] = useState<Record<string, boolean>>({});
-  const [claimBusy, setClaimBusy] = useState<string | null>(null);
-
-  async function handleClaimQuest(questId: string) {
-    setClaimBusy(questId);
-    try {
-      const r = await claimDailyQuest({ data: { questId } });
-      setClaimedQuests((prev) => ({ ...prev, [questId]: true }));
-      if (!r.already && Number(r.taskPoints ?? 0) > 0) {
-        setDisplayTaskPoints(Number(r.taskPointTotal ?? 0) || (displayTaskPoints + Number(r.taskPoints)));
-      }
-      try { hapticSuccess(); } catch { /* optional */ }
-    } catch (e) {
-      setCheckMsg(e instanceof Error ? e.message : "Claim failed");
-      try { hapticError(); } catch { /* optional */ }
-    } finally {
-      setClaimBusy(null);
-    }
-  }
 
   async function onCheckin() {
     setCheckBusy(true);
     setCheckMsg(null);
-    hapticLight();
     try {
       const r = await dailyCheckin();
       if (!r.already) {
         setDisplayTaskPoints(Number(r.taskPointTotal ?? displayTaskPoints + Number(r.taskPoints ?? 0)));
-        hapticSuccess();
-        const bonus = Number((r as { streakBonus?: number }).streakBonus ?? 0);
-        const nextIn = Number((r as { nextBonusIn?: number }).nextBonusIn ?? 7);
-        const bonusNote =
-          bonus > 0
-            ? ` · +${bonus} streak bonus!`
-            : nextIn > 0
-              ? ` · ${nextIn}d to streak bonus`
-              : "";
-        setCheckMsg(`Day ${r.streak} · +${r.taskPoints ?? 0} Task Points${bonusNote}`);
-      } else {
-        setCheckMsg(`Already checked in · streak ${r.streak}`);
       }
+      setCheckMsg(
+        r.already
+          ? `Already checked in · streak ${r.streak}`
+          : `Day ${r.streak} · +${r.taskPoints ?? 0} Task Points`,
+      );
     } catch (e) {
-      hapticError();
       setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
     } finally {
       setCheckBusy(false);
@@ -183,11 +130,6 @@ function HomePage() {
           className="relative rounded-full border border-cyan-400/20 bg-[#0b1628] p-2.5 text-slate-300"
         >
           <Bell className="size-4" />
-          {notifCount > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[8px] font-black text-white">
-              {notifCount > 9 ? "9+" : notifCount}
-            </span>
-          ) : null}
         </Link>
         <Link
           to="/profile"
@@ -261,23 +203,18 @@ function HomePage() {
         <Quick to="/tasks" label="Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
         <Quick to="/watch-earn" label="Watch & Earn" sub="Watch Videos" Icon={PlayCircle} />
         <Quick to="/advertise" label="Advertise" sub="Campaigns" Icon={Megaphone} />
-        <Quick to="/ambassador" label="Invite & Earn" sub="Task Points" Icon={Users} />
         <Quick to="/leaderboard" label="Rank" sub="Leaderboard" Icon={Trophy} />
+        <Quick to="/ambassador" label="Invite & Earn" sub="Task Points" Icon={Users} />
       </section>
-      <p className="mb-3.5 rounded-2xl border border-cyan-400/15 bg-[#0b1628] px-3 py-2 text-center text-[10px] text-slate-400">
-        <span className="font-bold text-cyan-200">{Number(stats?.verifiedToday ?? 0)}</span> verified today
-        <span className="mx-1.5 text-slate-600">·</span>
-        <span className="font-bold text-emerald-300">${Number(stats?.paidWeekUsd ?? 0).toFixed(2)}</span> paid this week
-      </p>
 
-      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-cyan-400/25 bg-gradient-to-r from-[#0c1a30] via-[#0a1528] to-[#07101f] p-3.5">
+      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-amber-400/35 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
         <div className="flex items-center gap-3">
-          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/15 text-cyan-200">
-            <Star className="size-6 fill-cyan-300 text-cyan-300" />
+          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-amber-300/40 bg-amber-400/15 text-amber-200">
+            <Star className="size-6 fill-amber-300 text-amber-300" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-black">Task Points</p>
-            <p className="text-2xl font-black text-cyan-200">{displayTaskPoints.toLocaleString()}</p>
+            <p className="text-2xl font-black text-amber-200">{displayTaskPoints.toLocaleString()}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] font-semibold text-slate-400">Next Level</p>
@@ -291,14 +228,13 @@ function HomePage() {
               />
             </div>
           </div>
-          <Link
-            to="/leaderboard"
-            className="flex flex-col items-center rounded-xl border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1.5 text-center"
-          >
-            <Trophy className="size-4 text-cyan-200" />
-            <p className="mt-0.5 text-[9px] font-bold text-cyan-200">Lv {levelNum}</p>
+          <div className="text-center">
+            <span className="inline-flex size-9 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
+              <Flame className="size-4" />
+            </span>
+            <p className="mt-1 text-[9px] font-bold text-cyan-200">Level {levelNum}</p>
             <p className="text-[8px] text-slate-500">{levelLabel}</p>
-          </Link>
+          </div>
         </div>
       </section>
 
@@ -314,19 +250,8 @@ function HomePage() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Daily check-in</p>
           <p className="truncate text-[11px] text-slate-400">
-            {checkMsg ?? `Streak ${streak}d · day ${(streak % 7) || (streak > 0 ? 7 : 0)}/7 to +50 bonus`}
+            {checkMsg ?? `Streak ${streak}d · claim Task Points`}
           </p>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
-              style={{
-                width: `${Math.min(
-                  100,
-                  (((streak % 7) || (streak > 0 && streak % 7 === 0 ? 7 : 0)) / 7) * 100,
-                )}%`,
-              }}
-            />
-          </div>
         </div>
         <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-[10px] font-black text-cyan-300">
           {checkBusy ? "…" : "Claim"}
@@ -345,80 +270,18 @@ function HomePage() {
             View All →
           </Link>
         </div>
-        {dailyQuests.length === 0 ? (
-          <p className="rounded-2xl border border-white/8 bg-[#0b1628] p-4 text-center text-[12px] text-slate-400">
-            No daily quests yet. Owner publishes them from Command Center → Economy.
-          </p>
-        ) : (
-          <div className={`grid gap-2 ${dailyQuests.length >= 3 ? "grid-cols-3" : dailyQuests.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-            {dailyQuests.map((q) => {
-              const to =
-                q.action === "watch"
-                  ? "/watch-earn"
-                  : q.action === "invite"
-                    ? "/ambassador"
-                    : "/tasks";
-              const Icon =
-                q.action === "watch" ? PlayCircle : q.action === "invite" ? Users : ClipboardCheck;
-              const reward =
-                q.task_points > 0
-                  ? `+${q.task_points} TP`
-                  : q.reward_usdt > 0
-                    ? `+$${Number(q.reward_usdt).toFixed(4)}`
-                    : "Quest";
-              const prog = progressMap.get(q.id);
-              const done = prog?.done ?? 0;
-              const target = prog?.target ?? q.target_count;
-              const pct = prog?.pct ?? 0;
-              const complete = Boolean(prog?.complete) || done >= target;
-              const claimed = claimedQuests[q.id];
-              return (
-                <DailyCard
-                  key={q.id}
-                  to={to}
-                  title={q.title}
-                  reward={reward}
-                  progress={`${done}/${target}`}
-                  pct={pct}
-                  Icon={Icon}
-                  complete={complete}
-                  claimed={Boolean(claimed)}
-                  claimBusy={claimBusy === q.id}
-                  onClaim={() => void handleClaimQuest(q.id)}
-                />
-              );
-            })}
-          </div>
-        )}
+        <div className="grid grid-cols-3 gap-2">
+          <DailyCard to="/tasks" title="Complete 3 Tasks" reward="+100 TP" progress={`${taskProgress}/3`} pct={(taskProgress / 3) * 100} Icon={ClipboardCheck} />
+          <DailyCard to="/watch-earn" title="Watch 5 Videos" reward="+50 TP" progress="0/5" pct={0} Icon={PlayCircle} />
+          <DailyCard to="/ambassador" title="Invite 1 Friend" reward="+200 TP" progress="0/1" pct={0} Icon={Users} />
+        </div>
       </section>
-
-      {gamesOn ? (
-        <section className="mb-3.5 overflow-hidden rounded-[20px] border border-cyan-400/25 bg-gradient-to-r from-[#0c1a30] to-[#07101f] p-3.5">
-          <div className="mb-3 flex items-center gap-3">
-            <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-              <Gamepad2 className="size-6" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="rounded bg-cyan-400 px-1.5 py-0.5 text-[8px] font-black text-[#04101c]">
-                  NEW
-                </span>
-                <p className="text-sm font-black">Taskora Games</p>
-              </div>
-              <p className="mt-0.5 text-[10px] text-slate-400">
-                Supported titles · rewards from real Task Points & ledger only.
-              </p>
-            </div>
-          </div>
-          <GameBrandRow size={42} />
-        </section>
-      ) : null}
 
       <section>
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="flex items-center gap-1.5 text-sm font-black">
-              <Flame className="size-4 text-cyan-300" /> Top Tasks
+              <Flame className="size-4 text-orange-300" /> Top Tasks
             </h2>
             <p className="text-[10px] text-slate-500">High earning tasks, complete now!</p>
           </div>
@@ -443,7 +306,7 @@ function HomePage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold">{t.title}</p>
                   <p className="text-[10px] text-slate-500">
-                    {t.platform} · +{formatUsd(Number(t.reward))}
+                    {platformLabel(t.platform as Platform)} · +{formatUsd(t.reward)}
                   </p>
                 </div>
                 <span
@@ -506,10 +369,6 @@ function DailyCard({
   progress,
   pct,
   Icon,
-  complete,
-  claimed,
-  claimBusy,
-  onClaim,
 }: {
   to: string;
   title: string;
@@ -517,41 +376,18 @@ function DailyCard({
   progress: string;
   pct: number;
   Icon: ComponentType<{ className?: string }>;
-  complete?: boolean;
-  claimed?: boolean;
-  claimBusy?: boolean;
-  onClaim?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-blue-400/15 bg-[#0b1628] p-2.5">
-      <Link to={to} className="block active:scale-[0.98]">
-        <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/15 text-cyan-300">
-          <Icon className="size-4" />
-        </span>
-        <p className="mt-2 text-[11px] font-bold leading-tight">{title}</p>
-        <p className="mt-0.5 text-[10px] font-black text-cyan-300">{reward}</p>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.min(100, pct)}%` }} />
-        </div>
-        <p className="mt-1 text-[9px] text-slate-500">{progress}</p>
-      </Link>
-      {complete ? (
-        <button
-          type="button"
-          disabled={claimed || claimBusy}
-          onClick={(e) => {
-            e.preventDefault();
-            onClaim?.();
-          }}
-          className={`mt-2 w-full rounded-lg py-1.5 text-[10px] font-black ${
-            claimed
-              ? "bg-emerald-500/15 text-emerald-300"
-              : "bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
-          } disabled:opacity-60`}
-        >
-          {claimed ? "Claimed" : claimBusy ? "…" : "Claim"}
-        </button>
-      ) : null}
-    </div>
+    <Link to={to} className="rounded-2xl border border-blue-400/15 bg-[#0b1628] p-2.5 active:scale-[0.98]">
+      <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/15 text-cyan-300">
+        <Icon className="size-4" />
+      </span>
+      <p className="mt-2 text-[11px] font-bold leading-tight">{title}</p>
+      <p className="mt-0.5 text-[10px] font-black text-cyan-300">{reward}</p>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.min(100, pct)}%` }} />
+      </div>
+      <p className="mt-1 text-[9px] text-slate-500">{progress}</p>
+    </Link>
   );
 }
