@@ -1,82 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { OwnerShell } from "@/components/OwnerShell";
-import { ownerGetPayoutPolicy, ownerSetPayoutPolicy, ownerGetPayoutChannel, ownerSetPayoutChannel } from "@/lib/owner-payout-policy.functions";
-
-export const Route=createFileRoute("/_authenticated/owner/payout-policy")({
-  loader:async()=>{
-    try{
-      const [policy,channel]=await Promise.all([ownerGetPayoutPolicy(),ownerGetPayoutChannel().catch(()=>({channel_id:""}))]);
-      return {policy,channelId:channel.channel_id??"",error:null as string|null};
-    }catch(e){
-      return {policy:null as Awaited<ReturnType<typeof ownerGetPayoutPolicy>>|null,channelId:"",error:e instanceof Error?e.message:"Owner required"};
-    }
-  },
-  component:PayoutPolicyPage,
-});
-
+import { ownerGetPayoutPolicy, ownerSetPayoutPolicy, ownerGetPayoutChannel, ownerSetPayoutChannel, ownerRefreshPayoutChannel, ownerSetPayoutPresentation } from "@/lib/owner-payout-policy.functions";
+const DEFAULT_TEMPLATE="✅ <b>PAYOUT COMPLETE</b>\\n\\nAmount: <b>#amount</b> USDT\\nNetwork: #method\\nUser: #name\\nUsername: #username\\nTo: <code>#address</code>\\nTx: <code>#tx_hash</code>\\nRef: <code>#reference</code>\\nTime: #time";
+export const Route=createFileRoute("/_authenticated/owner/payout-policy")({loader:async()=>{try{const [policy,channel]=await Promise.all([ownerGetPayoutPolicy(),ownerGetPayoutChannel().catch(()=>({channel_id:"",message_template:DEFAULT_TEMPLATE}))]);return{policy,channel,error:null as string|null};}catch(e){return{policy:null,channel:null,error:e instanceof Error?e.message:"Owner required"};}},component:PayoutPolicyPage});
 function PayoutPolicyPage(){
-  const initial=Route.useLoaderData();
-  const [policy,setPolicy]=useState(initial.policy);
-  const [channelId,setChannelId]=useState(initial.channelId);
-  const [msg,setMsg]=useState(initial.error);
-  const [busy,setBusy]=useState(false);
-  const [channelBusy,setChannelBusy]=useState(false);
-  const [deny,setDeny]=useState((initial.policy?.country_deny??[]).join(","));
-  const [allow,setAllow]=useState((initial.policy?.country_allow??[]).join(","));
-
-  if(!policy)return <OwnerShell><main className="mx-auto w-full max-w-[1180px] px-4 py-6 text-white"><h1 className="text-xl font-bold">Payout policy</h1><p className="mt-2 text-sm text-amber-200">{msg??"Load failed"}</p></main></OwnerShell>;
-
-  async function save(){
-    setBusy(true);setMsg(null);
-    try{
-      const r=await ownerSetPayoutPolicy({data:{
-        risk_force_dual:Number(policy.risk_force_dual),
-        risk_auto_freeze:Number(policy.risk_auto_freeze),
-        max_withdrawals_per_day:Number(policy.max_withdrawals_per_day),
-        country_deny:deny.split(/[,\s]+/).map(s=>s.trim()).filter(Boolean),
-        country_allow:allow.split(/[,\s]+/).map(s=>s.trim()).filter(Boolean),
-      }});
-      setPolicy(r.policy);setMsg("Policy saved.");
-    }catch(e){setMsg(e instanceof Error?e.message:"Save failed.");}finally{setBusy(false);}
-  }
-  async function saveChannel(){
-    setChannelBusy(true);setMsg(null);
-    try{
-      const r=await ownerSetPayoutChannel({data:{channel_id:channelId.trim()}});
-      setChannelId(r.channel_id??"");setMsg(r.channel_id?"Payment channel saved. Every paid withdrawal will post proof there.":"Payment channel cleared.");
-    }catch(e){setMsg(e instanceof Error?e.message:"Channel save failed.");}finally{setChannelBusy(false);}
-  }
-
-  return <OwnerShell><main className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 text-white">
-    <h1 className="text-xl font-bold">Payout policy</h1>
-    <p className="mt-1 text-xs text-white/45">Risk thresholds · daily WD cap · country allow/deny · public payment channel proof.</p>
-    {msg?<p className="mt-3 text-xs text-amber-200">{msg}</p>:null}
-    <section className="mt-5 rounded-2xl border border-blue-400/25 bg-[#0b1d36] p-4">
-      <h2 className="text-sm font-semibold text-blue-200">Payment channel (payout proof)</h2>
-      <p className="mt-1 text-[11px] text-white/45">Every time you mark a withdrawal Paid, TASKORA posts a public proof message here. Bot must be admin of the channel.</p>
-      <label className="mt-3 block text-[11px] text-white/50">Channel ID or @username
-        <input value={channelId} onChange={e=>setChannelId(e.target.value)} placeholder="-100xxxxxxxxxx or @YourPaymentChannel" className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm font-mono"/>
-      </label>
-      <button type="button" disabled={channelBusy} onClick={()=>void saveChannel()} className="mt-3 w-full rounded-xl border border-blue-400/40 bg-blue-500/15 py-2.5 text-sm font-semibold text-blue-100 disabled:opacity-50">{channelBusy?"Saving…":"Save payment channel"}</button>
-    </section>
-    <div className="mt-5 space-y-3">
-      <label className="block text-[11px] text-white/50">Force dual-approval at risk ≥
-        <input type="number" min={0} max={100} value={policy.risk_force_dual} onChange={e=>setPolicy({...policy,risk_force_dual:Number(e.target.value)})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/>
-      </label>
-      <label className="block text-[11px] text-white/50">Auto-freeze at risk ≥ (0 = off)
-        <input type="number" min={0} max={100} value={policy.risk_auto_freeze} onChange={e=>setPolicy({...policy,risk_auto_freeze:Number(e.target.value)})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/>
-      </label>
-      <label className="block text-[11px] text-white/50">Max WD requests / 24h
-        <input type="number" min={1} max={20} value={policy.max_withdrawals_per_day} onChange={e=>setPolicy({...policy,max_withdrawals_per_day:Number(e.target.value)})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/>
-      </label>
-      <label className="block text-[11px] text-white/50">Country deny (ISO, comma-separated)
-        <input value={deny} onChange={e=>setDeny(e.target.value)} placeholder="e.g. XX, YY" className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/>
-      </label>
-      <label className="block text-[11px] text-white/50">Country allow only (empty = all)
-        <input value={allow} onChange={e=>setAllow(e.target.value)} placeholder="e.g. NG, GH, KE" className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/>
-      </label>
-      <button type="button" disabled={busy} onClick={()=>void save()} className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-sky-500 py-3 text-sm font-bold disabled:opacity-50">{busy?"Saving…":"Save policy"}</button>
-    </div>
-  </main></OwnerShell>;
+ const initial=Route.useLoaderData(); const [policy,setPolicy]=useState(initial.policy); const [channel,setChannel]=useState(initial.channel); const [channelId,setChannelId]=useState(initial.channel?.channel_id??""); const [template,setTemplate]=useState(initial.channel?.message_template??DEFAULT_TEMPLATE); const [msg,setMsg]=useState(initial.error); const [busy,setBusy]=useState(false); const [channelBusy,setChannelBusy]=useState(false); const [presentationBusy,setPresentationBusy]=useState(false); const [deny,setDeny]=useState((initial.policy?.country_deny??[]).join(",")); const [allow,setAllow]=useState((initial.policy?.country_allow??[]).join(","));
+ if(!policy)return <OwnerShell><main className="mx-auto w-full max-w-[1180px] px-4 py-6 text-white"><h1 className="text-xl font-bold">Payout policy</h1><p className="mt-2 text-sm text-amber-200">{msg??"Load failed"}</p></main></OwnerShell>;
+ async function savePolicy(){setBusy(true);setMsg(null);try{const r=await ownerSetPayoutPolicy({data:{risk_force_dual:Number(policy.risk_force_dual),risk_auto_freeze:Number(policy.risk_auto_freeze),max_withdrawals_per_day:Number(policy.max_withdrawals_per_day),country_deny:deny.split(/[,\s]+/).map(s=>s.trim()).filter(Boolean),country_allow:allow.split(/[,\s]+/).map(s=>s.trim()).filter(Boolean)}});setPolicy(r.policy);setMsg("Payout policy saved.");}catch(e){setMsg(e instanceof Error?e.message:"Save failed.");}finally{setBusy(false);}}
+ async function saveChannel(){setChannelBusy(true);setMsg(null);try{const r=await ownerSetPayoutChannel({data:{channel_id:channelId.trim()}});setChannel(r);setChannelId(r.channel_id??"");setMsg("Payment channel saved. Refresh the preview to load its live profile.");}catch(e){setMsg(e instanceof Error?e.message:"Channel save failed.");}finally{setChannelBusy(false);}}
+ async function refreshChannel(){setChannelBusy(true);setMsg(null);try{const r=await ownerRefreshPayoutChannel();setChannel(r);setChannelId(r.channel_id??"");setTemplate(r.message_template??DEFAULT_TEMPLATE);setMsg("Channel profile refreshed from Telegram.");}catch(e){setMsg(e instanceof Error?e.message:"Channel preview failed.");}finally{setChannelBusy(false);}}
+ async function savePresentation(){setPresentationBusy(true);setMsg(null);try{const input=document.getElementById("payout-proof-image") as HTMLInputElement|null;const file=input?.files?.[0];let dataUrl:string|undefined;if(file){if(!file.type.startsWith("image/"))throw new Error("Choose an image file.");if(file.size>3*1024*1024)throw new Error("Keep the payout image under 3 MB.");dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error("Could not read image."));reader.readAsDataURL(file);});}const r=await ownerSetPayoutPresentation({data:{message_template:template,payout_image_data_url:dataUrl,payout_image_file_name:file?.name}});setChannel(r);setTemplate(r.message_template??DEFAULT_TEMPLATE);if(input)input.value="";setMsg("Payout message and image saved.");}catch(e){setMsg(e instanceof Error?e.message:"Presentation save failed.");}finally{setPresentationBusy(false);}}
+ return <OwnerShell><main className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 text-white"><h1 className="text-xl font-bold">Payout policy</h1><p className="mt-1 text-xs text-white/45">Risk rules, withdrawal limits, payment channel identity, payout image and public message.</p>{msg?<p className="mt-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-3 py-2 text-xs text-cyan-200">{msg}</p>:null}
+ <section className="mt-5 rounded-2xl border border-blue-400/25 bg-[#0b1d36] p-4"><h2 className="text-sm font-semibold text-blue-200">Payment channel owner / profile</h2><p className="mt-1 text-[11px] text-white/45">Enter the Telegram channel ID or @username. TASKORA will load the live title, @username, description and profile image.</p><input value={channelId} onChange={e=>setChannelId(e.target.value)} placeholder="-100xxxxxxxxxx or @YourPaymentChannel" className="mt-3 w-full rounded-xl border border-white/10 bg-[#08172a] px-3 py-2 text-sm font-mono"/><div className="mt-2 flex gap-2"><button type="button" disabled={channelBusy} onClick={()=>void saveChannel()} className="flex-1 rounded-xl border border-blue-400/30 bg-blue-500/15 py-2.5 text-xs font-bold text-blue-100 disabled:opacity-50">{channelBusy?"Saving…":"Save channel"}</button><button type="button" disabled={channelBusy||!channelId.trim()} onClick={()=>void refreshChannel()} className="flex-1 rounded-xl border border-cyan-400/30 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-100 disabled:opacity-50">Refresh preview</button></div>{channel?.channel_title||channel?.channel_username||channel?.channel_photo_url?<div className="mt-4 flex gap-3 rounded-xl border border-white/8 bg-black/15 p-3">{channel.channel_photo_url?<img src={channel.channel_photo_url} alt="Channel profile" className="size-16 rounded-2xl object-cover"/>:<div className="size-16 rounded-2xl bg-white/5"/>}<div className="min-w-0"><p className="font-bold text-white">{channel.channel_title??"Telegram channel"}</p><p className="text-xs text-cyan-300">{channel.channel_username??"Private / ID-only channel"}</p><p className="mt-1 line-clamp-3 text-[11px] text-white/45">{channel.channel_description??"No channel description."}</p></div></div>:null}</section>
+ <section className="mt-5 rounded-2xl border border-blue-400/25 bg-[#0b1d36] p-4"><h2 className="text-sm font-semibold text-blue-200">Successful payout message</h2><p className="mt-1 text-[11px] text-white/45">This message is sent when a withdrawal is marked Paid. <b>#username</b> becomes @username automatically.</p><div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-cyan-200">{["#amount","#method","#name","#username","#address","#tx_hash","#reference","#time"].map(x=><code key={x} className="rounded bg-black/20 px-2 py-1">{x}</code>)}</div><textarea value={template} onChange={e=>setTemplate(e.target.value)} rows={10} className="mt-3 w-full rounded-xl border border-white/10 bg-[#08172a] px-3 py-2 font-mono text-xs text-white outline-none focus:border-cyan-400/40"/><label className="mt-3 block text-[11px] text-white/50">Payout image (sent with every successful payout)<input id="payout-proof-image" type="file" accept="image/png,image/jpeg,image/webp" className="mt-1 block w-full rounded-xl border border-white/10 bg-[#08172a] px-3 py-2 text-xs"/></label>{channel?.payout_image_url?<img src={channel.payout_image_url} alt="Current payout proof" className="mt-3 max-h-40 rounded-xl object-contain"/>:null}<button type="button" disabled={presentationBusy} onClick={()=>void savePresentation()} className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-500 to-sky-500 py-3 text-sm font-bold disabled:opacity-50">{presentationBusy?"Saving…":"Save payout message & image"}</button></section>
+ <section className="mt-5 space-y-3"><label className="block text-[11px] text-white/50">Force dual-approval at risk ≥<input type="number" min={0} max={100} value={policy.risk_force_dual} onChange={e=>setPolicy({...policy,risk_force_dual:Number(e.target.value)})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/></label><label className="block text-[11px] text-white/50">Auto-freeze at risk ≥ (0 = off)<input type="number" min={0} max={100} value={policy.risk_auto_freeze} onChange={e=>setPolicy({...policy,risk_auto_freeze:Number(e.target.value)})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/></label><label className="block text-[11px] text-white/50">Max WD requests / 24h<input type="number" min={1} max={20} value={policy.max_withdrawals_per_day} onChange={e=>setPolicy({...policy,max_withdrawals_per_day:Number(e.target.value)})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/></label><label className="block text-[11px] text-white/50">Country deny (ISO, comma-separated)<input value={deny} onChange={e=>setDeny(e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/></label><label className="block text-[11px] text-white/50">Country allow only (empty = all)<input value={allow} onChange={e=>setAllow(e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1d36] px-3 py-2 text-sm"/></label><button type="button" disabled={busy} onClick={()=>void savePolicy()} className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-sky-500 py-3 text-sm font-bold disabled:opacity-50">{busy?"Saving…":"Save policy"}</button></section>
+ </main></OwnerShell>;
 }

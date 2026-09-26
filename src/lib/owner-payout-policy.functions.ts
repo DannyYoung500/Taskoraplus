@@ -94,6 +94,28 @@ export const ownerSetPayoutChannel = createServerFn({ method: "POST" })
     return { ok: true, ...result };
   });
 
+
+export const ownerRefreshPayoutChannel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const { refreshPayoutChannelPreview } = await import("@/lib/notify-owner");
+    const result = await refreshPayoutChannelPreview();
+    await audit({ adminId: context.userId, action: "payout_channel.preview_refresh", targetType: "settings", targetId: "payout_channel", next: result }).catch(() => undefined);
+    return result;
+  });
+
+export const ownerSetPayoutPresentation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { message_template: string; payout_image_data_url?: string; payout_image_file_name?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const { setPayoutPresentation } = await import("@/lib/notify-owner");
+    const result = await setPayoutPresentation({ messageTemplate: data.message_template, imageDataUrl: data.payout_image_data_url, imageFileName: data.payout_image_file_name });
+    await audit({ adminId: context.userId, action: "payout_proof.presentation_update", targetType: "settings", targetId: "payout_proof_settings", next: { hasImage: Boolean(result.payout_image_url), messageTemplate: result.message_template } }).catch(() => undefined);
+    return result;
+  });
+
 /** Cron-friendly ops digest (owner session OR CRON_SECRET header). */
 export const cronOpsDigest = createServerFn({ method: "POST" })
   .handler(async () => {

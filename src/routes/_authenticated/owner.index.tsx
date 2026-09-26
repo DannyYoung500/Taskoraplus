@@ -32,6 +32,8 @@ const NAV = [
   { to: "/owner/tasks", label: "Tasks", icon: ClipboardCheck },
   { to: "/owner/reviews", label: "Reviews", icon: CheckCircle2 },
   { to: "/owner/withdrawals", label: "Withdrawals", icon: Wallet },
+  { to: "/owner/deposits", label: "Deposits", icon: Wallet },
+  { to: "/owner/payout-policy", label: "Payout Policy", icon: Settings },
   { to: "/owner/economy", label: "Economy", icon: Settings },
   { to: "/owner/settings", label: "Settings", icon: Settings },
 ] as const;
