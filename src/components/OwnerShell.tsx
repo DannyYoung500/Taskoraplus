@@ -80,6 +80,7 @@ const SECTIONS: { label: string; items: Item[] }[] = [
     items: [
       { to: "/owner/welcome", title: "Bot /start Welcome", Icon: MessageSquareHeart },
       { to: "/owner/announce", title: "Broadcast", Icon: Bell },
+      { to: "/owner/checkin-notifications", title: "Check-in Notifications", Icon: Bell },
     ],
   },
   {
