@@ -68,19 +68,24 @@ function normalizeButtons(raw: unknown): WelcomeButton[] {
     });
 }
 
-function personalize(
-  text: string,
-  username?: string | null,
-  firstName?: string | null,
-  inviterName?: string | null,
-) {
-  const handle = username ? `@${username.replace(/^@/, "")}` : firstName || "friend";
-  const displayName = firstName?.trim() || handle;
-  const inviter = inviterName?.trim() || "a friend";
-  return text
-    .replace(/@username/gi, handle)
-    .replace(/\{\{first_name\}\}/gi, displayName)
-    .replace(/\{\{inviter\}\}/gi, inviter);
+function cleanName(value?: string | null): string {
+  return String(value ?? "").replace(/[<>]/g, "").trim();
+}
+
+function buildWelcomeText(firstName?: string | null, inviterName?: string | null) {
+  const name = cleanName(firstName) || "there";
+  const inviter = cleanName(inviterName);
+  return `🎉 <b>Welcome to TaskoraPlus!</b>
+
+Hello, <b>${name}</b>!${inviter ? `\\n\\n✅ <b>${inviter}</b> invited you to join!` : ""}
+
+💰 Complete tasks to earn USDT
+📅 Daily check-in for Task Points
+👥 Invite friends and earn up to 20% commission
+
+🚀 Invite friends and grow your monthly earnings
+
+👇 <b>Tap below to start earning!</b>`;
 }
 
 async function getInviterName(referralCode?: string | null) {
@@ -90,17 +95,65 @@ async function getInviterName(referralCode?: string | null) {
   const db = await admin();
   const { data } = await db
     .from("profiles")
-    .select("display_name, username")
+    .select("id, display_name, username")
     .eq("referral_code", code)
     .maybeSingle();
 
   if (!data) return null;
   return (
-    (typeof data.display_name === "string" && data.display_name.trim()) ||
+    (typeof data.display_name === "string" && cleanName(data.display_name)) ||
     (typeof data.username === "string" && data.username.trim()
       ? `@${data.username.replace(/^@/, "")}`
       : null)
   );
+}
+
+async function claimWelcomeReferral(
+  telegramId: number,
+  referralCode?: string | null,
+  inviterName?: string | null,
+) {
+  const db = await admin();
+  const { data: existingProfile } = await db
+    .from("profiles")
+    .select("id")
+    .eq("telegram_id", telegramId)
+    .maybeSingle();
+
+  if (existingProfile) {
+    return { isNewTelegramUser: false, inviterName: null };
+  }
+
+  const { data: claimed, error } = await db
+    .from("telegram_welcome_deliveries")
+    .insert({
+      telegram_id: telegramId,
+      referral_code: referralCode?.trim() || null,
+      inviter_profile_id: null,
+      inviter_name: inviterName || null,
+    })
+    .select("telegram_id")
+    .maybeSingle();
+
+  if (error?.code === "23505" || !claimed) {
+    return { isNewTelegramUser: false, inviterName: null };
+  }
+
+  if (referralCode?.trim()) {
+    const { data: inviter } = await db
+      .from("profiles")
+      .select("id")
+      .eq("referral_code", referralCode.trim())
+      .maybeSingle();
+    if (inviter?.id) {
+      await db
+        .from("telegram_welcome_deliveries")
+        .update({ inviter_profile_id: inviter.id })
+        .eq("telegram_id", telegramId);
+    }
+  }
+
+  return { isNewTelegramUser: true, inviterName: inviterName || null };
 }
 
 type TgBtn =
@@ -166,6 +219,8 @@ export async function sendWelcomeToChat(opts: {
   firstName?: string | null;
   useDraft?: boolean;
   referralCode?: string | null;
+  telegramId?: number | null;
+  referralGreeting?: boolean;
 }) {
   const db = await admin();
   const { data } = await db.from("bot_welcome_settings").select("*").eq("id", true).maybeSingle();
@@ -198,13 +253,9 @@ export async function sendWelcomeToChat(opts: {
     }
   }
 
-  const inviterName = await getInviterName(opts.referralCode);
-  const personalizedMessage = personalize(message, opts.username, opts.firstName, inviterName);
-  const text = inviterName
-    ? personalizedMessage
-    : personalizedMessage
-        .replace(/^\s*\{\{inviter\}\}.*(?:\r?\n|$)/gim, "")
-        .replace(/\n{3,}/g, "\n\n");
+  const text = opts.referralGreeting
+    ? buildWelcomeText(opts.firstName, await getInviterName(opts.referralCode))
+    : buildWelcomeText(opts.firstName);
   const reply_markup = buildInlineKeyboard(buttons, mini, community);
 
   if (photoFileId || photoUrl) {
@@ -417,11 +468,15 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
   }
   try {
     const startPayload = text.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i)?.[1]?.trim() || null;
+    const inviterName = await getInviterName(startPayload);
+    const claimed = await claimWelcomeReferral(msg.chat.id, startPayload, inviterName);
     await sendWelcomeToChat({
       chatId: msg.chat.id,
       username: msg.from?.username,
       firstName: msg.from?.first_name,
       referralCode: startPayload,
+      referralGreeting: claimed.isNewTelegramUser && Boolean(inviterName),
+      telegramId: msg.chat.id,
       useDraft: false,
     });
     return { handled: true, reason: "welcome_sent" };
