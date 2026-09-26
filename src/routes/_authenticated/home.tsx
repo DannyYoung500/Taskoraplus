@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import {
   ClipboardCheck,
   PlayCircle,
@@ -14,7 +14,7 @@ import {
   Star,
   Trophy,
 } from "lucide-react";
-import { listTasks, getDashboard, dailyCheckin } from "@/lib/taskora.functions";
+import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
@@ -72,6 +72,11 @@ function HomePage() {
   const nextTarget = lvl.next;
   const progressPct = Math.min(100, Math.round((taskPoints / nextTarget) * 100));
   const isOwner = Boolean(dash?.isOwner);
+
+  useEffect(() => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timezone) void syncMyTimezone({ data: { timezone } }).catch(() => {});
+  }, []);
 
   const submissions = dash?.submissions ?? [];
   const doneTasks = submissions.filter((s) => s.status === "approved" || s.status === "pending").length;
@@ -199,7 +204,7 @@ function HomePage() {
         </Link>
       </section>
 
-      <section className="mb-3.5 grid grid-cols-5 gap-1.5">
+      <section className="mb-3.5 space-y-2">
         <Quick to="/tasks" label="Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
         <Quick to="/watch-earn" label="Watch & Earn" sub="Watch Videos" Icon={PlayCircle} />
         <Quick to="/advertise" label="Advertise" sub="Campaigns" Icon={Megaphone} />
@@ -342,7 +347,7 @@ function Quick({
   return (
     <Link
       to={to}
-      className={`relative flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] px-1 py-2.5 text-center active:scale-[0.97] ${
+      className={`relative flex w-full items-center gap-3 rounded-2xl border border-blue-400/15 bg-[#0b1628] px-3.5 py-3 text-left active:scale-[0.99] ${
         muted ? "opacity-90" : ""
       }`}
     >
@@ -351,13 +356,14 @@ function Quick({
           {badge}
         </span>
       ) : null}
-      <span className="inline-flex size-9 items-center justify-center rounded-full bg-blue-500/15 text-cyan-300">
-        <Icon className="size-4" />
+      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300">
+        <Icon className="size-5" />
       </span>
-      <div className="min-w-0">
-        <p className="truncate text-[10px] font-black leading-tight">{label}</p>
-        <p className="truncate text-[8px] text-slate-500">{sub}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold leading-tight">{label}</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">{sub}</p>
       </div>
+      <ChevronRight className="size-4 shrink-0 text-slate-500" />
     </Link>
   );
 }

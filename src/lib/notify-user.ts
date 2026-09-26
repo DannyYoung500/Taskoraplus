@@ -47,10 +47,11 @@ export async function sendUserHtml(input: {
     : undefined;
 
   if (input.photoUrl) {
+    const safeCaption = input.text.replace(/https?:\/\/\S+/gi, "").trim();
     await telegram("sendPhoto", {
       chat_id: chatId,
       photo: input.photoUrl,
-      caption: input.text.slice(0, 1024),
+      caption: safeCaption.slice(0, 1024),
       parse_mode: "HTML",
       reply_markup: replyMarkup,
     });

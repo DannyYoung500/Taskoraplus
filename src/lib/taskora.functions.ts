@@ -8,8 +8,22 @@ import {
 } from "@/lib/telegram-auth-bridge";
 import { isOwnerTelegramId } from "@/lib/owner";
 import { notifyOwnersNewUser } from "@/lib/notify-owner";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
+
+export const syncMyTimezone = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { timezone: string }) => d)
+  .handler(async ({ data, context }) => {
+    const timezone = String(data.timezone || "").trim();
+    if (!timezone || timezone.length > 100) throw new Error("Invalid time zone.");
+    try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(); } catch { throw new Error("Invalid time zone."); }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("profiles").update({ timezone } as never).eq("id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true, timezone };
+  });
 
 export const loginWithTelegram = createServerFn({ method: "POST" })
   .inputValidator((d: { initData: string }) => d)
