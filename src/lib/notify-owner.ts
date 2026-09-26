@@ -221,9 +221,3 @@ export async function notifyOwnersVelocityAlert(opts: {
     /* never block */
   }
 }
-
-export const notifyOwnersWithdrawalRequested = async (o: { userId: string; amount: number; method: string; address: string; displayName?: string | null; reference?: string | null }) => sendOwnerHtml(`🔔 <b>New Withdrawal</b>\\n👤 User: ${esc(o.displayName ?? o.userId.slice(0, 8))}\\n💰 Amount: <b>$${Number(o.amount).toFixed(2)}</b>\\n📍 Network: ${esc(o.method)}\\n💳 Wallet: <code>${esc(o.address.slice(0, 18))}…</code>\\n🧾 Ref: <code>${esc(o.reference ?? "—")}</code>`);
-
-export const notifyOwnersWithdrawalPaid = async (o: { userId: string; amount: number; method: string; txHash?: string | null; reference?: string | null; displayName?: string | null }) => sendOwnerHtml(`✅ <b>Withdrawal Paid</b>\\n👤 User: ${esc(o.displayName ?? o.userId.slice(0, 8))}\\n💰 Amount: <b>$${Number(o.amount).toFixed(2)}</b>\\n📍 Network: ${esc(o.method)}\\n🔗 Tx: <code>${esc(o.txHash ?? "—")}</code>\\n🧾 Ref: <code>${esc(o.reference ?? "—")}</code>`);
-
-export const notifyOwnersWithdrawalFailed = async (o: { userId: string; amount: number; method: string; reason: string; reference?: string | null; displayName?: string | null }) => sendOwnerHtml(`❌ <b>Withdrawal Failed</b>\\n👤 User: ${esc(o.displayName ?? o.userId.slice(0, 8))}\\n💰 Amount: <b>$${Number(o.amount).toFixed(2)}</b>\\n📍 Network: ${esc(o.method)}\\n📝 Reason: ${esc(o.reason)}\\n🧾 Ref: <code>${esc(o.reference ?? "—")}</code>`);
