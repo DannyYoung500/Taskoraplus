@@ -7,7 +7,11 @@ import {
   ownerGetNotificationSettings,
   ownerSetNotificationSettings,
 } from "@/lib/owner-payout-policy.functions";
-import {\n  ownerGetCheckinNotificationSettings,\n  ownerSetCheckinNotificationSettings,\n  type CheckinNotificationSettings,\n} from "@/lib/checkin-notification.functions";
+import {
+  ownerGetCheckinNotificationSettings,
+  ownerSetCheckinNotificationSettings,
+  type CheckinNotificationSettings,
+} from "@/lib/checkin-notification.functions";
 
 const DEFAULT_TEMPLATE = [
   "✅ <b>Payout Successful!</b>",
