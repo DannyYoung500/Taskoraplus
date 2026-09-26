@@ -345,16 +345,16 @@ function Quick({
   return (
     <Link
       to={to}
-      className="flex min-w-0 min-h-[92px] flex-col items-center justify-center rounded-2xl border border-blue-400/20 bg-[#0b1628] px-1.5 py-3.5 text-center shadow-[0_6px_20px_rgba(15,23,42,0.22)] active:scale-[0.98]"
+      className="flex min-w-0 min-h-[104px] flex-col items-center justify-center rounded-2xl border border-blue-400/20 bg-[#0b1628] px-1 py-4 text-center shadow-[0_6px_20px_rgba(15,23,42,0.22)] active:scale-[0.98]"
     >
       {platform ? (
         <PlatformLogo platform={platform} size={40} />
       ) : (
-        <span className="inline-flex size-10 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300 ring-1 ring-blue-400/10">
-          <Icon className="size-5" />
+        <span className="inline-flex size-11 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300 ring-1 ring-blue-400/10">
+          <Icon className="size-[22px]" />
         </span>
       )}
-      <p className="mt-2 w-full truncate text-[11px] font-bold leading-tight text-slate-100">{label}</p>
+      <p className="mt-2.5 w-full truncate text-[11px] font-bold leading-tight text-slate-100">{label}</p>
     </Link>
   );
 }
