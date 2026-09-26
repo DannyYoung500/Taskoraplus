@@ -16,6 +16,7 @@ export type LockedPricing = {
   watchSeconds?: number;
 };
 
+/** Find service def by id across platforms. */
 export function findServiceById(serviceId: string): ServiceDef | null {
   for (const list of Object.values(SERVICES)) {
     const hit = list.find((s) => s.id === serviceId);
@@ -24,6 +25,7 @@ export function findServiceById(serviceId: string): ServiceDef | null {
   return null;
 }
 
+/** Prefer Supabase catalog row when present; else code defaults. */
 export async function loadCatalogService(serviceId: string): Promise<{
   customer: number;
   worker: number;
@@ -77,6 +79,7 @@ export async function loadCatalogService(serviceId: string): Promise<{
   };
 }
 
+/** Watch rate from economy settings or catalog yt_watch.per second. */
 export async function loadWatchRatePerSecond(): Promise<number> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -96,6 +99,11 @@ export async function loadWatchRatePerSecond(): Promise<number> {
   return yt?.fromUsd && yt.fromUsd > 0 ? yt.fromUsd : 0.0003;
 }
 
+/**
+ * Lock pricing for a campaign. Browser amounts are ignored.
+ * For watch services (unit=seconds or taskType=watch), qty is completions and
+ * watchSeconds drives per-completion customer price.
+ */
 export async function resolveLockedPricing(opts: {
   serviceId: string;
   qty: number;
@@ -118,10 +126,12 @@ export async function resolveLockedPricing(opts: {
     workerUnit = customerUnit * TASKER_SHARE;
     taskoraUnit = customerUnit * TASKORA_SHARE;
   } else {
+    // Enforce 70/30 on catalog customer if margins drift
     workerUnit = customerUnit * TASKER_SHARE;
     taskoraUnit = customerUnit * TASKORA_SHARE;
   }
 
+  // 6 decimal lock for consistency across UI
   const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
   customerUnit = round6(customerUnit);
   workerUnit = round6(workerUnit);
