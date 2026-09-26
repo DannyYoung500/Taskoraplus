@@ -171,6 +171,12 @@
   }
 
   img,
+  video {
+    pointer-events: none !important;
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+
   svg {
     -webkit-user-drag: none;
     user-drag: none;

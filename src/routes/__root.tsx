@@ -124,15 +124,20 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
-    const preventContextMenu = (event: Event) => event.preventDefault();
-    const preventDragStart = (event: Event) => event.preventDefault();
+    const blockMenu = (event: Event) => {
+      event.preventDefault();
+      return false;
+    };
+    const blockDrag = (event: Event) => event.preventDefault();
 
-    document.addEventListener("contextmenu", preventContextMenu);
-    document.addEventListener("dragstart", preventDragStart);
+    document.addEventListener("contextmenu", blockMenu, { capture: true });
+    document.addEventListener("longpress", blockMenu as EventListener, { capture: true });
+    document.addEventListener("dragstart", blockDrag, { capture: true });
 
     return () => {
-      document.removeEventListener("contextmenu", preventContextMenu);
-      document.removeEventListener("dragstart", preventDragStart);
+      document.removeEventListener("contextmenu", blockMenu, { capture: true });
+      document.removeEventListener("longpress", blockMenu as EventListener, { capture: true });
+      document.removeEventListener("dragstart", blockDrag, { capture: true });
     };
   }, []);
 
