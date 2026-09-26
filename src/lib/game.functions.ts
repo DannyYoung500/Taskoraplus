@@ -6,6 +6,65 @@ async function adminClient() {
   return supabaseAdmin;
 }
 
+export type AvailableGame = {
+  id: string;
+  providerId: string;
+  providerName: string;
+  providerKey: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  launchUrl: string | null;
+  embedUrl: string | null;
+  category: string;
+  rewardType: "task_points" | "usdt" | "mixed";
+  rewardValue: number;
+  providerValue: number;
+  estimatedMinutes: number | null;
+  featured: boolean;
+};
+
+export const getAvailableGames = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const s = await adminClient();
+    const { data, error } = await (s as any)
+      .from("games")
+      .select(
+        "id,provider_id,external_game_id,slug,title,description,thumbnail_url,launch_url,embed_url,category,status,featured,reward_type,reward_value,provider_value,estimated_minutes,provider:provider_id(id,provider_name,provider_key,enabled)",
+      )
+      .eq("status", "active")
+      .eq("provider.enabled", true)
+      .order("featured", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    return ((data ?? []) as any[])
+      .filter((row) => row.provider?.enabled)
+      .map(
+        (row): AvailableGame => ({
+          id: String(row.id),
+          providerId: String(row.provider_id),
+          providerName: String(row.provider?.provider_name ?? "Game Provider"),
+          providerKey: String(row.provider?.provider_key ?? ""),
+          title: String(row.title),
+          slug: String(row.slug),
+          description: row.description ? String(row.description) : null,
+          thumbnailUrl: row.thumbnail_url ? String(row.thumbnail_url) : null,
+          launchUrl: row.launch_url ? String(row.launch_url) : null,
+          embedUrl: row.embed_url ? String(row.embed_url) : null,
+          category: String(row.category ?? "arcade"),
+          rewardType: row.reward_type === "usdt" || row.reward_type === "mixed" ? row.reward_type : "task_points",
+          rewardValue: Number(row.reward_value ?? 0),
+          providerValue: Number(row.provider_value ?? 0),
+          estimatedMinutes: row.estimated_minutes == null ? null : Number(row.estimated_minutes),
+          featured: Boolean(row.featured),
+        }),
+      );
+  });
+
 const GAME_KEY = "tap_rush";
 const ROUND_SECONDS = 30;
 const DAILY_CAP = 100;
