@@ -23,7 +23,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const quantity=Math.floor(Number(data.quantity));
   if(quantity<Number(service.min_quantity)||quantity>Number(service.max_quantity)) throw new Error(`Quantity must be between ${service.min_quantity.toLocaleString()} and ${service.max_quantity.toLocaleString()}.`);
   const minWatch=Number(economy?.youtube_watch_min_seconds??1);
-  const maxWatch=Number(economy?.youtube_watch_max_seconds??7200);
+  const maxWatch=Number(economy?.youtube_watch_max_seconds??10800);
   const watchSeconds=service.pricing_model==="watch_second"?Math.floor(Number(data.watchSeconds??0)):0;
   const detectedVideoDuration=service.pricing_model==="watch_second"?Math.floor(Number(data.videoDurationSeconds??0)):0;
   if(service.pricing_model==="watch_second"&&detectedVideoDuration>0&&watchSeconds>detectedVideoDuration) throw new Error(`Watch duration cannot exceed the detected YouTube video length (${Math.floor(detectedVideoDuration/60)}m ${detectedVideoDuration%60}s).`);
