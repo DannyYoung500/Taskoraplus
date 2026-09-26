@@ -53,6 +53,7 @@ export async function sendUserHtml(input: {
       photo: input.photoUrl,
       caption: safeCaption.slice(0, 1024),
       parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
       reply_markup: replyMarkup,
     });
   } else {

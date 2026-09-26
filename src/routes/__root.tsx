@@ -87,13 +87,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#0b1424" },
       { name: "color-scheme", content: "dark" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { property: "og:title", content: "TASKORA — Verified Tasks. Real Rewards." },
-      {
-        property: "og:description",
-        content: "Complete verified social tasks and earn real crypto rewards inside Telegram.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

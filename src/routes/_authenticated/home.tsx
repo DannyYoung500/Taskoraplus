@@ -204,12 +204,14 @@ function HomePage() {
         </Link>
       </section>
 
-      <section className="mb-3.5 space-y-2">
-        <Quick to="/tasks" label="Tasks" sub="Complete & Earn" Icon={ClipboardCheck} />
-        <Quick to="/watch-earn" label="Watch & Earn" sub="Watch Videos" Icon={PlayCircle} />
-        <Quick to="/advertise" label="Advertise" sub="Campaigns" Icon={Megaphone} />
-        <Quick to="/leaderboard" label="Rank" sub="Leaderboard" Icon={Trophy} />
-        <Quick to="/ambassador" label="Invite & Earn" sub="Task Points" Icon={Users} />
+      <section className="mb-3.5">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+          <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
+          <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
+          <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
+          <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
+          <Quick to="/ambassador" label="Invite" Icon={Users} />
+        </div>
       </section>
 
       <section className="mb-3.5 overflow-hidden rounded-[20px] border border-amber-400/35 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
@@ -332,38 +334,21 @@ function HomePage() {
 function Quick({
   to,
   label,
-  sub,
   Icon,
-  badge,
-  muted,
 }: {
   to: string;
   label: string;
-  sub: string;
   Icon: ComponentType<{ className?: string }>;
-  badge?: string;
-  muted?: boolean;
 }) {
   return (
     <Link
       to={to}
-      className={`relative flex w-full items-center gap-3 rounded-2xl border border-blue-400/15 bg-[#0b1628] px-3.5 py-3 text-left active:scale-[0.99] ${
-        muted ? "opacity-90" : ""
-      }`}
+      className="flex min-w-0 flex-col items-center justify-center rounded-xl border border-blue-400/15 bg-[#0b1628] px-1.5 py-2.5 text-center active:scale-[0.98]"
     >
-      {badge ? (
-        <span className="absolute -right-0.5 -top-1 rounded bg-cyan-400 px-1 py-0.5 text-[7px] font-black text-[#04101c]">
-          {badge}
-        </span>
-      ) : null}
-      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300">
-        <Icon className="size-5" />
+      <span className="inline-flex size-8 items-center justify-center rounded-lg bg-blue-500/15 text-cyan-300">
+        <Icon className="size-4" />
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold leading-tight">{label}</p>
-        <p className="mt-0.5 text-[11px] text-slate-500">{sub}</p>
-      </div>
-      <ChevronRight className="size-4 shrink-0 text-slate-500" />
+      <p className="mt-1.5 w-full truncate text-[10px] font-bold leading-tight text-slate-100">{label}</p>
     </Link>
   );
 }
