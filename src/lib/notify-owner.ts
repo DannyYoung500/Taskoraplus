@@ -83,6 +83,23 @@ async function getPayoutProofSettings() {
   if (error) throw new Error(error.message);
   return (data ?? { channel_id: "", message_template: DEFAULT_PAYOUT_TEMPLATE, payout_image_url: null }) as any;
 }
+function normalizeTelegramChatRef(raw: string): string {
+  let s = String(raw ?? "").trim();
+  if (!s) return "";
+  try {
+    if (/^(?:https?:\\/\\/)?(?:www\\.)?(?:t\\.me|telegram\\.me)\\//i.test(s)) {
+      const u = new URL(s.startsWith("http") ? s : `https://${s}`);
+      const path = u.pathname.replace(/^\\/+/, "").split("/")[0] ?? "";
+      if (path && !path.startsWith("+") && !path.startsWith("joinchat")) {
+        return path.startsWith("-") || /^\\d+$/.test(path) ? path : `@${path.replace(/^@+/, "")}`;
+      }
+    }
+  } catch {}
+  s = s.replace(/^@+/, "");
+  if (/^-?\\d+$/.test(s)) return s;
+  return s ? `@${s}` : "";
+}
+
 function renderPayoutTemplate(template: string, values: Record<string,string>) {
   let result = template || DEFAULT_PAYOUT_TEMPLATE;
   for (const [key,value] of Object.entries(values)) result = result.split(key).join(value);
@@ -92,7 +109,7 @@ export async function postPayoutProofToChannel(opts: { amount:number; method:str
   try {
     const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
     const settings = await getPayoutProofSettings();
-    const channelId = settings.channel_id || process.env["TASKORA_PAYOUT_CHANNEL_ID"] || process.env["PAYOUT_CHANNEL_ID"] || process.env["TASKORA_PAYMENT_CHANNEL_ID"] || "";
+    const channelId = normalizeTelegramChatRef(settings.channel_id || process.env["TASKORA_PAYOUT_CHANNEL_ID"] || process.env["PAYOUT_CHANNEL_ID"] || process.env["TASKORA_PAYMENT_CHANNEL_ID"] || "");
     if (!botToken || !channelId) return;
     const username = opts.username ? String(opts.username).replace(/^@/,"") : "";
     const tx = (opts.txHash ?? "").trim();
@@ -139,13 +156,13 @@ export async function getPayoutChannelConfig() {
 }
 export async function setPayoutChannelConfig(channelId:string) {
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
-  const {error}=await supabaseAdmin.from("payout_proof_settings").upsert({id:true,channel_id:String(channelId??"").trim(),updated_at:new Date().toISOString()},{onConflict:"id"});
+  const normalized = normalizeTelegramChatRef(channelId); const {error}=await supabaseAdmin.from("payout_proof_settings").upsert({id:true,channel_id:normalized,updated_at:new Date().toISOString()},{onConflict:"id"});
   if(error) throw new Error(error.message); return getPayoutChannelConfig();
 }
 export async function refreshPayoutChannelPreview() {
   const botToken=process.env["TELEGRAM_BOT_TOKEN"]??""; const current=await getPayoutProofSettings();
   if(!botToken || !current.channel_id) throw new Error("Set the Telegram channel ID or @username first.");
-  const chatRes=await fetch(`https://api.telegram.org/bot${botToken}/getChat?chat_id=${encodeURIComponent(current.channel_id)}`);
+  const chatRef = normalizeTelegramChatRef(current.channel_id); if (!chatRef) throw new Error("Set a Telegram channel @username or numeric chat ID first."); const chatRes=await fetch(`https://api.telegram.org/bot${botToken}/getChat?chat_id=${encodeURIComponent(chatRef)}`);
   const chatJson=await chatRes.json() as any;
   if(!chatJson.ok || !chatJson.result) throw new Error(chatJson.description || "Telegram could not load that channel.");
   let photoUrl=current.channel_photo_url??null; const smallFileId=chatJson.result?.photo?.small_file_id;
@@ -162,7 +179,7 @@ export async function refreshPayoutChannelPreview() {
       }
     }
   }
-  const result={channel_id:current.channel_id,channel_username:chatJson.result.username?"@"+chatJson.result.username:null,channel_title:chatJson.result.title??chatJson.result.first_name??null,channel_description:chatJson.result.description??null,channel_photo_file_id:smallFileId??current.channel_photo_file_id??null,channel_photo_url:photoUrl,payout_image_url:current.payout_image_url??null,payout_image_file_name:current.payout_image_file_name??null,message_template:current.message_template||DEFAULT_PAYOUT_TEMPLATE,updated_at:new Date().toISOString()};
+  const result={channel_id:chatRef,channel_username:chatJson.result.username?"@"+chatJson.result.username:null,channel_title:chatJson.result.title??chatJson.result.first_name??null,channel_description:chatJson.result.description??null,channel_photo_file_id:smallFileId??current.channel_photo_file_id??null,channel_photo_url:photoUrl,payout_image_url:current.payout_image_url??null,payout_image_file_name:current.payout_image_file_name??null,message_template:current.message_template||DEFAULT_PAYOUT_TEMPLATE,updated_at:new Date().toISOString()};
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server"); const {error}=await supabaseAdmin.from("payout_proof_settings").upsert({id:true,...result},{onConflict:"id"}); if(error) throw new Error(error.message); return result;
 }
 export async function setPayoutPresentation(opts:{messageTemplate:string;imageDataUrl?:string;imageFileName?:string}) {
