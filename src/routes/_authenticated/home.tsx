@@ -208,6 +208,67 @@ function HomePage() {
       </section>
 
       <section className="mb-3.5">
+        <div className="grid grid-cols-5 gap-1.5">
+          <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
+          <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
+          <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
+          <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
+          <Quick to="/ambassador" label="Invite" Icon={Users} />
+        </div>
+      </section>
+
+      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-amber-400/35 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-amber-300/40 bg-amber-400/15 text-amber-200">
+            <Star className="size-6 fill-amber-300 text-amber-300" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Task Points</p>
+            <p className="text-2xl font-semibold text-amber-200">{displayTaskPoints.toLocaleString()}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-semibold text-slate-400">Next Level</p>
+            <p className="text-[11px] font-bold text-slate-200">
+              {displayTaskPoints.toLocaleString()} / {nextTarget.toLocaleString()}
+            </p>
+            <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+          <div className="text-center">
+            <span className="inline-flex size-9 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
+              <Flame className="size-4" />
+            </span>
+            <p className="mt-1 text-[9px] font-bold text-cyan-200">Level {levelNum}</p>
+            <p className="text-[8px] text-slate-500">{levelLabel}</p>
+          </div>
+        </div>
+      </section>
+
+      <button
+        type="button"
+        disabled={checkBusy}
+        onClick={() => void onCheckin()}
+        className="mb-3.5 flex w-full items-center gap-3 rounded-2xl border border-blue-400/20 bg-[#0b1628] px-3.5 py-3 text-left active:scale-[0.99]"
+      >
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300">
+          <CalendarCheck className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold">Daily check-in</p>
+          <p className="truncate text-[11px] text-slate-400">
+            {checkMsg ?? `Streak ${streak}d · claim Task Points`}
+          </p>
+        </div>
+        <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-[10px] font-black text-cyan-300">
+          {checkBusy ? "…" : "Claim"}
+        </span>
+      </button>
+
+      <section className="mb-3.5">
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="flex items-center gap-1.5 text-sm font-black">
