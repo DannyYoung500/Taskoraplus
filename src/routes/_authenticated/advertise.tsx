@@ -129,6 +129,11 @@ function AdvertisePage() {
   }, [ytId]);
 
   const detectedMaxSeconds = videoDuration ? Math.min(videoDuration, 7200) : 7200;
+  function setWatchDurationParts(minutes: number, seconds: number) {
+    const total = Math.max(1, Math.min(detectedMaxSeconds, Math.floor(minutes) * 60 + Math.floor(seconds)));
+    setWatchMinutes(Math.floor(total / 60));
+    setWatchSeconds(total % 60);
+  }
 
   async function publish() {
     if (!platform || !service) return;
@@ -225,11 +230,11 @@ function AdvertisePage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-[10px] text-white/40">Minutes</label>
-                  <input value={watchMinutes} onChange={(e) => setWatchMinutes(Math.min(Math.min(120, Math.floor(detectedMaxSeconds / 60)), Math.max(0, Math.floor(Number(e.target.value) || 0))))} type="number" min={0} max={Math.min(120, Math.floor(detectedMaxSeconds / 60))} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+                  <input value={watchMinutes} onChange={(e) => setWatchDurationParts(Number(e.target.value) || 0, watchSeconds)} type="number" min={0} max={Math.min(120, Math.floor(detectedMaxSeconds / 60))} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[10px] text-white/40">Seconds</label>
-                  <input value={watchSeconds} onChange={(e) => setWatchSeconds(Math.min(59, Math.max(0, Math.floor(Number(e.target.value) || 0))))} type="number" min={0} max={59} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+                  <input value={watchSeconds} onChange={(e) => setWatchDurationParts(watchMinutes, Number(e.target.value) || 0)} type="number" min={0} max={59} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
                 </div>
               </div>
               <p className="mt-2 text-[10px] leading-relaxed text-white/40">Seconds must be 0–59. Taskora automatically limits the total to the detected video duration. Billing uses qualifying seconds.</p>
