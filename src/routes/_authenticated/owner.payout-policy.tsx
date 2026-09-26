@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OwnerShell } from "@/components/OwnerShell";
 import {
   ownerGetPayoutPolicy,
@@ -47,9 +47,9 @@ function Page() {
   );
   const [message, setMessage] = useState(initial.error);
   const [saving, setSaving] = useState(false);
-  const [savingImage, setSavingImage] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);\n  const [checkin, setCheckin] = useState<CheckinNotificationSettings | null>(null);\n  const [savingCheckin, setSavingCheckin] = useState(false);
 
-  async function saveNotifications() {
+  useEffect(() => {\n    void ownerGetCheckinNotificationSettings().then(setCheckin).catch(() => undefined);\n  }, []);\n\n  async function saveCheckin() {\n    if (!checkin) return;\n    setSavingCheckin(true);\n    setMessage(null);\n    try {\n      setCheckin(await ownerSetCheckinNotificationSettings({ data: checkin }));\n      setMessage("Check-in reminder schedule saved.");\n    } catch (e) {\n      setMessage(e instanceof Error ? e.message : "Could not save check-in schedule.");\n    } finally {\n      setSavingCheckin(false);\n    }\n  }\n\n  async function saveNotifications() {
     setSavingImage(true);
     setMessage(null);
     try {
@@ -183,7 +183,7 @@ function Page() {
           </button>
         </section>
 
-        <section className="mt-5 space-y-3">
+        {checkin ? (\n          <section className="mt-5 rounded-2xl border border-amber-400/20 bg-[#0b1d36] p-4">\n            <h2 className="text-sm font-semibold text-amber-200">📅 Daily Check-in Reminder</h2>\n            <p className="mt-1 text-[11px] text-white/45">Choose the local time and time zone. The scheduler checks every 5 minutes and sends only once per user per day.</p>\n            <label className="mt-3 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-xs">\n              <span>🔔 Send daily reminders</span>\n              <input type="checkbox" checked={checkin.enabled} onChange={e => setCheckin({...checkin, enabled: e.target.checked})} />\n            </label>\n            <div className="mt-3 grid gap-2 sm:grid-cols-2">\n              <label className="text-[11px] text-white/55">🕐 Local time\n                <input type="time" value={checkin.time} onChange={e => setCheckin({...checkin, time: e.target.value})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#08172a] px-3 py-2.5 text-sm text-white" />\n                <span className="mt-1 block text-[10px] text-white/35">Displayed in 12-hour format where your device supports it; stored as 24-hour time.</span>\n              </label>\n              <label className="text-[11px] text-white/55">🌍 Country / time zone\n                <select value={checkin.timezone} onChange={e => setCheckin({...checkin, timezone: e.target.value})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#08172a] px-3 py-2.5 text-sm text-white">\n                  {typeof Intl !== "undefined" && Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone").map(zone => {\n                    const city = zone.split("/").slice(-1)[0].replaceAll("_", " ");\n                    const region = zone.split("/")[0];\n                    return <option key={zone} value={zone}>{region} · {city} ({zone})</option>;\n                  }) : <option value={checkin.timezone}>{checkin.timezone}</option>}\n                </select>\n                <span className="mt-1 block text-[10px] text-white/35">Uses the full IANA time-zone database, including daylight-saving changes.</span>\n              </label>\n            </div>\n            <label className="mt-3 block text-[11px] text-white/55">💬 Reminder message\n              <textarea value={checkin.message} onChange={e => setCheckin({...checkin, message: e.target.value})} rows={5} className="mt-1 w-full rounded-xl border border-white/10 bg-[#08172a] px-3 py-2 text-xs text-white" />\n            </label>\n            <button disabled={savingCheckin} onClick={() => void saveCheckin()} className="mt-3 w-full rounded-xl bg-amber-400 py-3 text-sm font-bold text-[#071221]">{savingCheckin ? "Saving…" : "Save check-in schedule"}</button>\n          </section>\n        ) : null}\n\n        <section className="mt-5 space-y-3">
           <h2 className="text-sm font-semibold text-blue-200">🛡️ Payout Risk Controls</h2>
           <label className="block text-[11px] text-white/50">
             Force dual approval at risk ≥
