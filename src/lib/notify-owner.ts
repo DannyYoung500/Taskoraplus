@@ -87,7 +87,7 @@ function normalizeTelegramChatRef(raw: string): string {
   let s = String(raw ?? "").trim();
   if (!s) return "";
   try {
-    if (/^(?:https?:\\/\\/)?(?:www\\.)?(?:t\\.me|telegram\\.me)\\//i.test(s)) {
+    if (/^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\//i.test(s)) {
       const u = new URL(s.startsWith("http") ? s : `https://${s}`);
       const path = u.pathname.replace(/^\\/+/, "").split("/")[0] ?? "";
       if (path && !path.startsWith("+") && !path.startsWith("joinchat")) {
@@ -134,7 +134,7 @@ export async function postPayoutProofToChannel(opts: { amount:number; method:str
 export async function sendPayoutProofTest() {
   const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
   const settings = await getPayoutProofSettings();
-  const channelId = settings.channel_id || process.env["TASKORA_PAYOUT_CHANNEL_ID"] || process.env["PAYOUT_CHANNEL_ID"] || process.env["TASKORA_PAYMENT_CHANNEL_ID"] || "";
+  const channelId = normalizeTelegramChatRef(settings.channel_id || process.env["TASKORA_PAYOUT_CHANNEL_ID"] || process.env["PAYOUT_CHANNEL_ID"] || process.env["TASKORA_PAYMENT_CHANNEL_ID"] || "");
   if (!botToken) throw new Error("Telegram bot token is not configured.");
   if (!channelId) throw new Error("Save a payout channel first.");
   const caption = renderPayoutTemplate(settings.message_template || DEFAULT_PAYOUT_TEMPLATE, {
