@@ -149,7 +149,7 @@ export async function refreshPayoutChannelPreview() {
 export async function setPayoutPresentation(opts:{messageTemplate:string;imageDataUrl?:string;imageFileName?:string}) {
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server"); let imageUrl:string|null=null;
   if(opts.imageDataUrl?.trim()){
-    const match=opts.imageDataUrl.match(/^data:(image\\/(?:png|jpeg|jpg|webp));base64,(.+)$/); if(!match) throw new Error("Payout image must be PNG, JPG or WebP.");
+    const match=opts.imageDataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/); if(!match) throw new Error("Payout image must be PNG, JPG or WebP.");
     if(match[2]!.length>4500000) throw new Error("Payout image is too large. Keep it under about 3 MB.");
     const bytes=Uint8Array.from(atob(match[2]!),c=>c.charCodeAt(0)); const ext=match[1]==="image/png"?"png":match[1]==="image/webp"?"webp":"jpg"; const path=`payout-${Date.now()}.${ext}`;
     const upload=await supabaseAdmin.storage.from("payout-proofs").upload(path,bytes,{contentType:match[1]!,upsert:true}); if(upload.error) throw new Error(upload.error.message);
