@@ -30,6 +30,18 @@ export const RULES = {
   riskAutoFreeze: 70,
   /** Amounts at or above this require on-chain tx hash when marking Paid */
   txHashRequiredUsd: 20,
+  /** Max profiles sharing one device fingerprint before hard WD block */
+  maxAccountsPerDevice: 3,
+  /** Soft WD $ cap when 2+ accounts share device */
+  multiDeviceWdCapUsd: 10,
+  /** Referral unlock: referee must complete this many approved tasks */
+  referralUnlockApprovedTasks: 3,
+  /** Referral unlock: referee must complete this many watch videos */
+  referralUnlockWatchCompletions: 10,
+  /** Max start-watch / submit bursts per minute (abuse throttle) */
+  maxActionsPerMinute: 8,
+  /** Campaign SLA hours before owner alert for stuck active campaigns */
+  campaignStuckHours: 72,
 } as const;
 
 export function hoursSince(iso: string | null | undefined): number {
