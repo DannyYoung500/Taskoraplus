@@ -301,8 +301,10 @@ export const reviewWithdrawal = createServerFn({ method: "POST" })
       const { notifyWithdrawalPaid, notifyWithdrawalRejected } = await import("@/lib/notify-user");
       if (data.decision === "paid") {
         await notifyWithdrawalPaid(String(row.user_id), { ...row, status: nextStatus, tx_hash: txHash });
+        await notifyOwnersWithdrawalPaid({ userId: String(row.user_id), amount: Number(row.amount), method: String(row.method ?? "USDT"), txHash, reference: String((row as any).reference ?? row.id) });
       } else {
         await notifyWithdrawalRejected(String(row.user_id), { ...row, status: nextStatus }, data.reason ?? "Withdrawal rejected by owner.");
+        await notifyOwnersWithdrawalFailed({ userId: String(row.user_id), amount: Number(row.amount), method: String(row.method ?? "USDT"), reason: data.reason ?? "Withdrawal rejected by owner.", reference: String((row as any).reference ?? row.id) });
       }
     } catch {}
     return { status: nextStatus };

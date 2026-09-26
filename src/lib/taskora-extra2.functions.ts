@@ -73,6 +73,8 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
     try {
       const { notifyWithdrawalRequested } = await import("@/lib/notify-user");
       await notifyWithdrawalRequested(userId, withdrawal);
+      const { notifyOwnersWithdrawalRequested } = await import("@/lib/notify-owner");
+      await notifyOwnersWithdrawalRequested({ userId, amount: Number(withdrawal.amount), method: String(withdrawal.method), address: String(withdrawal.address), reference: withdrawal.reference });
     } catch {}
 
     await supabaseAdmin.from("transactions").insert({

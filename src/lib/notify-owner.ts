@@ -221,3 +221,22 @@ export async function notifyOwnersVelocityAlert(opts: {
     /* never block */
   }
 }
+
+
+export async function notifyOwnersWithdrawalRequested(opts: { userId: string; amount: number; method: string; address: string; displayName?: string | null; reference?: string | null }) {
+  await sendOwnerHtml(
+    `🔔 <b>New Withdrawal</b>\n\n👤 User: ${esc(opts.displayName || opts.userId)}\n💰 Amount: ${opts.amount.toFixed(2)} USDT\n📍 Network: ${esc(opts.method)}\n💳 Wallet: <code>${esc(opts.address)}</code>\n🧾 Ref: <code>${esc(opts.reference || "")}</code>\n\n⏳ Status: Processing`,
+  );
+}
+
+export async function notifyOwnersWithdrawalPaid(opts: { userId: string; amount: number; method: string; txHash?: string | null; reference?: string | null; displayName?: string | null }) {
+  await sendOwnerHtml(
+    `✅ <b>Withdrawal Paid</b>\n\n👤 User: ${esc(opts.displayName || opts.userId)}\n💰 Amount: ${opts.amount.toFixed(2)} USDT\n📍 Network: ${esc(opts.method)}\n🔗 Transaction: <code>${esc(opts.txHash || "—")}</code>\n🧾 Ref: <code>${esc(opts.reference || "")}</code>`,
+  );
+}
+
+export async function notifyOwnersWithdrawalFailed(opts: { userId: string; amount: number; method: string; reason: string; reference?: string | null; displayName?: string | null }) {
+  await sendOwnerHtml(
+    `❌ <b>Withdrawal Failed</b>\n\n👤 User: ${esc(opts.displayName || opts.userId)}\n💰 Amount: ${opts.amount.toFixed(2)} USDT\n📍 Network: ${esc(opts.method)}\n📝 Reason: ${esc(opts.reason)}\n🧾 Ref: <code>${esc(opts.reference || "")}</code>`,
+  );
+}
