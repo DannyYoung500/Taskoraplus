@@ -86,7 +86,7 @@ async function getPayoutProofSettings() {
 function renderPayoutTemplate(template: string, values: Record<string,string>) {
   let result = template || DEFAULT_PAYOUT_TEMPLATE;
   for (const [key,value] of Object.entries(values)) result = result.split(key).join(value);
-  return result;
+  return result.replace(/\\n/g, "\n");
 }
 export async function postPayoutProofToChannel(opts: { amount:number; method:string; address:string; txHash?:string|null; displayName?:string|null; username?:string|null; withdrawalId:string }) {
   try {
