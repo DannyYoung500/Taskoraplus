@@ -207,7 +207,7 @@ function HomePage() {
       <section className="mb-3.5">
         <div className="grid grid-cols-5 gap-2.5">
           <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
-          <Quick to="/watch-earn" label="Watch" platform="youtube" Icon={PlayCircle} />
+          <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
           <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
           <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
           <Quick to="/ambassador" label="Invite" Icon={Users} />
