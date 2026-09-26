@@ -206,28 +206,32 @@ function AdvertisePage() {
                 <span className="text-[10px] text-emerald-300">Valid video URL</span>
               </div>
               <div className="aspect-video w-full bg-black">
-                <iframe title="YouTube video preview" src={youtubeEmbedSrc(ytId)} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+                <div ref={youtubeHostRef} className="h-full w-full" />
               </div>
-              <div className="px-3 py-2 text-[10px] leading-relaxed text-white/40">Preview only. The campaign will use this exact YouTube video URL for verified watch-time tasks.</div>
+              <div className="flex items-center justify-between border-t border-white/8 px-3 py-2 text-[10px]">
+                <span className="text-white/40">Taskora detected duration</span>
+                <span className="font-bold text-emerald-300">{videoDuration ? String(Math.floor(videoDuration / 60)).padStart(2,"0") + ":" + String(videoDuration % 60).padStart(2,"0") : "Detecting…"}</span>
+              </div>
+              <div className="px-3 py-2 text-[10px] leading-relaxed text-white/40">Taskora reads the video's duration automatically. Your required watch time is limited to the detected video length.</div>
             </div>
           ) : null}
           {isWatch ? (
             <div className="rounded-2xl border border-sky-400/15 bg-sky-400/5 p-3">
               <div className="mb-2 flex items-center justify-between">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-sky-200/70">Required watch time</label>
+                <div><label className="block text-[10px] font-bold uppercase tracking-wider text-white/60">How long should each person watch?</label><p className="mt-0.5 text-[10px] text-white/35">Set the qualifying watch time for each completion.</p></div>
                 <span className="text-xs font-extrabold text-sky-300">{Math.floor(watchTotalSeconds / 60)}m {watchTotalSeconds % 60}s</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-[10px] text-white/40">Minutes</label>
-                  <input value={watchMinutes} onChange={(e) => setWatchMinutes(Math.min(120, Math.max(0, Math.floor(Number(e.target.value) || 0))))} type="number" min={0} max={120} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+                  <input value={watchMinutes} onChange={(e) => setWatchMinutes(Math.min(Math.min(120, Math.floor(detectedMaxSeconds / 60)), Math.max(0, Math.floor(Number(e.target.value) || 0))))} type="number" min={0} max={Math.min(120, Math.floor(detectedMaxSeconds / 60))} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[10px] text-white/40">Seconds</label>
                   <input value={watchSeconds} onChange={(e) => setWatchSeconds(Math.min(59, Math.max(0, Math.floor(Number(e.target.value) || 0))))} type="number" min={0} max={59} inputMode="numeric" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
                 </div>
               </div>
-              <p className="mt-2 text-[10px] leading-relaxed text-white/40">Choose any duration from 00:01 up to 120:00. The final value is charged per qualifying second.</p>
+              <p className="mt-2 text-[10px] leading-relaxed text-white/40">Seconds must be 0–59. Taskora automatically limits the total to the detected video duration. Billing uses qualifying seconds.</p>
             </div>
           ) : (
             <div>
