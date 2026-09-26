@@ -77,6 +77,59 @@ function AdvertisePage() {
   const insufficient = balance < total;
   const ytId = isWatch ? extractYoutubeId(link) : null;
 
+  useEffect(() => {
+    setVideoDuration(null);
+    if (!ytId) return;
+    let cancelled = false;
+    let poll: ReturnType<typeof setInterval> | undefined;
+    const loadPlayer = () => {
+      if (cancelled || !youtubeHostRef.current || !(window as any).YT?.Player) return;
+      youtubePlayerRef.current?.destroy?.();
+      youtubePlayerRef.current = new (window as any).YT.Player(youtubeHostRef.current, {
+        videoId: ytId,
+        playerVars: { playsinline: 1, rel: 0, enablejsapi: 1 },
+        events: {
+          onReady: (event: any) => {
+            const readDuration = () => {
+              const seconds = Math.floor(Number(event.target.getDuration?.() || 0));
+              if (seconds > 0 && !cancelled) {
+                setVideoDuration(seconds);
+                setWatchMinutes((m) => Math.min(m, Math.floor(seconds / 60)));
+                setWatchSeconds((s) => Math.min(s, seconds < 60 ? Math.max(0, seconds - 1) : 59));
+                if (poll) clearInterval(poll);
+              }
+            };
+            readDuration();
+            poll = setInterval(readDuration, 500);
+          },
+        },
+      });
+    };
+    const w = window as any;
+    if (w.YT?.Player) {
+      loadPlayer();
+    } else {
+      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        script.async = true;
+        document.head.appendChild(script);
+      }
+      const previous = w.onYouTubeIframeAPIReady;
+      w.onYouTubeIframeAPIReady = () => { previous?.(); loadPlayer(); };
+      const wait = setInterval(() => { if (w.YT?.Player) { clearInterval(wait); loadPlayer(); } }, 250);
+      setTimeout(() => clearInterval(wait), 10000);
+    }
+    return () => {
+      cancelled = true;
+      if (poll) clearInterval(poll);
+      youtubePlayerRef.current?.destroy?.();
+      youtubePlayerRef.current = null;
+    };
+  }, [ytId]);
+
+  const detectedMaxSeconds = videoDuration ? Math.min(videoDuration, 7200) : 7200;
+
   async function publish() {
     if (!platform || !service) return;
     if (!link.trim()) {
@@ -91,8 +144,8 @@ function AdvertisePage() {
       setMsg(`Quantity must be between ${service.minQty.toLocaleString()} and ${service.maxQty.toLocaleString()}.`);
       return;
     }
-    if (isWatch && (watchTotalSeconds < 1 || watchTotalSeconds > 7200)) {
-      setMsg("Watch time must be between 00:01 and 120:00.");
+    if (isWatch && (watchTotalSeconds < 1 || watchTotalSeconds > detectedMaxSeconds)) {
+      setMsg("Watch time cannot be longer than the detected YouTube video duration.");
       return;
     }
     if (insufficient) {
