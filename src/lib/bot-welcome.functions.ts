@@ -53,9 +53,27 @@ function normalizeButtons(raw: unknown): WelcomeButton[] {
     });
 }
 
-function cleanName(value?: string | null): string {\n  return String(value ?? "").replace(/[<>]/g, "").replace(/\\\\[nrt]/g, " ").trim();\n}
+function cleanName(value?: string | null): string {
+  return String(value ?? "").replace(/[<>]/g, "").replace(/\\[nrt]/g, " ").trim();
+}
 
-function buildWelcomeText(firstName?: string | null, inviterName?: string | null) {\n  const name = cleanName(firstName) || "there";\n  const inviter = cleanName(inviterName);\n  return `🎉 Welcome to TaskoraPlus!\n\nHello, ${name}!${inviter ? `\n\n✅ ${inviter} invited you to join!` : ""}\n\n💰 Complete tasks to earn USDT\n📅 Daily check-in for Task Points\n👥 Invite friends and earn up to 20% commission\n\n🚀 Invite friends and grow your monthly earnings\n\n👇 Tap below to start earning!`;\n}
+function buildWelcomeText(firstName?: string | null, inviterName?: string | null) {
+  const name = cleanName(firstName) || "there";
+  const inviter = cleanName(inviterName);
+  return `🎉 Welcome to TaskoraPlus!
+
+Hello, ${name}!${inviter ? `
+
+✅ ${inviter} invited you to join!` : ""}
+
+💰 Complete tasks to earn USDT
+📅 Daily check-in for Task Points
+👥 Invite friends and earn up to 20% commission
+
+🚀 Invite friends and grow your monthly earnings
+
+👇 Tap below to start earning!`;
+}
 
 async function getInviterName(referralCode?: string | null) {
   const code = referralCode?.trim();
