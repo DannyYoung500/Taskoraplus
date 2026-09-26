@@ -198,7 +198,7 @@ function Page() {
               </label>
               <label className="text-[11px] text-white/55">🌍 Country / time zone
                 <select value={checkin.timezone} onChange={e => setCheckin({...checkin, timezone: e.target.value})} className="mt-1 w-full rounded-xl border border-white/10 bg-[#08172a] px-3 py-2.5 text-sm text-white">
-                  {typeof Intl !== "undefined" && Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone").map(zone => {
+                  {typeof Intl !== "undefined" && (Intl as any).supportedValuesOf ? (Intl as any).supportedValuesOf("timeZone").map((zone: string) => {
                     const city = zone.split("/").slice(-1)[0].replaceAll("_", " ");
                     const region = zone.split("/")[0];
                     return <option key={zone} value={zone}>{region} · {city} ({zone})</option>;
@@ -212,7 +212,9 @@ function Page() {
             </label>
             <button disabled={savingCheckin} onClick={() => void saveCheckin()} className="mt-3 w-full rounded-xl bg-amber-400 py-3 text-sm font-bold text-[#071221]">{savingCheckin ? "Saving…" : "Save check-in schedule"}</button>
           </section>
-        ) : null}\n\n        <section className="mt-5 space-y-3">
+        ) : null}
+
+        <section className="mt-5 space-y-3">
           <h2 className="text-sm font-semibold text-blue-200">🛡️ Payout Risk Controls</h2>
           <label className="block text-[11px] text-white/50">
             Force dual approval at risk ≥
