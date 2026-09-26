@@ -5,7 +5,7 @@ import { PLATFORM_META, PLATFORM_ORDER, CATEGORY_LABELS, PlatformLogo, type Plat
 import { getDashboard } from "@/lib/taskora.functions";
 import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
 import { SERVICES, type ServiceDef } from "@/lib/advertise-services";
-import { extractYoutubeId, youtubeEmbedSrc, youtubeWatchUrl } from "@/lib/youtube-url";
+import { extractYoutubeId, youtubeWatchUrl } from "@/lib/youtube-url";
 
 export const Route = createFileRoute("/_authenticated/advertise")({
   head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }),
