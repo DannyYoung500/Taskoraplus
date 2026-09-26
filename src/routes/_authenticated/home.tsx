@@ -205,9 +205,9 @@ function HomePage() {
       </section>
 
       <section className="mb-3.5">
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-5 gap-2.5">
           <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
-          <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
+          <Quick to="/watch-earn" label="Watch" platform="youtube" Icon={PlayCircle} />
           <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
           <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
           <Quick to="/ambassador" label="Invite" Icon={Users} />
@@ -335,20 +335,26 @@ function Quick({
   to,
   label,
   Icon,
+  platform,
 }: {
   to: string;
   label: string;
   Icon: ComponentType<{ className?: string }>;
+  platform?: Platform;
 }) {
   return (
     <Link
       to={to}
-      className="flex min-w-0 flex-col items-center justify-center rounded-xl border border-blue-400/15 bg-[#0b1628] px-1.5 py-2.5 text-center active:scale-[0.98]"
+      className="flex min-w-0 min-h-[92px] flex-col items-center justify-center rounded-2xl border border-blue-400/20 bg-[#0b1628] px-1.5 py-3.5 text-center shadow-[0_6px_20px_rgba(15,23,42,0.22)] active:scale-[0.98]"
     >
-      <span className="inline-flex size-8 items-center justify-center rounded-lg bg-blue-500/15 text-cyan-300">
-        <Icon className="size-4" />
-      </span>
-      <p className="mt-1.5 w-full truncate text-[10px] font-bold leading-tight text-slate-100">{label}</p>
+      {platform ? (
+        <PlatformLogo platform={platform} size={40} />
+      ) : (
+        <span className="inline-flex size-10 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300 ring-1 ring-blue-400/10">
+          <Icon className="size-5" />
+        </span>
+      )}
+      <p className="mt-2 w-full truncate text-[11px] font-bold leading-tight text-slate-100">{label}</p>
     </Link>
   );
 }
