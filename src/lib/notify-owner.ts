@@ -114,6 +114,25 @@ export async function postPayoutProofToChannel(opts: { amount:number; method:str
     await sendOwnerHtml(`📢 Payout proof posted\\n$${Number(opts.amount).toFixed(2)} · ${opts.method} · ${username ? "@" + username : "no username"}`);
   } catch {}
 }
+export async function sendPayoutProofTest() {
+  const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
+  const settings = await getPayoutProofSettings();
+  const channelId = settings.channel_id || process.env["TASKORA_PAYOUT_CHANNEL_ID"] || process.env["PAYOUT_CHANNEL_ID"] || process.env["TASKORA_PAYMENT_CHANNEL_ID"] || "";
+  if (!botToken) throw new Error("Telegram bot token is not configured.");
+  if (!channelId) throw new Error("Save a payout channel first.");
+  const caption = renderPayoutTemplate(settings.message_template || DEFAULT_PAYOUT_TEMPLATE, {
+    "#amount": "10.00", "#method": "USDT_TRC20", "#name": "TASKORA Test User",
+    "#username": "@taskora_test", "#address": "TTestAddress1234567890",
+    "#tx_hash": "TEST_TRANSACTION", "#reference": "TEST-PAYOUT", "#time": new Date().toISOString(),
+  });
+  const response = settings.payout_image_url
+    ? await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({chat_id:channelId,photo:settings.payout_image_url,caption:caption.slice(0,1024),parse_mode:"HTML"}) })
+    : await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({chat_id:channelId,text:caption.slice(0,4096),parse_mode:"HTML"}) });
+  const result = await response.json() as any;
+  if (!response.ok || !result.ok) throw new Error(result.description || "Telegram rejected the test payout.");
+  return { ok:true, channel_id:channelId, message_id:result.result?.message_id ?? null, used_image:Boolean(settings.payout_image_url) };
+}
+
 export async function getPayoutChannelConfig() {
   const s = await getPayoutProofSettings();
   return { channel_id:s.channel_id??"", channel_username:s.channel_username??null, channel_title:s.channel_title??null, channel_description:s.channel_description??null, channel_photo_url:s.channel_photo_url??null, payout_image_url:s.payout_image_url??null, payout_image_file_name:s.payout_image_file_name??null, message_template:s.message_template || DEFAULT_PAYOUT_TEMPLATE };
