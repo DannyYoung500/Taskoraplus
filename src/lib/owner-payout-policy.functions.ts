@@ -95,6 +95,16 @@ export const ownerSetPayoutChannel = createServerFn({ method: "POST" })
   });
 
 
+export const ownerTestPayoutProof = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const { sendPayoutProofTest } = await import("@/lib/notify-owner");
+    const result = await sendPayoutProofTest();
+    await audit({ adminId: context.userId, action: "payout_channel.test", targetType: "settings", targetId: "payout_proof_settings", next: result }).catch(() => undefined);
+    return result;
+  });
+
 export const ownerRefreshPayoutChannel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
