@@ -107,7 +107,7 @@ function ProfileScreen() {
           {isOwner ? (
             <Link
               to="/owner"
-              className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-2 text-amber-200"
+              className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-2 text-cyan-200"
             >
               <Crown className="size-5" />
             </Link>
@@ -136,7 +136,7 @@ function ProfileScreen() {
           to="/leaderboard"
           className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5"
         >
-          <Trophy className="size-5 text-amber-300" />
+          <Trophy className="size-5 text-cyan-300" />
           <div>
             <p className="text-xs font-black">Rank</p>
             <p className="text-[10px] text-slate-500">Leaderboard</p>
