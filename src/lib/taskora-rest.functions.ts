@@ -208,6 +208,10 @@ export const reviewSubmission = createServerFn({ method: "POST" })
         .eq("id", data.submissionId)
         .eq("status", "pending");
       if (error) throw new Error(error.message);
+      try {
+        const { notifyTaskRejected } = await import("@/lib/notify-user");
+        await notifyTaskRejected(submission.user_id, submission.tasks, data.reason ?? "Requirements were not met.");
+      } catch {}
       return { status: "rejected" as const };
     }
 
@@ -246,6 +250,10 @@ export const reviewSubmission = createServerFn({ method: "POST" })
       }
     }
 
+    try {
+      const { notifyTaskCompleted } = await import("@/lib/notify-user");
+      await notifyTaskCompleted(submission.user_id, task, Number((task as any)?.task_metadata?.task_points ?? 0));
+    } catch {}
     return { status: "verified" as const };
   });
 
