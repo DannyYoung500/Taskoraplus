@@ -87,16 +87,20 @@ function normalizeTelegramChatRef(raw: string): string {
   let s = String(raw ?? "").trim();
   if (!s) return "";
   try {
-    if (/^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\//i.test(s)) {
+    const lower = s.toLowerCase();
+    const isLink = lower.startsWith("https://t.me/") || lower.startsWith("http://t.me/") ||
+      lower.startsWith("https://telegram.me/") || lower.startsWith("http://telegram.me/") ||
+      lower.startsWith("t.me/") || lower.startsWith("telegram.me/");
+    if (isLink) {
       const u = new URL(s.startsWith("http") ? s : `https://${s}`);
-      const path = u.pathname.replace(/^\\/+/, "").split("/")[0] ?? "";
+      const path = u.pathname.split("/").filter(Boolean)[0] ?? "";
       if (path && !path.startsWith("+") && !path.startsWith("joinchat")) {
-        return path.startsWith("-") || /^\\d+$/.test(path) ? path : `@${path.replace(/^@+/, "")}`;
+        s = path;
       }
     }
   } catch {}
-  s = s.replace(/^@+/, "");
-  if (/^-?\\d+$/.test(s)) return s;
+  while (s.startsWith("@")) s = s.slice(1);
+  if (s && (s.startsWith("-") || /^[0-9]+$/.test(s))) return s;
   return s ? `@${s}` : "";
 }
 
