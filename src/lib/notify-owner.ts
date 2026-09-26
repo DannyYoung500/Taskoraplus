@@ -9,6 +9,8 @@ async function ownerChatIds(): Promise<{ botToken: string; ownerIds: string[] }>
   return { botToken, ownerIds };
 }
 
+function esc(v: unknown) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
 export async function sendOwnerHtml(msg: string) {
   const { botToken, ownerIds } = await ownerChatIds();
   if (!botToken || !ownerIds.length) return;
