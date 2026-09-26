@@ -88,10 +88,7 @@ export const createAdvertiseTask = createServerFn({ method: "POST" })
       .select("*")
       .single();
 
-    if (!error && task) {
-      try { const { publishNewTaskNotification } = await import("@/lib/notify-user"); await publishNewTaskNotification(task); } catch {}
-      return task;
-    }
+    if (!error && task) return task;
 
     // Keep the restored Advertise page usable if the optional task-detail migration
     // has not reached the database yet. The migration stores the full fields above.

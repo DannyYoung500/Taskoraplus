@@ -148,11 +148,14 @@ export const submitTask = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) throw new Error("You already submitted this task.");
 
-    const { data: submission, error } = await supabaseAdmin.from("submissions").insert({
-      user_id: userId, task_id: task.id, status: "pending", proof_text: data.proofText ?? null, proof_url: data.proofUrl ?? null,
-    }).select("id").single();
+    const { error } = await supabaseAdmin.from("submissions").insert({
+      user_id: userId,
+      task_id: task.id,
+      status: "pending",
+      proof_text: data.proofText ?? null,
+      proof_url: data.proofUrl ?? null,
+    });
     if (error) throw new Error(error.message);
-    try { const { notifyTaskSubmitted } = await import("@/lib/notify-user"); await notifyTaskSubmitted(userId, task, String(submission.id)); } catch {}
 
     await supabaseAdmin
       .from("tasks")
@@ -201,7 +204,6 @@ export const reviewSubmission = createServerFn({ method: "POST" })
         .eq("id", data.submissionId)
         .eq("status", "pending");
       if (error) throw new Error(error.message);
-      try { const { notifyTaskRejected } = await import("@/lib/notify-user"); await notifyTaskRejected(submission.user_id, submission.tasks, String(submission.id), data.reason ?? "Requirements were not met."); } catch {}
       return { status: "rejected" as const };
     }
 
@@ -240,7 +242,6 @@ export const reviewSubmission = createServerFn({ method: "POST" })
       }
     }
 
-    try { const { notifyTaskCompleted } = await import("@/lib/notify-user"); await notifyTaskCompleted(submission.user_id, task, String(submission.id), Number((task as any)?.task_metadata?.task_points ?? 0)); } catch {}
     return { status: "verified" as const };
   });
 

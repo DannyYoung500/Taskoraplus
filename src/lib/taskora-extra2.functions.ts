@@ -63,16 +63,13 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
     const balance = (txs ?? []).reduce((s, t) => s + Number(t.amount), 0);
     if (balance < data.amount) throw new Error("Not enough balance for this withdrawal.");
 
-    const { data: withdrawal, error } = await supabaseAdmin.from("withdrawals").insert({
-      user_id: userId, method: data.method, address: data.address.trim(), amount: data.amount,
-    }).select("*").single();
+    const { error } = await supabaseAdmin.from("withdrawals").insert({
+      user_id: userId,
+      method: data.method,
+      address: data.address.trim(),
+      amount: data.amount,
+    });
     if (error) throw new Error(error.message);
-    try {
-      const { notifyWithdrawalRequested } = await import("@/lib/notify-user"); await notifyWithdrawalRequested(userId, withdrawal);
-      const { notifyOwnersWithdrawalRequested } = await import("@/lib/notify-owner");
-      const p = await supabaseAdmin.from("profiles").select("display_name").eq("id", userId).maybeSingle();
-      await notifyOwnersWithdrawalRequested({ userId, amount: Number(withdrawal.amount), method: String(withdrawal.method), address: String(withdrawal.address), displayName: p.data?.display_name, reference: withdrawal.reference });
-    } catch {}
 
     await supabaseAdmin.from("transactions").insert({
       user_id: userId,
@@ -217,11 +214,9 @@ export const ownerCreateTask = createServerFn({ method: "POST" })
         delete row.meta;
         const r2 = await supabaseAdmin.from("tasks").insert(row as never).select("*").single();
         if (r2.error) throw new Error(r2.error.message);
-        try { const { publishNewTaskNotification } = await import("@/lib/notify-user"); await publishNewTaskNotification(r2.data); } catch {}
         return r2.data;
       }
       throw new Error(error.message);
     }
-    try { const { publishNewTaskNotification } = await import("@/lib/notify-user"); await publishNewTaskNotification(task); } catch {}
     return task;
   });
