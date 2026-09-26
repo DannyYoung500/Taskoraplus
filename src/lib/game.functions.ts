@@ -31,24 +31,43 @@ export const getAvailableGames = createServerFn({ method: "GET" })
     const s = await adminClient();
     const { data, error } = await (s as any)
       .from("games")
-      .select(
-        "id,provider_id,external_game_id,slug,title,description,thumbnail_url,launch_url,embed_url,category,status,featured,reward_type,reward_value,provider_value,estimated_minutes,provider:provider_id(id,provider_name,provider_key,enabled)",
+       .select(
+        "id,provider_id,external_game_id,slug,title,description,thumbnail_url,launch_url,embed_url,category,status,featured,reward_type,reward_value,provider_value,estimated_minutes,created_at",
       )
       .eq("status", "active")
-      .eq("provider.enabled", true)
       .order("featured", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
 
-    return ((data ?? []) as any[])
-      .filter((row) => row.provider?.enabled)
-      .map(
-        (row): AvailableGame => ({
+    const rows = (data ?? []) as any[];
+    if (rows.length === 0) return [];
+
+    const providerIds = Array.from(
+      new Set(rows.map((row) => String(row.provider_id)).filter(Boolean)),
+    );
+
+    const { data: providers, error: providersError } = await (s as any)
+      .from("monetization_providers")
+      .select("id,provider_name,provider_key,enabled")
+      .in("id", providerIds);
+
+    if (providersError) throw new Error(providersError.message);
+
+    const providerById = new Map(
+      ((providers ?? []) as any[]).map((provider) => [String(provider.id), provider]),
+    );
+
+    return rows
+      .map((row): AvailableGame | null => {
+        const provider = providerById.get(String(row.provider_id));
+        if (!provider?.enabled) return null;
+
+        return {
           id: String(row.id),
           providerId: String(row.provider_id),
-          providerName: String(row.provider?.provider_name ?? "Game Provider"),
-          providerKey: String(row.provider?.provider_key ?? ""),
+          providerName: String(provider.provider_name ?? "Game Provider"),
+          providerKey: String(provider.provider_key ?? ""),
           title: String(row.title),
           slug: String(row.slug),
           description: row.description ? String(row.description) : null,
@@ -56,13 +75,18 @@ export const getAvailableGames = createServerFn({ method: "GET" })
           launchUrl: row.launch_url ? String(row.launch_url) : null,
           embedUrl: row.embed_url ? String(row.embed_url) : null,
           category: String(row.category ?? "arcade"),
-          rewardType: row.reward_type === "usdt" || row.reward_type === "mixed" ? row.reward_type : "task_points",
+          rewardType:
+            row.reward_type === "usdt" || row.reward_type === "mixed"
+              ? row.reward_type
+              : "task_points",
           rewardValue: Number(row.reward_value ?? 0),
           providerValue: Number(row.provider_value ?? 0),
-          estimatedMinutes: row.estimated_minutes == null ? null : Number(row.estimated_minutes),
+          estimatedMinutes:
+            row.estimated_minutes == null ? null : Number(row.estimated_minutes),
           featured: Boolean(row.featured),
-        }),
-      );
+        };
+      })
+      .filter((game): game is AvailableGame => game !== null);
   });
 
 const GAME_KEY = "tap_rush";
