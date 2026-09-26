@@ -125,6 +125,10 @@ export const dailyCheckin = createServerFn({ method: "POST" })
       },
     );
     if (pointsError) throw new Error(pointsError.message);
+    try {
+      const { notifyCheckinSuccess } = await import("@/lib/notify-user");
+      await notifyCheckinSuccess(userId, streak, totalAward, streakBonus);
+    } catch {}
     return {
       already: false,
       streak,
@@ -199,6 +203,10 @@ export const reviewWithdrawal = createServerFn({ method: "POST" })
         } as never)
         .eq("id", data.withdrawalId);
       if (error) throw new Error(error.message);
+      try {
+        const { notifyWithdrawalReview } = await import("@/lib/notify-user");
+        await notifyWithdrawalReview(String(row.user_id), row);
+      } catch {}
       return { status: "pending", approval_stage: "first_ok" as const };
     }
 
@@ -289,5 +297,13 @@ export const reviewWithdrawal = createServerFn({ method: "POST" })
       }
     }
 
+    try {
+      const { notifyWithdrawalPaid, notifyWithdrawalRejected } = await import("@/lib/notify-user");
+      if (data.decision === "paid") {
+        await notifyWithdrawalPaid(String(row.user_id), { ...row, status: nextStatus, tx_hash: txHash });
+      } else {
+        await notifyWithdrawalRejected(String(row.user_id), { ...row, status: nextStatus }, data.reason ?? "Withdrawal rejected by owner.");
+      }
+    } catch {}
     return { status: nextStatus };
   });

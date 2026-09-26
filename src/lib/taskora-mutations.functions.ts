@@ -100,6 +100,10 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     if (proofHash) row.proof_hash = proofHash;
     const { error } = await supabaseAdmin.from("submissions").insert(row);
     if (error) throw new Error(error.message);
+    try {
+      const { notifyTaskSubmitted } = await import("@/lib/notify-user");
+      await notifyTaskSubmitted(userId, task);
+    } catch {}
     await supabaseAdmin
       .from("tasks")
       .update({ slots_left: Math.max(0, task.slots_left - 1) })

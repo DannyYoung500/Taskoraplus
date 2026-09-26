@@ -70,6 +70,10 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
       amount: data.amount,
     });
     if (error) throw new Error(error.message);
+    try {
+      const { notifyWithdrawalRequested } = await import("@/lib/notify-user");
+      await notifyWithdrawalRequested(userId, withdrawal);
+    } catch {}
 
     await supabaseAdmin.from("transactions").insert({
       user_id: userId,

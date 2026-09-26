@@ -156,6 +156,10 @@ export const submitTask = createServerFn({ method: "POST" })
       proof_url: data.proofUrl ?? null,
     });
     if (error) throw new Error(error.message);
+    try {
+      const { notifyTaskSubmitted } = await import("@/lib/notify-user");
+      await notifyTaskSubmitted(userId, task);
+    } catch {}
 
     await supabaseAdmin
       .from("tasks")
