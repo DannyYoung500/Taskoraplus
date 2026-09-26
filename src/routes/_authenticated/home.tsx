@@ -107,16 +107,16 @@ function HomePage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#030814] px-3.5 pb-28 pt-3 text-white">
-      <header className="mb-4 flex items-center gap-2.5">
+    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#030814] px-3 pb-28 pt-2.5 text-white">
+      <header className="mb-3.5 flex items-center gap-2">
         <img
           src={TASKORA_LOGO}
           alt="TASKORA"
-          className="size-11 rounded-full object-cover ring-2 ring-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.35)]"
+          className="size-9 rounded-full object-cover ring-1 ring-cyan-400/40 shadow-[0_0_16px_rgba(34,211,238,0.22)]"
         />
         <div className="min-w-0 flex-1">
           <p
-            className="text-[22px] font-black leading-none tracking-[0.06em]"
+            className="text-[19px] font-semibold leading-none tracking-[0.01em]"
             style={{
               background: "linear-gradient(90deg,#e0f2fe,#38bdf8,#2563eb)",
               WebkitBackgroundClip: "text",
@@ -125,31 +125,31 @@ function HomePage() {
           >
             TASKORA
           </p>
-          <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
+          <p className="mt-0.5 text-[8px] font-medium tracking-[0.12em] text-slate-400">
             Earn · Play · Grow
           </p>
         </div>
         <Link
           to="/notifications"
           aria-label="Notifications"
-          className="relative rounded-full border border-cyan-400/20 bg-[#0b1628] p-2.5 text-slate-300"
+          className="relative rounded-full border border-white/8 bg-white/[0.035] p-2 text-slate-300"
         >
           <Bell className="size-4" />
         </Link>
         <Link
           to="/profile"
-          className="flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-[#0b1628] py-1 pl-1 pr-2.5"
+          className="flex items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.035] py-1 pl-1 pr-2"
         >
           {photo ? (
-            <img src={photo} alt="" className="size-8 rounded-full object-cover" />
+            <img src={photo} alt="" className="size-7 rounded-full object-cover" />
           ) : (
             <span className="flex size-8 items-center justify-center rounded-full bg-cyan-500/20 text-xs font-bold">
               {name.charAt(0)}
             </span>
           )}
           <div className="min-w-0 leading-tight">
-            <p className="max-w-[72px] truncate text-[11px] font-bold">{name}</p>
-            <p className="text-[9px] text-cyan-300/70">Level {levelNum}</p>
+            <p className="max-w-[68px] truncate text-[10px] font-medium">{name}</p>
+            <p className="text-[8px] text-slate-500">Level {levelNum}</p>
           </div>
           <ChevronRight className="size-3 text-slate-500" />
         </Link>
@@ -168,7 +168,7 @@ function HomePage() {
       ) : null}
 
       <section
-        className="relative mb-3.5 overflow-hidden rounded-[22px] border border-cyan-400/35 p-4 shadow-[0_0_40px_rgba(14,165,233,0.18)]"
+        className="relative mb-3.5 overflow-hidden rounded-[18px] border border-blue-400/20 p-3.5 shadow-[0_12px_32px_rgba(2,8,23,0.28)]"
         style={{
           background:
             "radial-gradient(circle at 92% 20%,rgba(56,189,248,0.28),transparent 36%), linear-gradient(145deg,#0a1a33 0%,#071221 55%,#050d1a 100%)",
@@ -189,13 +189,13 @@ function HomePage() {
               ) : null}
             </p>
           </div>
-          <div className="flex size-[72px] shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/20 to-blue-600/10">
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/20 to-blue-600/10">
             <WalletCards className="size-8 text-cyan-200" />
           </div>
         </div>
         <Link
           to="/wallet"
-          className="mt-3.5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-black text-white shadow-[0_8px_28px_rgba(37,99,235,0.35)]"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-medium text-white shadow-[0_6px_20px_rgba(37,99,235,0.28)]"
           style={{ background: BLUE_GRAD }}
         >
           <WalletCards className="size-3.5" />
@@ -205,7 +205,7 @@ function HomePage() {
       </section>
 
       <section className="mb-3.5">
-        <div className="grid grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-5 gap-1.5">
           <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
           <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
           <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
@@ -220,8 +220,8 @@ function HomePage() {
             <Star className="size-6 fill-amber-300 text-amber-300" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black">Task Points</p>
-            <p className="text-2xl font-black text-amber-200">{displayTaskPoints.toLocaleString()}</p>
+            <p className="text-sm font-semibold">Task Points</p>
+            <p className="text-2xl font-semibold text-amber-200">{displayTaskPoints.toLocaleString()}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] font-semibold text-slate-400">Next Level</p>
@@ -345,16 +345,16 @@ function Quick({
   return (
     <Link
       to={to}
-      className="flex min-w-0 min-h-[88px] flex-col items-center justify-center rounded-xl border border-blue-400/20 bg-[#0b1628] px-1 py-2.5 text-center shadow-[0_4px_14px_rgba(15,23,42,0.16)] active:scale-[0.98]"
+      className="flex min-w-0 min-h-[68px] flex-col items-center justify-center rounded-[14px] border border-blue-400/15 bg-[#0b1628]/80 px-1 py-2 text-center shadow-[0_4px_14px_rgba(15,23,42,0.16)] active:scale-[0.98]"
     >
       {platform ? (
         <PlatformLogo platform={platform} size={40} />
       ) : (
-        <span className="inline-flex size-9 items-center justify-center rounded-lg bg-blue-500/15 text-cyan-300 ring-1 ring-blue-400/10">
+        <span className="inline-flex size-7 items-center justify-center rounded-lg bg-blue-500/10 text-cyan-300">
           <Icon className="size-5" />
         </span>
       )}
-      <p className="mt-1.5 w-full truncate text-[10px] font-normal leading-tight text-slate-300">{label}</p>
+      <p className="mt-1 w-full truncate text-[9px] font-medium leading-tight text-slate-300">{label}</p>
     </Link>
   );
 }
