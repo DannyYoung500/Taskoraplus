@@ -15,19 +15,22 @@ import {
   Trophy,
 } from "lucide-react";
 import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
+import { listDailyMissions } from "@/lib/daily-missions.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
 
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
-    const [tasks, dash] = await Promise.all([
+    const [tasks, dash, missions] = await Promise.all([
       listTasks().catch(() => []),
       getDashboard().catch(() => null),
+      listDailyMissions().catch(() => []),
     ]);
     return {
       tasks: tasks.filter((task) => !isDemoTaskTitle(task.title)).slice(0, 8),
       dash,
+      missions,
     };
   },
   component: HomePage,
@@ -43,7 +46,7 @@ function levelFromPoints(points: number) {
 }
 
 function HomePage() {
-  const { tasks, dash } = Route.useLoaderData();
+  const { tasks, dash, missions } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
   const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
   const balance = rawBalance <= 0.00005 ? 0 : Math.max(0, rawBalance);
@@ -205,82 +208,27 @@ function HomePage() {
       </section>
 
       <section className="mb-3.5">
-        <div className="grid grid-cols-5 gap-1.5">
-          <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
-          <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
-          <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
-          <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
-          <Quick to="/ambassador" label="Invite" Icon={Users} />
-        </div>
-      </section>
-
-      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-amber-400/35 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-amber-300/40 bg-amber-400/15 text-amber-200">
-            <Star className="size-6 fill-amber-300 text-amber-300" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Task Points</p>
-            <p className="text-2xl font-semibold text-amber-200">{displayTaskPoints.toLocaleString()}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-semibold text-slate-400">Next Level</p>
-            <p className="text-[11px] font-bold text-slate-200">
-              {displayTaskPoints.toLocaleString()} / {nextTarget.toLocaleString()}
-            </p>
-            <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          </div>
-          <div className="text-center">
-            <span className="inline-flex size-9 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-              <Flame className="size-4" />
-            </span>
-            <p className="mt-1 text-[9px] font-bold text-cyan-200">Level {levelNum}</p>
-            <p className="text-[8px] text-slate-500">{levelLabel}</p>
-          </div>
-        </div>
-      </section>
-
-      <button
-        type="button"
-        disabled={checkBusy}
-        onClick={() => void onCheckin()}
-        className="mb-3.5 flex w-full items-center gap-3 rounded-2xl border border-blue-400/20 bg-[#0b1628] px-3.5 py-3 text-left active:scale-[0.99]"
-      >
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300">
-          <CalendarCheck className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">Daily check-in</p>
-          <p className="truncate text-[11px] text-slate-400">
-            {checkMsg ?? `Streak ${streak}d · claim Task Points`}
-          </p>
-        </div>
-        <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-[10px] font-black text-cyan-300">
-          {checkBusy ? "…" : "Claim"}
-        </span>
-      </button>
-
-      <section className="mb-3.5">
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="flex items-center gap-1.5 text-sm font-black">
-              <ClipboardCheck className="size-4 text-cyan-300" /> Daily Tasks
+              <CalendarCheck className="size-4 text-cyan-300" /> Daily Missions
             </h2>
-            <p className="text-[10px] text-slate-500">Complete daily tasks and earn more Task Points!</p>
+            <p className="text-[10px] text-slate-500">Complete today's missions and earn extra rewards.</p>
           </div>
-          <Link to="/tasks" className="text-[11px] font-bold text-cyan-300">
-            View All →
-          </Link>
+          <Link to="/daily-missions" className="text-[11px] font-bold text-cyan-300">View All →</Link>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <DailyCard to="/tasks" title="Complete 3 Tasks" reward="+100 TP" progress={`${taskProgress}/3`} pct={(taskProgress / 3) * 100} Icon={ClipboardCheck} />
-          <DailyCard to="/watch-earn" title="Watch 5 Videos" reward="+50 TP" progress="0/5" pct={0} Icon={PlayCircle} />
-          <DailyCard to="/ambassador" title="Invite 1 Friend" reward="+200 TP" progress="0/1" pct={0} Icon={Users} />
+          {missions.slice(0,3).map((m:any)=>(
+            <Link key={m.id} to="/daily-missions" className="rounded-2xl border border-blue-400/15 bg-[#0b1628] p-2.5 active:scale-[0.98]">
+              <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/15 text-cyan-300">
+                {m.mission_type==="rewarded_ad"?<PlayCircle className="size-4"/>:<ClipboardCheck className="size-4"/>}
+              </span>
+              <p className="mt-2 line-clamp-2 text-[11px] font-bold leading-tight">{m.title}</p>
+              <p className="mt-0.5 text-[10px] font-black text-cyan-300">{Number(m.reward_usdt)>0?formatUsd(m.reward_usdt):"+"+m.reward_points+" TP"}</p>
+              <p className="mt-1 text-[9px] text-slate-500">{m.completed?"Completed":"Open mission"}</p>
+            </Link>
+          ))}
+          {missions.length===0?<Link to="/daily-missions" className="col-span-3 rounded-2xl border border-white/8 bg-[#0b1628] p-4 text-center text-[11px] text-slate-500">No missions today · check back later</Link>:null}
         </div>
       </section>
 
