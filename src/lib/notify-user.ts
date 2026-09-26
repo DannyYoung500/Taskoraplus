@@ -1,5 +1,3 @@
-import { createServerFn } from "@tanstack/react-start";
-
 const TASK_CHANNEL = "@TaskoraPlusNoti";
 const COMMUNITY = "@TaskoraCommunity";
 const APP_URL = "https://taskoraplus.app";
@@ -83,8 +81,6 @@ export async function publishNewTaskNotification(task: any) {
     return { ok: false, error: e instanceof Error ? e.message : "Task notification failed" };
   }
 }
-
-export const publishNewTaskNotificationServer = createServerFn({ method: "POST" }).handler(async ({ data }: { data: { task: any } }) => publishNewTaskNotification(data.task));
 
 export const notifyTaskSubmitted = async (userId: string, task: any, id: string) => sendUserHtml({ userId, eventKey: `submission:submitted:${id}`, text: `📤 <b>Task Submitted!</b>\\n\\n📋 Task: ${esc(task?.title)}\\n💰 Potential Reward: +${Number(task?.reward ?? 0).toFixed(2)} USDT\\n🔎 Status: <b>Pending Review</b>\\n\\n⏳ Your submission has been received and is being reviewed.` });
 
