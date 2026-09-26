@@ -26,22 +26,7 @@ export type WelcomeButton = {
   path?: string;
 };
 
-const DEFAULT_MESSAGE = `✨ WELCOME TO TASKORA
-
-Hey @username 👋
-Your premium Telegram earning hub is ready.
-
-🎯 COMPLETE — Find verified tasks and earn real rewards.
-🎮 PLAY — Explore supported games and earn from eligible activity.
-▶️ WATCH & EARN — Watch eligible content and earn USDT.
-👥 REFER — Invite friends and earn eligible referral commission.
-💰 WALLET — Track your balance, earnings and withdrawals.
-⭐ RANK UP — Build Task Points and climb the leaderboard.
-
-🔐 Secure • Telegram-native • Built for earning
-
-Ready to get started?
-Open TASKORA below. 🚀`;
+const DEFAULT_MESSAGE = `🎉 Welcome to TaskoraPlus!\n\nHello!\n\n💰 Complete tasks to earn USDT\n📅 Daily check-in for Task Points\n👥 Invite friends and earn up to 20% commission\n\n🚀 Invite friends and grow your monthly earnings\n\n👇 Tap below to start earning!`;
 
 const DEFAULT_BUTTONS: WelcomeButton[] = [
   { id: "open", label: "🚀 OPEN TASKORA", type: "web_app", path: "/" },
@@ -68,25 +53,9 @@ function normalizeButtons(raw: unknown): WelcomeButton[] {
     });
 }
 
-function cleanName(value?: string | null): string {
-  return String(value ?? "").replace(/[<>]/g, "").trim();
-}
+function cleanName(value?: string | null): string {\n  return String(value ?? "").replace(/[<>]/g, "").replace(/\\\\[nrt]/g, " ").trim();\n}
 
-function buildWelcomeText(firstName?: string | null, inviterName?: string | null) {
-  const name = cleanName(firstName) || "there";
-  const inviter = cleanName(inviterName);
-  return `🎉 <b>Welcome to TaskoraPlus!</b>
-
-Hello, <b>${name}</b>!${inviter ? `\\n\\n✅ <b>${inviter}</b> invited you to join!` : ""}
-
-💰 Complete tasks to earn USDT
-📅 Daily check-in for Task Points
-👥 Invite friends and earn up to 20% commission
-
-🚀 Invite friends and grow your monthly earnings
-
-👇 <b>Tap below to start earning!</b>`;
-}
+function buildWelcomeText(firstName?: string | null, inviterName?: string | null) {\n  const name = cleanName(firstName) || "there";\n  const inviter = cleanName(inviterName);\n  return `🎉 Welcome to TaskoraPlus!\n\nHello, ${name}!${inviter ? `\n\n✅ ${inviter} invited you to join!` : ""}\n\n💰 Complete tasks to earn USDT\n📅 Daily check-in for Task Points\n👥 Invite friends and earn up to 20% commission\n\n🚀 Invite friends and grow your monthly earnings\n\n👇 Tap below to start earning!`;\n}
 
 async function getInviterName(referralCode?: string | null) {
   const code = referralCode?.trim();
