@@ -9,7 +9,7 @@ export const listAdvertiseServices=createServerFn({method:"GET"}).handler(async(
 });
 
 export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
-.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number})=>d)
+.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number;targetCountryCode?:string;targetCountryName?:string;allowOtherCountriesIfUnavailable?:boolean})=>d)
 .handler(async({data,context})=>{
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
   const [{data:service,error:serviceError},{data:economy,error:economyError}]=await Promise.all([
@@ -29,6 +29,10 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   if(service.pricing_model==="watch_second"&&detectedVideoDuration>0&&watchSeconds>detectedVideoDuration) throw new Error(`Watch duration cannot exceed the detected YouTube video length (${Math.floor(detectedVideoDuration/60)}m ${detectedVideoDuration%60}s).`);
   if(service.pricing_model==="watch_second"&&(watchSeconds<minWatch||watchSeconds>maxWatch)) throw new Error(`Watch duration must be between ${minWatch} and ${maxWatch} seconds.`);
   const target=String(data.link||"").trim();
+  const targetCountryCode=String(data.targetCountryCode||"").trim().toUpperCase();
+  const targetCountryName=String(data.targetCountryName||"").trim() || null;
+  const allowOtherCountriesIfUnavailable=data.allowOtherCountriesIfUnavailable !== false;
+  if (targetCountryCode && !/^[A-Z]{2}$/.test(targetCountryCode)) throw new Error("Choose a valid country.");
   if(!/^https?:\/\//i.test(target)) throw new Error("Enter a valid video or target URL.");
 
   const unitService={
@@ -64,7 +68,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const {data:campaign,error:campaignError}=await supabaseAdmin.from("campaigns").insert({
     advertiser_user_id:context.userId,advertiser_id:context.userId,platform:service.platform,task_type:service.task_type,
     title:campaignTitle,instructions,target_url:target,reward:perTaskReward,slots:quantity,remaining_slots:quantity,
-    budget:pricing.customerTotal,amount_spent:0,status:"draft"
+    budget:pricing.customerTotal,amount_spent:0,status:"draft",target_country_code:targetCountryCode||null,target_country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable
   } as never).select("*").single();
   if(campaignError||!campaign) throw new Error(campaignError?.message??"Could not create campaign.");
 
@@ -87,7 +91,8 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     seconds:service.pricing_model==="watch_second"?watchSeconds:30,slots_left:quantity,steps:service.pricing_model==="watch_second"?[`Watch for ${Math.floor(watchSeconds/60)}m ${watchSeconds%60}s`,"Wait for automatic verification"]:service.default_steps??[`Complete: ${service.service_name}`],
     proof:verificationMode,link:target,is_active:false,status:"draft",task_type:taskType,target,slots_total:quantity,budget:pricing.customerTotal,
     campaign_id:campaign.id,created_by:context.userId,instructions,requires_review:verificationMode==="screenshot",
-    task_metadata:taskMetadata,warning_text:null,description:null,featured:false
+    target_country_code:targetCountryCode||null,target_country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable,
+    task_metadata:{...taskMetadata,country_targeting:{country_code:targetCountryCode||null,country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable}},warning_text:null,description:null,featured:false
   } as never).select("*").single();
   if(taskError||!task){await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id);throw new Error(taskError?.message??"Could not create campaign task.");}
   return {campaign,task,pricing:{...pricing,watchSeconds,perTaskReward,perTaskCustomer,verificationMethods},status:"draft" as const};

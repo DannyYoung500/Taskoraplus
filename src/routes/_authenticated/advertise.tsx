@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap, PlayCircle } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap, PlayCircle, MapPin } from "lucide-react";
 import { PLATFORM_META, PLATFORM_ORDER, CATEGORY_LABELS, PlatformLogo, type Platform } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
 import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
 import { SERVICES, type ServiceDef } from "@/lib/advertise-services";
 import { extractYoutubeId, youtubeWatchUrl } from "@/lib/youtube-url";
+import { COUNTRIES, countryNameFromCode } from "@/lib/task-country";
 
 export const Route = createFileRoute("/_authenticated/advertise")({
   head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }),
@@ -29,6 +30,8 @@ function AdvertisePage() {
   const [watchMinutes, setWatchMinutes] = useState(1);
   const [watchSeconds, setWatchSeconds] = useState(0);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [targetCountryCode, setTargetCountryCode] = useState("");
+  const [allowOtherCountriesIfUnavailable, setAllowOtherCountriesIfUnavailable] = useState(true);
   const youtubePlayerRef = useRef<any>(null);
   const youtubeHostRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -64,6 +67,8 @@ function AdvertisePage() {
     setWatchMinutes(1);
     setWatchSeconds(0);
     setVideoDuration(null);
+    setTargetCountryCode("");
+    setAllowOtherCountriesIfUnavailable(true);
     setTitle("");
     setLink("");
     setMsg(null);
@@ -169,6 +174,9 @@ function AdvertisePage() {
           watchSeconds: isWatch ? watchTotalSeconds : undefined,
           videoDurationSeconds: isWatch ? videoDuration ?? undefined : undefined,
           videoSource: isWatch ? "external_url" : undefined,
+          targetCountryCode: targetCountryCode || undefined,
+          targetCountryName: targetCountryCode ? countryNameFromCode(targetCountryCode) : undefined,
+          allowOtherCountriesIfUnavailable: targetCountryCode ? allowOtherCountriesIfUnavailable : true,
         },
       });
       setMsg(`Campaign created · ${result.task.id.slice(0, 8)}… Waiting for activation.`);
@@ -245,6 +253,27 @@ function AdvertisePage() {
               <input value={qty} onChange={(e) => setQty(Number(e.target.value) || 0)} type="number" min={service.minQty} max={service.maxQty} className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none" />
             </div>
           )}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-3">
+            <div className="flex items-start gap-2">
+              <MapPin className="mt-0.5 size-4 shrink-0 text-sky-300" />
+              <div className="min-w-0 flex-1">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/60">Who can do this task?</label>
+                <p className="mt-0.5 text-[10px] leading-relaxed text-white/35">Choose a country. Users from that country get the task first.</p>
+              </div>
+            </div>
+            <select value={targetCountryCode} onChange={(e) => setTargetCountryCode(e.target.value)} className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/40">
+              <option value="">🌎 All countries</option>
+              {COUNTRIES.map((country) => (
+                <option key={country.code} value={country.code}>{country.flag} {country.name}</option>
+              ))}
+            </select>
+            {targetCountryCode ? (
+              <label className="mt-3 flex items-start gap-2 text-[10px] leading-relaxed text-white/45">
+                <input type="checkbox" checked={allowOtherCountriesIfUnavailable} onChange={(e) => setAllowOtherCountriesIfUnavailable(e.target.checked)} className="mt-0.5 accent-sky-400" />
+                <span>Allow other countries only if no active user is available in {countryNameFromCode(targetCountryCode)}.</span>
+              </label>
+            ) : null}
+          </div>
           <div className="flex items-center justify-between rounded-xl bg-black/25 px-3 py-2.5 text-xs">
             <span className="text-white/45 inline-flex items-center gap-1"><Wallet className="size-3.5" /> Wallet balance</span>
             <span className={insufficient ? "font-bold text-rose-300" : "font-bold text-emerald-300"}>${balance.toFixed(2)}</span>

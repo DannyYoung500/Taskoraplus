@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { RULES, hoursSince, normalizeWalletAddress } from "@/lib/platform-rules";
+import { isTaskEligibleForUser } from "@/lib/task-country";
 
 async function getMaintenanceSwitches() {
   try {
@@ -69,6 +70,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       .eq("is_active", true)
       .maybeSingle();
     if (!task) throw new Error("This task is no longer available.");
+    if (!(await isTaskEligibleForUser({ supabaseAdmin, task, userId }))) throw new Error("This task is currently reserved for another country.");
     if (task.slots_left <= 0) throw new Error("All slots for this task are taken.");
     const { data: existing } = await supabaseAdmin
       .from("submissions")

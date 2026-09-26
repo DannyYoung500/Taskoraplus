@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { isOwnerTelegramId } from "@/lib/owner";
+import { isTaskEligibleForUser } from "@/lib/task-country";
 
 function publicClient() {
   const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
@@ -45,25 +46,40 @@ async function assertAdmin(userId: string) {
   throw new Error("Owner/admin authorization required.");
 }
 
-export const listTasks = createServerFn({ method: "GET" }).handler(async () => {
-  const { data, error } = await publicClient()
-    .from("tasks")
-    .select("*")
-    .eq("is_active", true)
-    .order("reward", { ascending: false });
-  if (error) throw new Error(error.message);
-  return data ?? [];
-});
+export const listTasks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: profile }, { data, error }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("country_code,status").eq("id", context.userId).maybeSingle(),
+      supabaseAdmin.from("tasks").select("*").eq("is_active", true).order("reward", { ascending: false }),
+    ]);
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    const targets=[...new Set(rows.map((task:any)=>String(task.target_country_code??"").trim().toUpperCase()).filter(Boolean))];
+    const availableTargets=new Set<string>();
+    if (targets.length) {
+      const {data:users}=await supabaseAdmin.from("profiles").select("country_code").in("country_code",targets).eq("status","active");
+      for(const user of users??[]) availableTargets.add(String(user.country_code??"").toUpperCase());
+    }
+    const userCountry=String(profile?.country_code??"").trim().toUpperCase();
+    return rows.filter((task:any)=>{
+      const target=String(task.target_country_code??"").trim().toUpperCase();
+      if(!target || target===userCountry) return true;
+      if(task.allow_other_countries_if_unavailable===false) return false;
+      return !availableTargets.has(target);
+    });
+  });
 
 export const getTask = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { taskId: string }) => d)
-  .handler(async ({ data }) => {
-    const { data: task, error } = await publicClient()
-      .from("tasks")
-      .select("*")
-      .eq("id", data.taskId)
-      .maybeSingle();
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: task, error } = await supabaseAdmin.from("tasks").select("*").eq("id", data.taskId).eq("is_active", true).maybeSingle();
     if (error) throw new Error(error.message);
+    if (!task) return null;
+    if (!(await isTaskEligibleForUser({supabaseAdmin,task,userId:context.userId}))) return null;
     return task;
   });
 
@@ -138,6 +154,7 @@ export const submitTask = createServerFn({ method: "POST" })
       .eq("is_active", true)
       .maybeSingle();
     if (!task) throw new Error("This task is no longer available.");
+    if (!(await isTaskEligibleForUser({ supabaseAdmin, task, userId }))) throw new Error("This task is currently reserved for another country.");
     if (task.slots_left <= 0) throw new Error("All slots for this task are taken.");
 
     const { data: existing } = await supabaseAdmin
