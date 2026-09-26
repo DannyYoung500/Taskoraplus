@@ -98,8 +98,9 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       proof_url: proofUrl || null,
     };
     if (proofHash) row.proof_hash = proofHash;
-    const { error } = await supabaseAdmin.from("submissions").insert(row);
+    const { data: submission, error } = await supabaseAdmin.from("submissions").insert(row).select("id").single();
     if (error) throw new Error(error.message);
+    try { const { notifyTaskSubmitted } = await import("@/lib/notify-user"); await notifyTaskSubmitted(userId, task, String(submission.id)); } catch {}
     await supabaseAdmin
       .from("tasks")
       .update({ slots_left: Math.max(0, task.slots_left - 1) })
@@ -257,16 +258,17 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     const balance = (txs ?? []).reduce((s, t) => s + Number(t.amount), 0);
     if (balance < data.amount) throw new Error("Not enough balance for this withdrawal.");
 
-    const { error } = await supabaseAdmin.from("withdrawals").insert({
-      user_id: userId,
-      method: data.method,
-      address,
-      amount: data.amount,
-      status: "pending",
-      requires_dual: requiresDual,
-      approval_stage: requiresDual ? "needs_dual" : "pending",
-    } as never);
+    const { data: withdrawal, error } = await supabaseAdmin.from("withdrawals").insert({
+      user_id: userId, method: data.method, address, amount: data.amount, status: "pending",
+      requires_dual: requiresDual, approval_stage: requiresDual ? "needs_dual" : "pending",
+    } as never).select("*").single();
     if (error) throw new Error(error.message);
+    try {
+      const { notifyWithdrawalRequested } = await import("@/lib/notify-user"); await notifyWithdrawalRequested(userId, withdrawal);
+      const { notifyOwnersWithdrawalRequested } = await import("@/lib/notify-owner");
+      const p = await supabaseAdmin.from("profiles").select("display_name").eq("id", userId).maybeSingle();
+      await notifyOwnersWithdrawalRequested({ userId, amount: Number(withdrawal.amount), method: String(withdrawal.method), address: String(withdrawal.address), displayName: p.data?.display_name, reference: withdrawal.reference });
+    } catch {}
 
     await supabaseAdmin.from("transactions").insert({
       user_id: userId,

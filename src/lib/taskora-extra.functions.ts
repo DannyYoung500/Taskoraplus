@@ -125,6 +125,7 @@ export const dailyCheckin = createServerFn({ method: "POST" })
       },
     );
     if (pointsError) throw new Error(pointsError.message);
+    try { const { notifyCheckinSuccess } = await import("@/lib/notify-user"); await notifyCheckinSuccess(userId, streak, totalAward, streakBonus); } catch {}
     return {
       already: false,
       streak,
@@ -199,6 +200,7 @@ export const reviewWithdrawal = createServerFn({ method: "POST" })
         } as never)
         .eq("id", data.withdrawalId);
       if (error) throw new Error(error.message);
+      try { const { notifyWithdrawalReview } = await import("@/lib/notify-user"); await notifyWithdrawalReview(String(row.user_id), row); } catch {}
       return { status: "pending", approval_stage: "first_ok" as const };
     }
 
@@ -266,28 +268,18 @@ export const reviewWithdrawal = createServerFn({ method: "POST" })
       }
     }
 
-    // Public payout proof → payment channel on every successful paid mark
-    if (data.decision === "paid") {
-      try {
-        const { data: profile } = await supabaseAdmin
-          .from("profiles")
-          .select("display_name, username")
-          .eq("id", row.user_id)
-          .maybeSingle();
-        const { postPayoutProofToChannel } = await import("@/lib/notify-owner");
-        await postPayoutProofToChannel({
-          amount: Number(row.amount),
-          method: String(row.method ?? "USDT"),
-          address: String((row as { address?: string }).address ?? ""),
-          txHash: txHash,
-          displayName: profile?.display_name ?? null,
-          username: profile?.username ?? null,
-          withdrawalId: data.withdrawalId,
-        });
-      } catch {
-        /* never block mark-paid */
+    try {
+      const { notifyWithdrawalPaid, notifyWithdrawalRejected } = await import("@/lib/notify-user");
+      const { notifyOwnersWithdrawalPaid, notifyOwnersWithdrawalFailed } = await import("@/lib/notify-owner");
+      const { data: profile } = await supabaseAdmin.from("profiles").select("display_name").eq("id", row.user_id).maybeSingle();
+      const updatedRow = { ...row, status: nextStatus, tx_hash: txHash, rejection_reason: data.reason ?? row.rejection_reason };
+      if (data.decision === "paid") {
+        await notifyWithdrawalPaid(String(row.user_id), updatedRow);
+        await notifyOwnersWithdrawalPaid({ userId: String(row.user_id), amount: Number(row.amount), method: String(row.method ?? "USDT"), txHash, reference: String((row as any).reference ?? row.id), displayName: profile?.display_name });
+      } else {
+        await notifyWithdrawalRejected(String(row.user_id), updatedRow, data.reason ?? "Withdrawal rejected by owner.");
+        await notifyOwnersWithdrawalFailed({ userId: String(row.user_id), amount: Number(row.amount), method: String(row.method ?? "USDT"), reason: data.reason ?? "Withdrawal rejected by owner.", reference: String((row as any).reference ?? row.id), displayName: profile?.display_name });
       }
-    }
-
+    } catch {}
     return { status: nextStatus };
   });

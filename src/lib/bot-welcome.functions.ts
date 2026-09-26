@@ -49,7 +49,7 @@ const DEFAULT_BUTTONS: WelcomeButton[] = [
   { id: "watch", label: "▶️ WATCH & EARN", type: "web_app", path: "/watch-earn" },
   { id: "wallet", label: "💰 WALLET", type: "web_app", path: "/wallet" },
   { id: "referrals", label: "👥 REFERRALS", type: "web_app", path: "/profile" },
-  { id: "community", label: "💬 COMMUNITY", type: "url", url: "https://t.me/Taskoraplus" },
+  { id: "community", label: "💬 COMMUNITY", type: "url", url: "https://t.me/TaskoraCommunity" },
 ];
 
 function normalizeButtons(raw: unknown): WelcomeButton[] {
@@ -142,7 +142,7 @@ export async function sendWelcomeToChat(opts: {
   let buttons = DEFAULT_BUTTONS;
   let photoUrl: string | null = null;
   let photoFileId: string | null = null;
-  let community = "https://t.me/Taskoraplus";
+  let community = "https://t.me/TaskoraCommunity";
   let mini = process.env["MINI_APP_URL"] || process.env["VITE_MINI_APP_URL"] || null;
 
   if (data) {
@@ -200,7 +200,7 @@ export const ownerGetBotWelcome = createServerFn({ method: "POST" })
       photo_url: (row.photo_url as string | null) ?? null,
       message_text: (row.message_text as string) || DEFAULT_MESSAGE,
       buttons: normalizeButtons(row.buttons),
-      community_url: (row.community_url as string) || "https://t.me/Taskoraplus",
+      community_url: (row.community_url as string) || "https://t.me/TaskoraCommunity",
       mini_app_url:
         (row.mini_app_url as string | null) ||
         process.env["MINI_APP_URL"] ||
@@ -211,7 +211,7 @@ export const ownerGetBotWelcome = createServerFn({ method: "POST" })
         (row.draft_message_text as string) || (row.message_text as string) || DEFAULT_MESSAGE,
       draft_buttons: normalizeButtons(row.draft_buttons ?? row.buttons),
       draft_community_url:
-        (row.draft_community_url as string) || (row.community_url as string) || "https://t.me/Taskoraplus",
+        (row.draft_community_url as string) || (row.community_url as string) || "https://t.me/TaskoraCommunity",
       draft_mini_app_url:
         (row.draft_mini_app_url as string | null) ||
         (row.mini_app_url as string | null) ||
@@ -305,7 +305,7 @@ export const ownerPublishBotWelcome = createServerFn({ method: "POST" })
     const draftMsg = (cur?.draft_message_text as string) || (cur?.message_text as string) || DEFAULT_MESSAGE;
     const draftBtns = normalizeButtons(cur?.draft_buttons ?? cur?.buttons ?? DEFAULT_BUTTONS);
     const draftPhoto = (cur?.draft_photo_url as string | null) ?? null;
-    const draftCommunity = (cur?.draft_community_url as string) || (cur?.community_url as string) || "https://t.me/Taskoraplus";
+    const draftCommunity = (cur?.draft_community_url as string) || (cur?.community_url as string) || "https://t.me/TaskoraCommunity";
     const draftMini = (cur?.draft_mini_app_url as string | null) ?? (cur?.mini_app_url as string | null) ?? null;
     const { error } = await db.from("bot_welcome_settings").upsert({
       id: true,
