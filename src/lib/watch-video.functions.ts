@@ -77,6 +77,12 @@ export const startWatchVideo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { videoId: string }) => data)
   .handler(async ({ data, context }) => {
+    try {
+      const { assertActionRateLimit } = await import("@/lib/strong-ops");
+      await assertActionRateLimit({ userId: context.userId, kind: "watch_start" });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Too many")) throw e;
+    }
     const s = await adminClient();
     const { data: v } = await (s as any)
       .from("watch_videos")
@@ -122,6 +128,7 @@ export const startWatchVideo = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error || !session) {
+      // Retry without optional columns if schema lacks them
       if (error && /qualified_seconds|last_heartbeat/i.test(error.message)) {
         const r2 = await (s as any)
           .from("watch_video_sessions")
@@ -142,7 +149,16 @@ export const startWatchVideo = createServerFn({ method: "POST" })
  */
 export const heartbeatWatchVideo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { sessionId: string; playing?: boolean }) => data)
+  .inputValidator(
+    (data: {
+      sessionId: string;
+      playing?: boolean;
+      /** Page Visibility API — only credit when tab/app is foreground */
+      visible?: boolean;
+      /** Optional mid-watch human ack */
+      attentionAck?: boolean;
+    }) => data,
+  )
   .handler(async ({ data, context }) => {
     const s = await adminClient();
     const { data: session } = await (s as any)
@@ -171,7 +187,10 @@ export const heartbeatWatchVideo = createServerFn({ method: "POST" })
       : new Date(String(session.started_at)).getTime();
     const gapSec = (now - last) / 1000;
 
-    if (data.playing !== false && gapSec >= 1 && gapSec <= 15) {
+    // Only credit when: playing + foreground visible + realistic gap (anti-idle / anti-skip)
+    const playing = data.playing !== false;
+    const visible = data.visible !== false;
+    if (playing && visible && gapSec >= 1 && gapSec <= 15) {
       qualified = Math.min(required + 5, qualified + Math.floor(gapSec));
     }
 
@@ -185,6 +204,7 @@ export const heartbeatWatchVideo = createServerFn({ method: "POST" })
       .eq("id", session.id)
       .eq("status", "started");
     if (error && /qualified_seconds|last_heartbeat/i.test(error.message)) {
+      // Schema without heartbeat columns — soft ok
       return {
         ok: true as const,
         qualifiedSeconds: Math.floor((now - new Date(String(session.started_at)).getTime()) / 1000),
@@ -211,6 +231,7 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
     if (session.status === "completed") return { ok: true as const, already: true as const };
     if (session.status !== "started") throw new Error("This video session is no longer valid.");
 
+    // Hard one-completion guard (race-safe)
     const { data: prior } = await (s as any)
       .from("watch_video_sessions")
       .select("id")
@@ -237,6 +258,7 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
     const wallElapsed = (Date.now() - new Date(String(session.started_at)).getTime()) / 1000;
     const qualified = Number(session.qualified_seconds ?? 0);
 
+    // Prefer heartbeat-qualified time; fall back to wall clock if column missing
     const credit =
       session.qualified_seconds != null && session.qualified_seconds !== undefined
         ? qualified
@@ -245,8 +267,23 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
     if (credit + 1 < required) {
       throw new Error(`Keep watching for ${Math.ceil(required - credit)} more seconds.`);
     }
+    // Wall clock must also roughly cover required (blocks pure client lies without heartbeats)
     if (wallElapsed + 2 < required * 0.85) {
       throw new Error("Watch session too short. Play the video without skipping.");
+    }
+    // Behavioral score: qualified (visible+playing) must cover min ratio of required for longer videos
+    try {
+      const { RULES } = await import("@/lib/platform-rules");
+      if (required >= RULES.attentionRequiredSeconds && wallElapsed > 0) {
+        const ratio = credit / Math.max(required, 1);
+        if (ratio + 0.02 < RULES.minVisibleWatchRatio) {
+          throw new Error(
+            "Keep the video in the foreground while watching. Switch back and finish the timer.",
+          );
+        }
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("foreground")) throw e;
     }
 
     const { data: updated, error: updateError } = await (s as any)
@@ -263,6 +300,7 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
       .select("id")
       .maybeSingle();
     if (updateError) {
+      // Retry minimal update
       if (/qualified_seconds/i.test(updateError.message)) {
         const r2 = await (s as any)
           .from("watch_video_sessions")
@@ -321,6 +359,7 @@ export const registerOwnerVideo = createServerFn({ method: "POST" })
     if (data.rewardUsdt < 0) throw new Error("USDT reward cannot be negative.");
     const platform = data.platform.trim() || "youtube";
 
+    // YouTube only path for advertise/watch: normalize URL, no upload
     let videoUrl = data.videoUrl.trim();
     let providerVideoId = videoUrl;
     if (/youtube|youtu\.be/i.test(videoUrl) || platform.toLowerCase() === "youtube") {
@@ -328,6 +367,7 @@ export const registerOwnerVideo = createServerFn({ method: "POST" })
       videoUrl = norm.url;
       providerVideoId = norm.id;
 
+      // Velocity: same YouTube id already used heavily
       const s0 = await adminClient();
       const { count } = await (s0 as any)
         .from("watch_videos")
