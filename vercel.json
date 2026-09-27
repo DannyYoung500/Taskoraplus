@@ -1,14 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "tanstack-start",
-  "crons": [
-    {
-      "path": "/api/cron/ops-digest",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/referral-notifications",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "framework": "tanstack-start"
 }
