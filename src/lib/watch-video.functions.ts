@@ -83,6 +83,21 @@ export const startWatchVideo = createServerFn({ method: "POST" })
     } catch (e) {
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
+    // Kill switch: watches_paused
+    try {
+      const s0 = await adminClient();
+      const { data: sw } = await s0
+        .from("app_settings")
+        .select("value")
+        .eq("key", "maintenance_switches")
+        .maybeSingle();
+      const v = (sw?.value ?? {}) as Record<string, unknown>;
+      if (Boolean(v.watches_paused) || Boolean(v.read_only)) {
+        throw new Error("Watch & Earn is temporarily paused by the owner. Try again later.");
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("paused")) throw e;
+    }
     const s = await adminClient();
     const { data: v } = await (s as any)
       .from("watch_videos")
@@ -113,7 +128,17 @@ export const startWatchVideo = createServerFn({ method: "POST" })
       .eq("status", "started")
       .maybeSingle();
     if (existing) {
-      return { sessionId: String(existing.id), sourceType: String(v.source_type) };
+      const { mintWatchNonce } = await import("@/lib/strong-ops");
+      const nonce = mintWatchNonce(String(existing.id), context.userId);
+      try {
+        await (s as any)
+          .from("watch_video_sessions")
+          .update({ session_nonce: nonce })
+          .eq("id", existing.id);
+      } catch {
+        /* column may not exist */
+      }
+      return { sessionId: String(existing.id), sourceType: String(v.source_type), nonce };
     }
 
     const { data: session, error } = await (s as any)
@@ -136,11 +161,23 @@ export const startWatchVideo = createServerFn({ method: "POST" })
           .select("id")
           .single();
         if (r2.error || !r2.data) throw new Error(r2.error?.message ?? "Could not start video session.");
-        return { sessionId: String(r2.data.id), sourceType: String(v.source_type) };
+        const { mintWatchNonce } = await import("@/lib/strong-ops");
+        const nonce = mintWatchNonce(String(r2.data.id), context.userId);
+        return { sessionId: String(r2.data.id), sourceType: String(v.source_type), nonce };
       }
       throw new Error(error?.message ?? "Could not start video session.");
     }
-    return { sessionId: String(session.id), sourceType: String(v.source_type) };
+    const { mintWatchNonce } = await import("@/lib/strong-ops");
+    const nonce = mintWatchNonce(String(session.id), context.userId);
+    try {
+      await (s as any)
+        .from("watch_video_sessions")
+        .update({ session_nonce: nonce })
+        .eq("id", session.id);
+    } catch {
+      /* soft */
+    }
+    return { sessionId: String(session.id), sourceType: String(v.source_type), nonce };
   });
 
 /**
