@@ -14,45 +14,50 @@ const getReferralChallenge = createServerFn({ method: "GET" })
     const { data: cfgRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "referral_challenge").maybeSingle();
     const cfg = (cfgRow?.value ?? {}) as Record<string, unknown>;
     const target = {
-      tasks: Number(cfg.task_target ?? 10),
-      videos: Number(cfg.video_target ?? 50),
-      games: Number(cfg.game_target ?? 10),
-      ads: Number(cfg.ad_target ?? 50),
+      tasks: Number(cfg.task_target ?? 5),
+      ads: Number(cfg.ad_target ?? 20),
+      videos: Number(cfg.video_target ?? 1),
     };
     const bonus = {
-      join: Number(cfg.join_bonus_usd ?? 0),
-      tasks: Number(cfg.task_bonus_usd ?? 0.01),
-      videos: Number(cfg.video_bonus_usd ?? 0.02),
-      games: Number(cfg.game_bonus_usd ?? 0.02),
-      ads: Number(cfg.ad_bonus_usd ?? 0.03),
+      join: Number(cfg.join_bonus_usd ?? 0.0012),
+      tasks: Number(cfg.task_bonus_usd ?? 0.004),
+      ads: Number(cfg.ad_bonus_usd ?? 0.0072),
+      videos: Number(cfg.video_bonus_usd ?? 0.0036),
     };
     const commissionPercent = Number(cfg.withdrawal_commission_percent ?? 10);
     const { data: me } = await supabaseAdmin.from("profiles").select("id").eq("id", context.userId).maybeSingle();
     if (!me) throw new Error("Profile not found.");
 
-    const { data: rows } = await supabaseAdmin.from("profiles").select("id,display_name,username,created_at").eq("referred_by", context.userId);
+    const { data: rows } = await supabaseAdmin
+      .from("profiles")
+      .select("id,display_name,username,created_at")
+      .eq("referred_by", context.userId);
+
     const referred = rows ?? [];
     const members = await Promise.all(referred.map(async (friend) => {
-      const [tasks, videos, games, ads, gate] = await Promise.all([
-        supabaseAdmin.from("submissions").select("id",{count:"exact",head:true}).eq("user_id",friend.id).eq("status","verified"),
-        supabaseAdmin.from("watch_video_sessions").select("id",{count:"exact",head:true}).eq("user_id",friend.id).eq("status","completed"),
-        supabaseAdmin.from("game_rounds").select("id",{count:"exact",head:true}).eq("user_id",friend.id).eq("status","completed"),
-        supabaseAdmin.from("watch_completions").select("id",{count:"exact",head:true}).eq("user_id",friend.id),
-        supabaseAdmin.from("telegram_gate_events").select("id,status,membership_status").eq("user_id",friend.id).in("status",["verified","success","passed"]).in("membership_status",["member","administrator","creator","owner","joined","success"]).order("checked_at",{ascending:false}).limit(1).maybeSingle(),
+      const [tasks, videos, ads, gate] = await Promise.all([
+        supabaseAdmin.from("submissions").select("id", { count: "exact", head: true }).eq("user_id", friend.id).eq("status", "verified"),
+        supabaseAdmin.from("watch_video_sessions").select("id", { count: "exact", head: true }).eq("user_id", friend.id).eq("status", "completed"),
+        supabaseAdmin.from("watch_completions").select("id", { count: "exact", head: true }).eq("user_id", friend.id),
+        supabaseAdmin.from("telegram_gate_events").select("id,status,membership_status").eq("user_id", friend.id)
+          .in("status", ["verified", "success", "passed"])
+          .in("membership_status", ["member", "administrator", "creator", "owner", "joined", "success"])
+          .order("checked_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
+
       const progress = {
         join: Boolean(gate.data),
-        tasks: Math.min(tasks.count ?? 0,target.tasks),
-        videos: Math.min(videos.count ?? 0,target.videos),
-        games: Math.min(games.count ?? 0,target.games),
-        ads: Math.min(ads.count ?? 0,target.ads),
+        tasks: Math.min(tasks.count ?? 0, target.tasks),
+        ads: Math.min(ads.count ?? 0, target.ads),
+        videos: Math.min(videos.count ?? 0, target.videos),
       };
-      const valid = progress.join && progress.tasks >= target.tasks && progress.videos >= target.videos && progress.games >= target.games && progress.ads >= target.ads;
+      const valid = progress.join && progress.tasks >= target.tasks && progress.ads >= target.ads && progress.videos >= target.videos;
       return { id: friend.id, name: friend.display_name || friend.username || "Friend", progress, valid };
     }));
-    const validCount = members.filter(m=>m.valid).length;
-    const earnings = await supabaseAdmin.from("transactions").select("amount").eq("user_id",context.userId).eq("kind","referral");
-    const referralEarnings = (earnings.data ?? []).reduce((sum,t)=>sum+Number(t.amount||0),0);
+
+    const validCount = members.filter((m) => m.valid).length;
+    const earnings = await supabaseAdmin.from("transactions").select("amount").eq("user_id", context.userId).eq("kind", "referral");
+    const referralEarnings = (earnings.data ?? []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     return { target, bonus, commissionPercent, members, validCount, referralEarnings };
   });
 
