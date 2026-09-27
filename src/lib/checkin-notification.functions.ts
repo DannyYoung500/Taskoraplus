@@ -13,7 +13,7 @@ const DEFAULTS: CheckinNotificationSettings = {
   enabled: true,
   morning_time: "09:00",
   night_time: "21:00",
-  message: "📅 Check-in Reminder\n\n⏰ You haven't checked in today!\n🔥 Keep your streak going and earn more 🎯 Task Points.\n\n👇 Check in now to claim today's points.",
+  message: "📅 <b>Daily Check-In Reminder</b>\n\n⏰ You haven't checked in today.\n🔥 Keep your streak going and work toward your next badge.\n\n🏅 <b>30 days</b> unlocks the Badge of Honor.\n\n👇 Open TaskoraPlus and check in now.",
 };
 
 function validTime(value: string) {

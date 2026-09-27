@@ -3,141 +3,41 @@ import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { isOwnerTelegramId } from "@/lib/owner";
+const CHECKIN_BADGES = [
+  { days: 30, name: "Badge of Honor" },
+  { days: 60, name: "Dedicated Member" },
+  { days: 90, name: "Elite Member" },
+  { days: 180, name: "Veteran" },
+  { days: 365, name: "Legend" },
+] as const;
 
-export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
-
-function publicClient() {
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  const url = process.env["SUPABASE_URL"] ?? "https://qvwetjpgplkhxuymsnyx.supabase.co";
-  return createClient<Database>(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      fetch: (input, init) => {
-        const h = new Headers(init?.headers);
-        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) {
-          h.delete("Authorization");
-        }
-        h.set("apikey", key);
-        return fetch(input, { ...init, headers: h });
-      },
-    },
-  });
-}
-
-async function assertAdmin(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (isAdmin) return;
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("telegram_id")
-    .eq("id", userId)
-    .maybeSingle();
-  const tg = (profile as { telegram_id?: number | string | null } | null)?.telegram_id;
-  if (isOwnerTelegramId(tg ?? null)) {
-    await supabaseAdmin.from("user_roles").upsert(
-      { user_id: userId, role: "admin" } as never,
-      { onConflict: "user_id,role" } as never,
-    );
-    return;
-  }
-  throw new Error("Owner/admin authorization required.");
-}
-
-export const listTasks = createServerFn({ method: "GET" }).handler(async () => {
-  const { data, error } = await publicClient()
-    .from("tasks")
-    .select("*")
-    .eq("is_active", true)
-    .order("reward", { ascending: false });
-  if (error) throw new Error(error.message);
-  return data ?? [];
-});
-
-export const getTask = createServerFn({ method: "GET" })
-  .inputValidator((d: { taskId: string }) => d)
-  .handler(async ({ data }) => {
-    const { data: task, error } = await publicClient()
-      .from("tasks")
-      .select("*")
-      .eq("id", data.taskId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    return task;
-  });
-
-export const dailyCheckin = createServerFn({ method: "POST" })
+function getCheckinBadge(streak: number) {
+  let unlocked: string | null = null;
+  for (const badge of CHECKIN_BADGES) if (streak >= badge.days) unlocked = badge.name;
+  return { unlocked, next: CHECKIN_BADGES.find((badge) => streak < badge.days) ?? null };
+}export const dailyCheckin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { RULES } = await import("@/lib/platform-rules");
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("streak, last_checkin")
-      .eq("id", userId)
-      .maybeSingle();
+    const { data: profile } = await supabaseAdmin.from("profiles").select("streak, last_checkin").eq("id", userId).maybeSingle();
     if (!profile) throw new Error("Profile not found.");
-
     const today = new Date().toISOString().slice(0, 10);
     if (profile.last_checkin === today) {
-      return { already: true, streak: Number(profile.streak ?? 0), taskPoints: 0, streakBonus: 0 };
+      const badge = getCheckinBadge(Number(profile.streak ?? 0));
+      return { already: true, streak: Number(profile.streak ?? 0), badge: badge.unlocked, nextBadge: badge.next, badgeUnlocked: false };
     }
-
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
     const prev = Number(profile.streak ?? 0);
     const streak = profile.last_checkin === yesterday ? prev + 1 : 1;
-
     await supabaseAdmin.from("profiles").update({ streak, last_checkin: today }).eq("id", userId);
-    const { data: settingsRow } = await supabaseAdmin
-      .from("app_settings")
-      .select("value")
-      .eq("key", "economy")
-      .maybeSingle();
-    const dailyPoints = Math.max(
-      0,
-      Math.floor(
-        Number(
-          (settingsRow?.value as { daily_checkin_points?: number } | null)?.daily_checkin_points ?? 25,
-        ),
-      ),
-    );
-
-    const bonusDays = RULES.streakBonusDays;
-    const streakBonus =
-      streak > 0 && streak % bonusDays === 0 ? RULES.streakBonusPoints : 0;
-    const totalAward = dailyPoints + streakBonus;
-
-    const { data: taskPointTotal, error: pointsError } = await (supabaseAdmin as any).rpc(
-      "award_task_points",
-      {
-        _user_id: userId,
-        _amount: totalAward,
-        _kind: "daily_checkin",
-        _label:
-          streakBonus > 0
-            ? `Daily check-in — day ${streak} (+${streakBonus} streak bonus)`
-            : `Daily check-in — day ${streak}`,
-        _reference: `checkin:${userId}:${today}`,
-      },
-    );
-    if (pointsError) throw new Error(pointsError.message);
+    const badge = getCheckinBadge(streak);
+    const badgeUnlocked = Boolean(badge.next && streak === badge.next.days);
     try {
       const { notifyCheckinSuccess } = await import("@/lib/notify-user");
-      await notifyCheckinSuccess(userId, streak, totalAward, streakBonus);
+      await notifyCheckinSuccess(userId, streak, badgeUnlocked ? badge.next?.name ?? null : null, badge.next?.days ?? null);
     } catch {}
-    return {
-      already: false,
-      streak,
-      taskPoints: totalAward,
-      basePoints: dailyPoints,
-      streakBonus,
-      nextBonusIn: streakBonus > 0 ? bonusDays : bonusDays - (streak % bonusDays),
-      taskPointTotal: Number(taskPointTotal ?? 0),
-    };
+    return { already: false, streak, badge: badge.unlocked, nextBadge: badge.next, badgeUnlocked };
   });
 
 export const listPendingWithdrawals = createServerFn({ method: "GET" })

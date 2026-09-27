@@ -70,6 +70,7 @@ const SECTIONS: { label: string; items: Item[] }[] = [
     label: "Monetization",
     items: [
       { to: "/owner/monetization", title: "Providers", Icon: SlidersHorizontal },
+      { to: "/owner/ad-networks", title: "Ad Networks", Icon: Megaphone },
       { to: "/owner/videos", title: "Watch & Earn", Icon: PlayCircle },
       { to: "/owner/games", title: "Games Marketplace", Icon: Gamepad2 },
       { to: "/advertise", title: "Publish Task", Icon: Megaphone },

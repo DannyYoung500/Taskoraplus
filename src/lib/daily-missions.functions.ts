@@ -12,15 +12,25 @@ export const listDailyMissions=createServerFn({method:"GET"}).middleware([requir
  if(error)throw new Error(error.message);
  const ids=(missions??[]).map((m:any)=>m.id);const {data:claims}=ids.length?await (s as any).from("daily_mission_claims").select("mission_id,status").eq("user_id",context.userId).eq("mission_date",date).in("mission_id",ids):{data:[]};
  const claimMap=new Map((claims??[]).map((c:any)=>[c.mission_id,c]));const taskIds=(missions??[]).map((m:any)=>m.task_id).filter(Boolean);const {data:subs}=taskIds.length?await s.from("submissions").select("task_id,status").eq("user_id",context.userId).in("task_id",taskIds):{data:[]};const doneTasks=new Set((subs??[]).filter((x:any)=>x.status==="verified").map((x:any)=>x.task_id));
- const adKey=(missions??[]).find((m:any)=>m.mission_type==="rewarded_ad")?.provider_key;let provider:any=null;if(adKey){const {data:pr}=await (s as any).from("monetization_providers").select("provider_key,enabled,placement_id").eq("provider_key",adKey).maybeSingle();provider=pr??null;}
- return (missions??[]).map((m:any)=>{const c=claimMap.get(m.id);const adReady=m.mission_type==="rewarded_ad"&&provider?.enabled&&provider?.placement_id;return {...m,completed:m.mission_type==="task"?doneTasks.has(m.task_id):c?.status==="completed",adReady:Boolean(adReady),adPlacementId:adReady?String(provider.placement_id):null};});
+ const adKeys=[...new Set((missions??[]).filter((m:any)=>m.mission_type==="rewarded_ad"&&m.provider_key).map((m:any)=>String(m.provider_key)))];
+ const providersByKey=new Map<string,any>();
+ if(adKeys.length){const {data:prs}=await (s as any).from("monetization_providers").select("provider_key,provider_name,enabled,placement_id,settings").in("provider_key",adKeys);for(const p of prs??[])providersByKey.set(String(p.provider_key),p);}
+ const completedCounts=new Map<string,number>();
+ for(const c of claims??[]) if(c.status==="completed") completedCounts.set(c.mission_id,(completedCounts.get(c.mission_id)??0)+1);
+ return (missions??[]).map((m:any)=>{
+   const c=claimMap.get(m.id);const provider=providersByKey.get(String(m.provider_key));
+   const adapterReady=String(m.provider_key)==="adsgram";
+   const adReady=m.mission_type==="rewarded_ad"&&Boolean(provider?.enabled&&provider?.placement_id&&adapterReady);
+   const settings=(provider?.settings??{}) as Record<string,unknown>;
+   return {...m,completed:m.mission_type==="task"?doneTasks.has(m.task_id):c?.status==="completed",completedCount:completedCounts.get(m.id)??0,adReady:Boolean(adReady),adPlacementId:adReady?String(provider.placement_id):null,providerName:provider?.provider_name??m.provider_key,providerSettings:settings,adapterReady};
+ });
 });
 
 export const claimRewardedAd=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).inputValidator((d:{missionId:string})=>d).handler(async({data,context})=>{
  const s=await db();const {data:p}=await s.from("profiles").select("timezone,status").eq("id",context.userId).maybeSingle();if(p&&String((p as any).status??"active")!=="active")throw new Error("Account is not active.");
  const date=localDate(String((p as any)?.timezone||"UTC"));const {data:m}=await (s as any).from("daily_missions").select("*").eq("id",data.missionId).eq("mission_type","rewarded_ad").eq("is_active",true).maybeSingle();if(!m)throw new Error("This ad mission is unavailable.");
  const now=new Date();if(m.starts_at&&new Date(m.starts_at)>now)throw new Error("This mission has not started yet.");if(m.ends_at&&new Date(m.ends_at)<now)throw new Error("This mission has ended.");
- const {data:provider}=await (s as any).from("monetization_providers").select("enabled,placement_id").eq("provider_key",m.provider_key).maybeSingle();if(!provider?.enabled||!provider?.placement_id)throw new Error("Rewarded ads are not configured yet.");
+ const {data:provider}=await (s as any).from("monetization_providers").select("enabled,placement_id").eq("provider_key",m.provider_key).maybeSingle();if(String(m.provider_key)!=="adsgram")throw new Error("This ad network is not connected to TaskoraPlus yet.");if(!provider?.enabled||!provider?.placement_id)throw new Error("Rewarded ads are not configured yet.");
  const {count}=await (s as any).from("daily_mission_claims").select("id",{count:"exact",head:true}).eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).eq("status","completed");if((count??0)>=Number(m.daily_limit))throw new Error("Today's ad mission limit is reached.");
  const {data:existing}=await (s as any).from("daily_mission_claims").select("id,status").eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).maybeSingle();if(existing?.status==="completed")throw new Error("You already completed this ad mission today.");
  if(existing?.id)return {claimId:String(existing.id),placementId:String(provider.placement_id)};

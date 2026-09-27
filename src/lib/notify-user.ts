@@ -192,13 +192,16 @@ export async function notifyWithdrawalPaid(userId: string, row: any) {
   });
 }
 
-export const notifyCheckinSuccess = (userId: string, streak: number, points: number, bonus = 0) =>
+export const notifyCheckinSuccess = (userId: string, streak: number, badgeUnlocked: string | null = null, nextBadgeDays: number | null = null) =>
   sendUserHtml({
     userId,
     text:
-      `🎉 <b>Check-in Successful!</b>\n\n🔥 Streak: ${streak} days\n🎯 Task Points: +${points} TP` +
-      (bonus > 0 ? `\n🎁 Streak Bonus: +${bonus} TP` : "") +
-      "\n\n🚀 Check in tomorrow for more points!",
+      `🔥 <b>Daily Check-In Complete!</b>\n\n🔥 Streak: <b>${streak} days</b>\n🏅 ` +
+      (badgeUnlocked
+        ? `<b>${badgeUnlocked}</b> unlocked!\n\n🎉 Your consistency has earned you a new badge of honor and respect.\n\n🚀 Keep building your TaskoraPlus reputation.`
+        : nextBadgeDays
+          ? `Next badge: <b>${nextBadgeDays} days</b>\n📅 Progress: <b>${streak}/${nextBadgeDays}</b>\n\nKeep checking in every day. Your badge is waiting for you.`
+          : `<b>All current streak badges unlocked.</b>\n\nKeep checking in and keep your streak alive.`),
   });
 
 

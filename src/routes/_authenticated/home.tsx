@@ -105,6 +105,8 @@ function HomePage() {
   const name = profile?.display_name ?? "Tasker";
   const photo = profile?.photo_url ?? null;
   const streak = profile?.streak ?? 0;
+  const checkinBadge = streak >= 365 ? "Legend" : streak >= 180 ? "Veteran" : streak >= 90 ? "Elite Member" : streak >= 60 ? "Dedicated Member" : streak >= 30 ? "Badge of Honor" : null;
+  const nextBadge = streak < 30 ? 30 : streak < 60 ? 60 : streak < 90 ? 90 : streak < 180 ? 180 : streak < 365 ? 365 : null;
 
 
   const levelNum = Number(levelStats?.level ?? profile?.level_num ?? 1);
@@ -130,8 +132,10 @@ function HomePage() {
       const r = await dailyCheckin();
       setCheckMsg(
         r.already
-          ? `Already checked in · streak ${r.streak}`
-          : `Day ${r.streak} · Check-in complete`,
+          ? `Already checked in · streak ${r.streak}d`
+          : r.badgeUnlocked
+            ? `🏅 ${r.badge} unlocked · ${r.streak}d streak`
+            : `Day ${r.streak} · Check-in complete`,
       );
     } catch (e) {
       setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
@@ -279,11 +283,11 @@ function HomePage() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Daily check-in</p>
           <p className="truncate text-[11px] text-slate-400">
-            {checkMsg ?? `Streak ${streak}d · claim today's check-in reward`}
+            {checkMsg ?? `Streak ${streak}d · keep your streak alive`}
           </p>
         </div>
         <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-[10px] font-black text-cyan-300">
-          {checkBusy ? "…" : "Claim"}
+          {checkBusy ? "…" : "Check In"}
         </span>
       </button>
 
