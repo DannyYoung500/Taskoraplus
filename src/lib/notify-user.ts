@@ -200,3 +200,46 @@ export const notifyCheckinSuccess = (userId: string, streak: number, points: num
       (bonus > 0 ? `\n🎁 Streak Bonus: +${bonus} TP` : "") +
       "\n\n🚀 Check in tomorrow for more points!",
   });
+
+
+export async function notifyReferralMilestone(input: {
+  inviterUserId: string;
+  milestone: "join" | "tasks" | "videos" | "games" | "ads";
+  amountUsd: number;
+  referralName?: string | null;
+}) {
+  const labels = {
+    join: "🤝 Join + Verify",
+    tasks: "✅ 5 Tasks",
+    videos: "🎬 20 Videos",
+    games: "🎮 5 Games",
+    ads: "📺 20 Ads",
+  };
+  return sendUserHtml({
+    userId: input.inviterUserId,
+    text:
+      `🎉 <b>Referral Reward</b>\\n\\n` +
+      `Your referral completed: <b>${labels[input.milestone]}</b>\\n\\n` +
+      `💰 Reward: <b>+$${Number(input.amountUsd).toFixed(4)}</b>\\n\\n` +
+      `Keep going — all five requirements must be completed before the referral becomes valid.`,
+  });
+}
+
+export async function notifyReferralValid(input: {
+  inviterUserId: string;
+  referralName?: string | null;
+}) {
+  return sendUserHtml({
+    userId: input.inviterUserId,
+    text:
+      `🎉 <b>Referral Valid!</b>\\n\\n` +
+      `Your referral has completed all requirements:\\n\\n` +
+      `🤝 Join + Verify — ✅\\n` +
+      `✅ 5 Tasks — ✅\\n` +
+      `🎬 20 Videos — ✅\\n` +
+      `🎮 5 Games — ✅\\n` +
+      `📺 20 Ads — ✅\\n\\n` +
+      `🔓 <b>Referral is now VALID</b>\\n\\n` +
+      `💰 <b>10% withdrawal commission unlocked.</b>`,
+  });
+}
