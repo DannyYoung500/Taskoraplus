@@ -15,6 +15,8 @@ import {
   SiThreads,
   SiGoogle,
   SiAudiomack,
+  SiGithub,
+  SiBinance,
 } from "react-icons/si";
 import { FaGlobe, FaPoll, FaAppStore, FaLinkedin } from "react-icons/fa";
 import type { IconType } from "react-icons";
@@ -39,7 +41,10 @@ export type Platform =
   | "google"
   | "website"
   | "survey"
-  | "app_review";
+  | "app_review"
+  | "app_install"
+  | "github"
+  | "binance";
 
 type PlatformMeta = {
   Icon: IconType;
@@ -169,14 +174,41 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     services: 2,
     blurb: "Plays & followers",
   },
+  app_install: {
+    Icon: FaAppStore,
+    color: "#0D96F6",
+    bg: "from-[#0D96F6] to-[#0070c9]",
+    label: "App Installs",
+    category: "reviews",
+    services: 2,
+    blurb: "Android & iOS app installs",
+  },
+  github: {
+    Icon: SiGithub,
+    color: "#FFFFFF",
+    bg: "from-[#24292e] to-[#111111]",
+    label: "GitHub",
+    category: "social",
+    services: 5,
+    blurb: "Stars, follows, forks, watches & issues",
+  },
+  binance: {
+    Icon: SiBinance,
+    color: "#F3BA2F",
+    bg: "from-[#F3BA2F] to-[#c89218]",
+    label: "Binance",
+    category: "social",
+    services: 6,
+    blurb: "Square follows, likes, comments & campaigns",
+  },
   app_review: {
     Icon: FaAppStore,
     color: "#0D96F6",
     bg: "from-[#0D96F6] to-[#0070c9]",
     label: "App Review",
     category: "reviews",
-    services: 2,
-    blurb: "App Store & Play ratings",
+    services: 3,
+    blurb: "App Store & Play reviews and ratings",
   },
   google: {
     Icon: SiGoogle,
@@ -255,6 +287,9 @@ export const PLATFORM_ORDER: Platform[] = [
   "pinterest",
   "reddit",
   "twitch",
+  "github",
+  "binance",
+  "app_install",
 ];
 
 export const CATEGORY_LABELS: Record<PlatformMeta["category"], string> = {
