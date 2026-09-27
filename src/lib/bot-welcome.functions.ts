@@ -37,6 +37,20 @@ const DEFAULT_BUTTONS: WelcomeButton[] = [
   { id: "community", label: "💬 COMMUNITY", type: "url", url: "https://t.me/Taskoraplus" },
 ];
 
+function normalizeTelegramUrl(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const username = raw.match(/^@([A-Za-z0-9_]{5,32})$/)?.[1];
+  const candidate = username ? `https://t.me/${username}` : raw;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function normalizeButtons(raw: unknown): WelcomeButton[] {
   if (!Array.isArray(raw)) return DEFAULT_BUTTONS;
   return raw
@@ -47,7 +61,7 @@ function normalizeButtons(raw: unknown): WelcomeButton[] {
         id: String(x.id || crypto.randomUUID().slice(0, 8)),
         label: String(x.label).slice(0, 64),
         type: x.type === "url" || x.type === "callback" ? x.type : "web_app",
-        url: x.url ? String(x.url).slice(0, 512) : undefined,
+        url: x.url ? normalizeTelegramUrl(String(x.url).slice(0, 512)) ?? undefined : undefined,
         path: x.path ? String(x.path).slice(0, 128) : undefined,
       };
     });
@@ -160,10 +174,10 @@ function buildInlineKeyboard(
     let btn: TgBtn | null = null;
     if (b.type === "web_app") {
       const path = b.path ? (b.path.startsWith("/") ? b.path : `/${b.path}`) : "";
-      const url = b.url || (base ? `${base}${path}` : "") || base;
+      const url = normalizeTelegramUrl(b.url || (base ? `${base}${path}` : "") || base);
       if (url) btn = { text: b.label, web_app: { url } };
     } else if (b.type === "url") {
-      const url = b.url || (b.id === "community" ? communityUrl : "");
+      const url = normalizeTelegramUrl(b.url || (b.id === "community" ? communityUrl : ""));
       if (url) btn = { text: b.label, url };
     } else if (b.type === "callback" && b.id) {
       btn = { text: b.label, callback_data: b.id.slice(0, 64) };
@@ -224,14 +238,17 @@ export async function sendWelcomeToChat(opts: {
       buttons = normalizeButtons(data.draft_buttons ?? data.buttons);
       photoUrl = (data.draft_photo_url as string | null) ?? (data.photo_url as string | null);
       photoFileId = (data.draft_photo_file_id as string | null) ?? (data.photo_file_id as string | null);
-      community = (data.draft_community_url as string) || (data.community_url as string) || community;
+      community =
+        normalizeTelegramUrl(data.draft_community_url as string) ||
+        normalizeTelegramUrl(data.community_url as string) ||
+        community;
       mini = (data.draft_mini_app_url as string | null) || (data.mini_app_url as string | null) || mini;
     } else {
       message = (data.message_text as string) || message;
       buttons = normalizeButtons(data.buttons);
       photoUrl = data.photo_url as string | null;
       photoFileId = data.photo_file_id as string | null;
-      community = (data.community_url as string) || community;
+      community = normalizeTelegramUrl(data.community_url as string) || community;
       mini = (data.mini_app_url as string | null) || mini;
     }
     if (data.enabled === false && !opts.useDraft) {
@@ -361,7 +378,10 @@ export const ownerSaveBotWelcomeDraft = createServerFn({ method: "POST" })
     if (data.message_text != null) payload.draft_message_text = String(data.message_text).slice(0, 4000);
     if (data.buttons != null) payload.draft_buttons = normalizeButtons(data.buttons);
     if (data.photo_url !== undefined) payload.draft_photo_url = data.photo_url;
-    if (data.community_url != null) payload.draft_community_url = String(data.community_url).slice(0, 512);
+    if (data.community_url != null) {
+      payload.draft_community_url =
+        normalizeTelegramUrl(String(data.community_url).slice(0, 512)) || "https://t.me/TaskoraCommunity";
+    }
     if (data.mini_app_url !== undefined) payload.draft_mini_app_url = data.mini_app_url;
     if (data.enabled != null) payload.enabled = Boolean(data.enabled);
     const { error } = await db.from("bot_welcome_settings").upsert({ id: true, ...payload });
@@ -380,7 +400,10 @@ export const ownerPublishBotWelcome = createServerFn({ method: "POST" })
     const draftMsg = (cur?.draft_message_text as string) || (cur?.message_text as string) || DEFAULT_MESSAGE;
     const draftBtns = normalizeButtons(cur?.draft_buttons ?? cur?.buttons ?? DEFAULT_BUTTONS);
     const draftPhoto = (cur?.draft_photo_url as string | null) ?? null;
-    const draftCommunity = (cur?.draft_community_url as string) || (cur?.community_url as string) || "https://t.me/Taskoraplus";
+    const draftCommunity =
+      normalizeTelegramUrl(cur?.draft_community_url as string) ||
+      normalizeTelegramUrl(cur?.community_url as string) ||
+      "https://t.me/Taskoraplus";
     const draftMini = (cur?.draft_mini_app_url as string | null) ?? (cur?.mini_app_url as string | null) ?? null;
     const { error } = await db.from("bot_welcome_settings").upsert({
       id: true,
