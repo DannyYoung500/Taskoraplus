@@ -12,7 +12,6 @@ import {
   CalendarCheck,
   WalletCards,
   Flame,
-  Star,
   Trophy,
 } from "lucide-react";
 import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
@@ -79,19 +78,11 @@ export const Route = createFileRoute("/_authenticated/home")({
       tasks: tasks.filter((task) => !isDemoTaskTitle(task.title)).slice(0, 8),
       dash,
       missions,
+      levelStats,
     };
   },
   component: HomePage,
 });
-
-function levelFromPoints(points: number) {
-  if (points >= 10000) return { num: 20, label: "Elite", next: 15000 };
-  if (points >= 5000) return { num: 15, label: "Pro", next: 10000 };
-  if (points >= 2500) return { num: 12, label: "Starter", next: 5000 };
-  if (points >= 1000) return { num: 8, label: "Rising", next: 2500 };
-  if (points >= 250) return { num: 4, label: "Rookie", next: 1000 };
-  return { num: 1, label: "New", next: 250 };
-}
 
 function HomePage() {
   const { tasks, dash, missions, levelStats } = Route.useLoaderData();
@@ -107,8 +98,6 @@ function HomePage() {
         display_name?: string | null;
         photo_url?: string | null;
         streak?: number;
-        task_points?: number;
-        level?: string | null;
         level_num?: number | null;
       }
     | null;
@@ -119,9 +108,7 @@ function HomePage() {
 
 
   const levelNum = Number(levelStats?.level ?? profile?.level_num ?? 1);
-  const levelLabel = profile?.level ?? lvl.label;
-  const nextTarget = lvl.next;
-  const progressPct = Math.min(100, Math.round((taskPoints / nextTarget) * 100));
+  const progressPct = Number(levelStats?.progress ?? 0);
   const isOwner = Boolean(dash?.isOwner);
 
   useEffect(() => {
@@ -134,7 +121,6 @@ function HomePage() {
   const taskProgress = Math.min(3, doneTasks);
 
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
-  const [displayTaskPoints, setDisplayTaskPoints] = useState(taskPoints);
   const [checkBusy, setCheckBusy] = useState(false);
 
   async function onCheckin() {
@@ -142,9 +128,6 @@ function HomePage() {
     setCheckMsg(null);
     try {
       const r = await dailyCheckin();
-      if (!r.already) {
-        setDisplayTaskPoints(Number(r.taskPointTotal ?? displayTaskPoints + Number(r.taskPoints ?? 0)));
-      }
       setCheckMsg(
         r.already
           ? `Already checked in · streak ${r.streak}`
@@ -265,33 +248,21 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-amber-400/35 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
+      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-cyan-400/20 bg-[#0b1628] p-3.5">
         <div className="flex items-center gap-3">
-          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-amber-300/40 bg-amber-400/15 text-amber-200">
-            <Star className="size-6 fill-amber-300 text-amber-300" />
+          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-400/10 text-cyan-200">
+            <Trophy className="size-6" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Task Points</p>
-            <p className="text-2xl font-semibold text-amber-200">{displayTaskPoints.toLocaleString()}</p>
+            <p className="text-sm font-semibold">Level {levelNum}</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Keep completing activities to reach the next level.</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-semibold text-slate-400">Next Level</p>
-            <p className="text-[11px] font-bold text-slate-200">
-              {displayTaskPoints.toLocaleString()} / {nextTarget.toLocaleString()}
-            </p>
+            <p className="text-[10px] font-semibold text-slate-400">Progress</p>
+            <p className="text-[11px] font-bold text-cyan-200">{progressPct}%</p>
             <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
-                style={{ width: `${progressPct}%` }}
-              />
+              <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" style={{ width: progressPct + "%" }} />
             </div>
-          </div>
-          <div className="text-center">
-            <span className="inline-flex size-9 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-              <Flame className="size-4" />
-            </span>
-            <p className="mt-1 text-[9px] font-bold text-cyan-200">Level {levelNum}</p>
-            <p className="text-[8px] text-slate-500">{levelLabel}</p>
           </div>
         </div>
       </section>
