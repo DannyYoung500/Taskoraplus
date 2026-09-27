@@ -42,6 +42,18 @@ export const RULES = {
   maxActionsPerMinute: 8,
   /** Campaign SLA hours before owner alert for stuck active campaigns */
   campaignStuckHours: 72,
+  /** IP/ASN: max distinct accounts from same IP family in 24h before dual-approval */
+  maxAccountsPerIpFamily24h: 8,
+  /** IP/ASN hard block threshold */
+  hardBlockAccountsPerIpFamily24h: 20,
+  /** First successful paid withdrawal count below which dual is forced */
+  graduatedHoldPaidCount: 3,
+  /** Watch sessions longer than this require mid-watch attention ack */
+  attentionRequiredSeconds: 45,
+  /** Min visibility ratio (qualified vs wall) for long watches */
+  minVisibleWatchRatio: 0.85,
+  /** Campaign circuit-breaker: pause if spend exceeds this multiple of expected */
+  campaignSpendCircuitMultiplier: 1.5,
 } as const;
 
 export function hoursSince(iso: string | null | undefined): number {
