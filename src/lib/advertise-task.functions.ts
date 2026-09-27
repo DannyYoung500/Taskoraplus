@@ -22,7 +22,10 @@ const ALLOWED_ACTIONS: Record<string, string[]> = {
   google: ["review", "watch"],
   website: ["visit", "signup", "watch"],
   survey: ["vote", "signup", "watch"],
-  app_review: ["review", "watch"],
+  app_review: ["review", "rating", "watch"],
+  app_install: ["install"],
+  github: ["star", "follow", "fork", "watch", "comment"],
+  binance: ["follow", "like", "comment", "view", "post", "join"],
 };
 
 export const createAdvertiseTask = createServerFn({ method: "POST" })
