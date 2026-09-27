@@ -127,7 +127,7 @@ export const listPendingWithdrawalsWithRisk = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("withdrawals")
       .select(
-        "*, profiles:user_id(display_name, username, telegram_id, photo_url, last_active_at, country, country_code, language_code, wallet_frozen)",
+        "*, profiles:user_id(display_name, username, telegram_id, photo_url, last_active_at, country, country_code, language_code, wallet_frozen, device_fp, last_ip_hint, created_at)",
       )
       .eq("status", "pending")
       .order("created_at", { ascending: true })
@@ -151,6 +151,44 @@ export const listPendingWithdrawalsWithRisk = createServerFn({ method: "GET" })
         country_code: prof.country_code,
         language_code: prof.language_code,
       });
+
+      // Risk strip breakdown for owner UI
+      let device_cluster = 1;
+      let ip_family_count = 1;
+      let account_age_hours = 9999;
+      try {
+        const fp = String(prof.device_fp ?? "");
+        if (fp.length >= 8) {
+          const { data: sib } = await supabaseAdmin
+            .from("profiles")
+            .select("id")
+            .eq("device_fp", fp)
+            .limit(12);
+          device_cluster = (sib ?? []).length || 1;
+        }
+        const ip = String(prof.last_ip_hint ?? "").trim();
+        if (ip.length >= 4) {
+          const family = ip.includes(".")
+            ? ip.split(".").slice(0, 3).join(".")
+            : ip.slice(0, 12);
+          const since = new Date(Date.now() - 86_400_000).toISOString();
+          const { data: ipRows } = await supabaseAdmin
+            .from("profiles")
+            .select("id")
+            .ilike("last_ip_hint", `${family}%`)
+            .gte("last_seen_at", since)
+            .limit(30);
+          ip_family_count = new Set((ipRows ?? []).map((r) => r.id)).size || 1;
+        }
+        if (prof.created_at) {
+          account_age_hours = Math.round(
+            (Date.now() - new Date(String(prof.created_at)).getTime()) / 3600000,
+          );
+        }
+      } catch {
+        /* soft */
+      }
+
       enriched.push({
         ...row,
         photo_url: prof.photo_url ?? null,
@@ -162,6 +200,9 @@ export const listPendingWithdrawalsWithRisk = createServerFn({ method: "GET" })
         presence_label: presence.label,
         country_line,
         wallet_frozen: Boolean(prof.wallet_frozen),
+        device_cluster,
+        ip_family_count,
+        account_age_hours,
       });
     }
     return enriched;
