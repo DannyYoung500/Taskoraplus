@@ -224,6 +224,7 @@ export type EconomySettings = {
   referral_points: number;
   games_enabled: boolean;
   daily_tasks: DailyTaskDef[];
+  deposit_addresses: Array<{ id: string; method: string; network: string; address: string }>;
 };
 
 const DEFAULT_ECONOMY: EconomySettings = {
@@ -244,6 +245,7 @@ const DEFAULT_ECONOMY: EconomySettings = {
   referral_points: 100,
   games_enabled: false,
   daily_tasks: [],
+  deposit_addresses: [],
 };
 
 export const ownerGetEconomy = createServerFn({ method: "GET" })
@@ -279,6 +281,16 @@ export const ownerSaveEconomy = createServerFn({ method: "POST" })
       daily_checkin_points: Math.max(0, Math.floor(Number(data.daily_checkin_points ?? current.daily_checkin_points))),
       referral_points: Math.max(0, Math.floor(Number(data.referral_points ?? current.referral_points))),
       games_enabled: data.games_enabled ?? current.games_enabled,
+      deposit_addresses: Array.isArray(data.deposit_addresses)
+        ? data.deposit_addresses
+            .map((a) => ({
+              id: String(a?.id ?? "").trim(),
+              method: String(a?.method ?? "").trim().slice(0, 40),
+              network: String(a?.network ?? "").trim().slice(0, 60),
+              address: String(a?.address ?? "").trim().slice(0, 200),
+            }))
+            .filter((a) => a.id && a.method && a.network && a.address)
+        : current.deposit_addresses,
       daily_tasks: Array.isArray(data.daily_tasks)
         ? data.daily_tasks
             .filter((d) => d && String(d.title ?? "").trim())
@@ -328,5 +340,6 @@ export const getPublicFeatures = createServerFn({ method: "GET" })
         : [],
       daily_checkin_points: Number(v.daily_checkin_points ?? DEFAULT_ECONOMY.daily_checkin_points),
       referral_points: Number(v.referral_points ?? DEFAULT_ECONOMY.referral_points),
+      deposit_addresses: Array.isArray(v.deposit_addresses) ? v.deposit_addresses : [],
     };
   });

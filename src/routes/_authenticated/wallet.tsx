@@ -48,35 +48,21 @@ export const Route = createFileRoute("/_authenticated/wallet")({
 const WITHDRAW_METHODS = [
   { id: "USDT · TRC20", label: "USDT", network: "TRC20 (Tron)" },
   { id: "USDT · BEP20", label: "USDT", network: "BEP20 (BSC)" },
+  { id: "USDT · ERC20", label: "USDT", network: "ERC20 (Ethereum)" },
   { id: "BTC", label: "Bitcoin", network: "Bitcoin" },
+  { id: "ETH", label: "Ethereum", network: "Ethereum" },
+  { id: "BNB · BEP20", label: "BNB", network: "BEP20 (BSC)" },
   { id: "TON", label: "TON", network: "TON" },
 ] as const;
 
-const DEFAULT_DEPOSIT = [
-  {
-    id: "USDT · TRC20",
-    label: "USDT TRC20",
-    network: "Tron",
-    address: "TXk9rA2mP4nQ7vL8wY3cF6hJ1sD5bN0uE",
-  },
-  {
-    id: "USDT · BEP20",
-    label: "USDT BEP20",
-    network: "BSC",
-    address: "0x9A2bC4d5E6f708192a3B4c5D6e7F8091a2B3c4D5",
-  },
-  {
-    id: "BTC",
-    label: "Bitcoin",
-    network: "BTC",
-    address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
-  },
-  {
-    id: "TON",
-    label: "TON",
-    network: "TON",
-    address: "EQD________________________________________",
-  },
+const SUPPORTED_DEPOSIT_ASSETS = [
+  { id: "USDT · TRC20", label: "USDT", network: "TRC20 (Tron)" },
+  { id: "USDT · BEP20", label: "USDT", network: "BEP20 (BSC)" },
+  { id: "USDT · ERC20", label: "USDT", network: "ERC20 (Ethereum)" },
+  { id: "BTC", label: "Bitcoin", network: "Bitcoin" },
+  { id: "ETH", label: "Ethereum", network: "Ethereum" },
+  { id: "BNB · BEP20", label: "BNB", network: "BEP20 (BSC)" },
+  { id: "TON", label: "TON", network: "TON" },
 ] as const;
 
 function WalletScreen() {
@@ -103,15 +89,16 @@ function WalletScreen() {
       ?.deposit_addresses ?? []
   ).filter((a) => a.address);
 
-  const depositMethods =
-    ownerAddrs.length > 0
-      ? ownerAddrs.map((a) => ({
-          id: a.id,
-          label: a.method,
-          network: a.network || a.method,
-          address: a.address,
-        }))
-      : DEFAULT_DEPOSIT.map((m) => ({ ...m }));
+  const configuredDeposits = ownerAddrs.map((a) => ({
+    id: a.id,
+    label: a.method,
+    network: a.network || a.method,
+    address: a.address,
+  }));
+  const depositMethods = SUPPORTED_DEPOSIT_ASSETS.map((asset) => {
+    const configured = configuredDeposits.find((a) => a.id === asset.id || a.label === asset.label);
+    return { ...asset, address: configured?.address ?? "" };
+  });
 
   const dMethod = depositMethods[Math.min(dIdx, Math.max(0, depositMethods.length - 1))] ?? depositMethods[0];
 
@@ -292,16 +279,25 @@ function WalletScreen() {
                 Deposit address · {dMethod?.network}
               </p>
             </div>
-            <p className="break-all rounded-xl border border-cyan-400/15 bg-black/40 px-3 py-3.5 font-mono text-[11px] leading-relaxed text-cyan-100/95">
-              {dMethod?.address ?? "—"}
-            </p>
-            <button
-              type="button"
-              onClick={() => void copyAddress()}
-              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 py-3 text-xs font-bold text-cyan-100 transition active:scale-[0.98]"
-            >
-              {copied ? (<><Check className="size-3.5" /> Address copied</>) : (<><Copy className="size-3.5" /> Copy address</>)}
-            </button>
+            {dMethod?.address ? (
+              <>
+                <p className="break-all rounded-xl border border-cyan-400/15 bg-black/40 px-3 py-3.5 font-mono text-[11px] leading-relaxed text-cyan-100/95">
+                  {dMethod.address}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void copyAddress()}
+                  className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 py-3 text-xs font-bold text-cyan-100 transition active:scale-[0.98]"
+                >
+                  {copied ? (<><Check className="size-3.5" /> Address copied</>) : (<><Copy className="size-3.5" /> Copy address</>)}
+                </button>
+              </>
+            ) : (
+              <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-3 text-center">
+                <p className="text-xs font-bold text-amber-200">Deposit address not configured</p>
+                <p className="mt-1 text-[10px] text-amber-200/70">This network is supported, but TaskoraPlus has not configured a real receiving address yet. Do not send funds until an address appears here.</p>
+              </div>
+            )}
             <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-center">
               <p className="text-[11px] font-semibold text-amber-200">
                 ⚠ Send only {dMethod?.label} on {dMethod?.network}
@@ -323,7 +319,7 @@ function WalletScreen() {
               {dBusy ? "Submitting…" : "Submit deposit for confirmation"}
             </button>
             {dMsg ? (<p className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 px-3 py-2 text-center text-xs text-cyan-100/90">{dMsg}</p>) : null}
-            <p className="text-center text-[10px] text-slate-500">Credits appear after owner confirms on-chain. Usually under 30 min.</p>
+            <p className="text-center text-[10px] text-slate-500">Credits appear only after real on-chain confirmation. Never send funds to an address that is not shown as configured.</p>
           </div>
         </section>
       ) : null}

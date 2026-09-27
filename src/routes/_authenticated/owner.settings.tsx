@@ -428,6 +428,44 @@ function OwnerSettings() {
             <NumField label="Successful referral Task Points" value={economy.referral_points} onChange={(v) => setEconomy({ ...economy, referral_points: v })} />
           </div>
 
+          <section className="rounded-3xl border border-cyan-400/15 bg-[#12141c] p-4">
+            <div className="mb-3">
+              <h3 className="text-sm font-bold text-cyan-200">Real Crypto Deposit Addresses</h3>
+              <p className="mt-1 text-[10px] leading-4 text-white/40">
+                Configure only addresses you actually control. Blank networks stay unavailable to users. Fake/example addresses are never used.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {[
+                ["USDT · TRC20", "USDT", "TRC20 (Tron)"],
+                ["USDT · BEP20", "USDT", "BEP20 (BSC)"],
+                ["USDT · ERC20", "USDT", "ERC20 (Ethereum)"],
+                ["BTC", "Bitcoin", "Bitcoin"],
+                ["ETH", "Ethereum", "Ethereum"],
+                ["BNB · BEP20", "BNB", "BEP20 (BSC)"],
+                ["TON", "TON", "TON"],
+              ].map(([id, method, network]) => {
+                const current = (economy.deposit_addresses ?? []).find((a) => a.id === id);
+                return (
+                  <label key={id} className="block">
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-white/40">{method} · {network}</span>
+                    <input
+                      value={current?.address ?? ""}
+                      onChange={(e) => {
+                        const list = [...(economy.deposit_addresses ?? [])].filter((a) => a.id !== id);
+                        const address = e.target.value.trim();
+                        if (address) list.push({ id, method, network, address });
+                        setEconomy({ ...economy, deposit_addresses: list });
+                      }}
+                      placeholder="Paste your real receiving address"
+                      className="mt-1 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-xs outline-none focus:border-cyan-400/40"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-2">
             <Toggle
               label="Dual approval for large withdrawals"
