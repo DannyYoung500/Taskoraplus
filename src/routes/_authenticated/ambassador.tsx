@@ -1,28 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Copy, Share2, Crown, ChevronRight, Star, Trophy } from "lucide-react";
-import { getDashboard, getPublicFeatures } from "@/lib/taskora.functions";
+import { Copy, Share2, Crown, ChevronRight, Trophy } from "lucide-react";
+import { getDashboard } from "@/lib/taskora.functions";
 import { Screen, Card, GoldButton } from "@/components/Screen";
-import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO } from "@/lib/brand";
 
 export const Route = createFileRoute("/_authenticated/ambassador")({
   head: () => ({ meta: [{ title: "Referral — TASKORA" }] }),
   loader: async () => {
-    const [dash, features] = await Promise.all([
-      getDashboard().catch(() => null),
-      getPublicFeatures().catch(() => ({ referral_points: 100 })),
-    ]);
-    return { dash, features };
+    const dash = await getDashboard().catch(() => null);
+    return { dash };
   },
   component: AmbassadorPage,
 });
 
 function AmbassadorPage() {
-  const { dash, features } = Route.useLoaderData();
+  const { dash } = Route.useLoaderData();
   const [copied, setCopied] = useState(false);
   const telegramId = dash?.telegramId ?? null;
   const referrals = Number(dash?.referrals ?? 0);
-  const referralPoints = Number(features?.referral_points ?? 100);
+
   const link = telegramId
     ? `https://t.me/Taskoraplusbot/?startapp=${encodeURIComponent(String(telegramId))}`
     : "";
@@ -73,7 +70,7 @@ function AmbassadorPage() {
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Your stats</p>
           <p className="mt-3 text-4xl font-black tracking-tight">{referrals}</p>
           <p className="text-xs text-slate-500">successful referrals</p>
-          <p className="mt-2 text-[11px] text-slate-400">~{referralPoints} Task Points per referral (owner-configured)</p>
+          <p className="mt-2 text-[11px] text-slate-400">Task Points are awarded according to the active referral rules.</p>
         </Card>
 
         <Card className="p-4">
