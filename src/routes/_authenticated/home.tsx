@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { useEffect, useState, type ComponentType } from "react";
 import {
   ClipboardCheck,
@@ -18,14 +19,61 @@ import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/tas
 import { listDailyMissions } from "@/lib/daily-missions.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
+
+const LEVEL_REQUIREMENTS = [
+  { tasks: 0, videos: 0, games: 0, ads: 0 },
+  { tasks: 25, videos: 50, games: 25, ads: 50 },
+  { tasks: 75, videos: 150, games: 75, ads: 150 },
+  { tasks: 150, videos: 300, games: 150, ads: 300 },
+  { tasks: 250, videos: 500, games: 250, ads: 500 },
+  { tasks: 400, videos: 800, games: 400, ads: 800 },
+  { tasks: 600, videos: 1200, games: 600, ads: 1200 },
+  { tasks: 850, videos: 1700, games: 850, ads: 1700 },
+  { tasks: 1200, videos: 2400, games: 1200, ads: 2400 },
+  { tasks: 1600, videos: 3200, games: 1600, ads: 3200 },
+  { tasks: 2100, videos: 4200, games: 2100, ads: 4200 },
+  { tasks: 2700, videos: 5400, games: 2700, ads: 5400 },
+  { tasks: 3400, videos: 6800, games: 3400, ads: 6800 },
+  { tasks: 4200, videos: 8400, games: 4200, ads: 8400 },
+  { tasks: 5000, videos: 10000, games: 5000, ads: 10000 },
+] as const;
+
+const getMyLevelStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [tasks, videos, games, ads] = await Promise.all([
+      supabaseAdmin.from("submissions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "verified"),
+      supabaseAdmin.from("watch_video_sessions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "completed"),
+      supabaseAdmin.from("game_rounds").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "completed"),
+      supabaseAdmin.from("watch_completions").select("id", { count: "exact", head: true }).eq("user_id", context.userId),
+    ]);
+    const activity = { tasks: tasks.count ?? 0, videos: videos.count ?? 0, games: games.count ?? 0, ads: ads.count ?? 0 };
+    let level = 1;
+    for (let i = 1; i < LEVEL_REQUIREMENTS.length; i += 1) {
+      const req = LEVEL_REQUIREMENTS[i];
+      if (activity.tasks >= req.tasks && activity.videos >= req.videos && activity.games >= req.games && activity.ads >= req.ads) level = i + 1;
+      else break;
+    }
+    const next = LEVEL_REQUIREMENTS[Math.min(level, LEVEL_REQUIREMENTS.length - 1)];
+    const progress = level >= LEVEL_REQUIREMENTS.length ? 100 : Math.min(99, Math.round(Math.min(
+      activity.tasks / Math.max(1, next.tasks),
+      activity.videos / Math.max(1, next.videos),
+      activity.games / Math.max(1, next.games),
+      activity.ads / Math.max(1, next.ads),
+    ) * 100));
+    return { level, progress };
+  });
 
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
-    const [tasks, dash, missions] = await Promise.all([
+    const [tasks, dash, missions, levelStats] = await Promise.all([
       listTasks().catch(() => []),
       getDashboard().catch(() => null),
       listDailyMissions().catch(() => []),
+      getMyLevelStats().catch(() => ({ level: 1, progress: 0 })),
     ]);
     return {
       tasks: tasks.filter((task) => !isDemoTaskTitle(task.title)).slice(0, 8),
@@ -46,7 +94,7 @@ function levelFromPoints(points: number) {
 }
 
 function HomePage() {
-  const { tasks, dash, missions } = Route.useLoaderData();
+  const { tasks, dash, missions, levelStats } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
   const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
   const balance = rawBalance <= 0.00005 ? 0 : Math.max(0, rawBalance);
@@ -68,9 +116,9 @@ function HomePage() {
   const name = profile?.display_name ?? "Tasker";
   const photo = profile?.photo_url ?? null;
   const streak = profile?.streak ?? 0;
-  const taskPoints = Number(profile?.task_points ?? 0);
-  const lvl = levelFromPoints(taskPoints);
-  const levelNum = profile?.level_num ?? lvl.num;
+
+
+  const levelNum = Number(levelStats?.level ?? profile?.level_num ?? 1);
   const levelLabel = profile?.level ?? lvl.label;
   const nextTarget = lvl.next;
   const progressPct = Math.min(100, Math.round((taskPoints / nextTarget) * 100));
@@ -100,7 +148,7 @@ function HomePage() {
       setCheckMsg(
         r.already
           ? `Already checked in · streak ${r.streak}`
-          : `Day ${r.streak} · +${r.taskPoints ?? 0} Task Points`,
+          : `Day ${r.streak} · Check-in complete`,
       );
     } catch (e) {
       setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
@@ -260,7 +308,7 @@ function HomePage() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">Daily check-in</p>
           <p className="truncate text-[11px] text-slate-400">
-            {checkMsg ?? `Streak ${streak}d · claim Task Points`}
+            {checkMsg ?? `Streak ${streak}d · claim today's check-in reward`}
           </p>
         </div>
         <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-[10px] font-black text-cyan-300">
@@ -285,7 +333,7 @@ function HomePage() {
                 {m.mission_type==="rewarded_ad"?<PlayCircle className="size-4"/>:<ClipboardCheck className="size-4"/>}
               </span>
               <p className="mt-2 line-clamp-2 text-[11px] font-bold leading-tight">{m.title}</p>
-              <p className="mt-0.5 text-[10px] font-black text-cyan-300">{Number(m.reward_usdt)>0?formatUsd(m.reward_usdt):"+"+m.reward_points+" TP"}</p>
+              <p className="mt-0.5 text-[10px] font-black text-cyan-300">{Number(m.reward_usdt)>0?formatUsd(m.reward_usdt):"Bonus"}</p>
               <p className="mt-1 text-[9px] text-slate-500">{m.completed?"Completed":"Open mission"}</p>
             </Link>
           ))}
