@@ -51,7 +51,7 @@ export async function sendUserHtml(input: {
     await telegram("sendPhoto", {
       chat_id: chatId,
       photo: input.photoUrl,
-      caption: safeCaption.slice(0, 1024),
+      caption: safeCaption.replace(/\\n/g, "\n").slice(0, 1024),
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
       reply_markup: replyMarkup,
@@ -59,7 +59,7 @@ export async function sendUserHtml(input: {
   } else {
     await telegram("sendMessage", {
       chat_id: chatId,
-      text: input.text.slice(0, 4096),
+      text: input.text.replace(/\\n/g, "\n").slice(0, 4096),
       parse_mode: "HTML",
       disable_web_page_preview: true,
       reply_markup: replyMarkup,
