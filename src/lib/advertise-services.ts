@@ -136,9 +136,28 @@ export const SERVICES: Record<Platform, ServiceDef[]> = {
     S("am_likes", "like", "Audiomack Likes", "Real likes on your track", 0.012, 0.0084, 0.0036, "likes", 100, 50000, [100, 250, 500, 1000], "~48h", "https://audiomack.com/…", ["Like this Audiomack track"], ["Open the track", "Tap Like", "Screenshot", "Submit proof"], "Audiomack only."),
   ],
   app_review: [
-    S("ar_ios", "review", "iOS App Reviews", "Real reviews on the App Store", 1.5, 1.05, 0.45, "reviews", 20, 500, [10, 25, 50, 100], "~96h", "https://apps.apple.com/app/…", ["Review this iOS app"], ["Open the App Store page", "Leave an honest review", "Screenshot", "Submit proof"], "Honest reviews only."),
-    S("ar_android", "review", "Android App Reviews", "Real reviews on Google Play", 1.5, 1.05, 0.45, "reviews", 20, 500, [10, 25, 50, 100], "~96h", "https://play.google.com/store/apps/…", ["Review this Android app"], ["Open Play Store", "Leave an honest review", "Screenshot", "Submit proof"], "Honest reviews only."),
-    S("ar_ratings", "review", "App Ratings", "Star ratings for your mobile app", 0.5, 0.35, 0.15, "ratings", 50, 1000, [20, 50, 100, 250], "~72h", "App Store or Play Store URL", ["Rate this app"], ["Open the store page", "Submit a rating", "Screenshot", "Submit proof"], "Genuine ratings only."),
+    S("ar_ios", "review", "iOS App Reviews", "Genuine feedback on the App Store", 0.2, 0.14, 0.06, "reviews", 20, 500, [10, 25, 50, 100], "~96h", "https://apps.apple.com/app/…", ["Leave genuine feedback"], ["Use the app", "Leave honest feedback", "Submit proof"], "Genuine, unbiased feedback only."),
+    S("ar_android", "review", "Android App Reviews", "Genuine feedback on Google Play", 0.2, 0.14, 0.06, "reviews", 20, 500, [10, 25, 50, 100], "~96h", "https://play.google.com/store/apps/…", ["Leave genuine feedback"], ["Use the app", "Leave honest feedback", "Submit proof"], "Genuine, unbiased feedback only."),
+    S("ar_ratings", "rating", "App Ratings", "Genuine app experience ratings", 0.05, 0.035, 0.015, "ratings", 50, 1000, [20, 50, 100, 250], "~72h", "App Store or Play Store URL", ["Share an honest rating"], ["Use the app", "Give an honest rating if eligible", "Submit proof"], "Genuine ratings only; no required star value."),
+  ],
+  app_install: [
+    S("ai_android", "install", "Android App Install", "Real Android app acquisition", 0.5, 0.35, 0.15, "installs", 1, 10000, [1, 5, 10, 25, 50, 100], "~72h", "Google Play app URL", ["Install and use this Android app"], ["Open the official store listing", "Install the app", "Open and use the app as instructed", "Submit proof"], "Genuine acquisition only; no forced ratings or reviews."),
+    S("ai_ios", "install", "iOS App Install", "Real iOS app acquisition", 0.5, 0.35, 0.15, "installs", 1, 10000, [1, 5, 10, 25, 50, 100], "~72h", "App Store app URL", ["Install and use this iOS app"], ["Open the official App Store listing", "Install the app", "Open and use the app as instructed", "Submit proof"], "Genuine acquisition only; no forced ratings or reviews."),
+  ],
+  github: [
+    S("gh_stars", "star", "GitHub Repository Stars", "Stars on a GitHub repository", 0.035, 0.025, 0.01, "stars", 1, 10000, [1, 5, 10, 25, 50], "~72h", "https://github.com/owner/repository", ["Star this GitHub repository"], ["Open the repository", "Star the repository", "Submit proof"], "Genuine repository interest only."),
+    S("gh_follow", "follow", "GitHub Follow", "Follow a GitHub user", 0.02, 0.014, 0.006, "follows", 1, 10000, [1, 5, 10, 25], "~72h", "https://github.com/username", ["Follow this GitHub user"], ["Open the profile", "Follow", "Submit proof"], "Genuine engagement only."),
+    S("gh_fork", "fork", "GitHub Repository Forks", "Fork a GitHub repository", 0.025, 0.0175, 0.0075, "forks", 1, 10000, [1, 5, 10, 25], "~72h", "https://github.com/owner/repository", ["Fork this GitHub repository"], ["Open the repository", "Fork it", "Submit proof"], "Genuine use only."),
+    S("gh_watch", "watch", "GitHub Repository Watch", "Watch a GitHub repository", 0.02, 0.014, 0.006, "watches", 1, 10000, [1, 5, 10, 25], "~72h", "https://github.com/owner/repository", ["Watch this GitHub repository"], ["Open the repository", "Choose Watch", "Submit proof"], "Genuine engagement only."),
+    S("gh_issue_comment", "comment", "GitHub Issue Comments", "Relevant comments on GitHub issues", 0.03, 0.021, 0.009, "comments", 1, 5000, [1, 5, 10, 25], "~96h", "https://github.com/owner/repository/issues/1", ["Leave a relevant issue comment"], ["Open the issue", "Leave a relevant comment", "Submit proof"], "No spam."),
+  ],
+  binance: [
+    S("bn_follow_square", "follow", "Binance Square Follow", "Follow a Binance Square profile", 0.04, 0.028, 0.012, "follows", 1, 10000, [1, 5, 10, 25], "~72h", "https://www.binance.com/en/square/profile/…", ["Follow this Binance Square profile"], ["Open the official profile", "Follow", "Submit proof"], "No trading or deposit required."),
+    S("bn_square_like", "like", "Binance Square Likes", "Like a Binance Square post", 0.012, 0.008, 0.004, "likes", 1, 50000, [1, 5, 10, 25], "~48h", "https://www.binance.com/en/square/post/…", ["Like this Binance Square post"], ["Open the post", "Like", "Submit proof"], "No trading or deposit required."),
+    S("bn_square_comment", "comment", "Binance Square Comments", "Relevant Binance Square comments", 0.03, 0.021, 0.009, "comments", 1, 5000, [1, 5, 10, 25], "~72h", "https://www.binance.com/en/square/post/…", ["Leave a relevant Binance Square comment"], ["Open the post", "Leave a relevant comment", "Submit proof"], "No spam."),
+    S("bn_square_view", "view", "Binance Square Views", "Genuine post visits", 0.005, 0.0035, 0.0015, "views", 1, 100000, [1, 10, 50, 100], "~48h", "https://www.binance.com/en/square/post/…", ["View this Binance Square post"], ["Open the post", "Read the content", "Submit proof"], "No trading or deposit required."),
+    S("bn_square_post", "post", "Binance Square Posts", "Create a genuine post where permitted", 0.035, 0.025, 0.01, "posts", 1, 10000, [1, 5, 10], "~96h", "https://www.binance.com/en/square", ["Create a genuine Binance Square post"], ["Open Binance Square", "Create the requested genuine post", "Submit proof"], "No spam or financial manipulation."),
+    S("bn_campaign_join", "join", "Binance Campaign Join", "Join an eligible promotional campaign", 0.03, 0.021, 0.009, "joins", 1, 10000, [1, 5, 10], "~96h", "https://www.binance.com/", ["Join this eligible Binance campaign"], ["Open the official campaign", "Join if eligible", "Submit proof"], "Never require deposits or trades solely for a reward."),
   ],
   google: [
     S("gb_reviews", "review", "Google Business Reviews", "Real Google Business reviews", 0.25, 0.175, 0.075, "reviews", 20, 200, [10, 25, 50], "~96h", "https://maps.google.com/…", ["Review this Google Business"], ["Open the listing", "Leave an honest review", "Screenshot", "Submit proof"], "Honest local reviews only."),
@@ -158,8 +177,11 @@ export const SERVICES: Record<Platform, ServiceDef[]> = {
     S("pin_saves", "like", "Pinterest Saves", "Real saves on your pin", 0.015, 0.0105, 0.0045, "saves", 100, 50000, [100, 250, 500, 1000], "~48h", "https://www.pinterest.com/pin/…", ["Save this Pinterest pin"], ["Open the pin", "Tap Save", "Screenshot", "Submit proof"], "Pinterest only."),
   ],
   reddit: [
-    S("rd_upvotes", "like", "Reddit Upvotes", "Real upvotes on your Reddit post", 0.15, 0.105, 0.045, "upvotes", 100, 10000, [100, 250, 500, 1000], "~48h", "https://www.reddit.com/r/…/comments/…", ["Upvote this Reddit post"], ["Open the post", "Upvote", "Screenshot", "Submit proof"], "Reddit account required."),
-    S("rd_comments", "comment", "Reddit Comments", "Real comments on your Reddit post", 0.3, 0.21, 0.09, "comments", 20, 2000, [20, 50, 100], "~72h", "https://www.reddit.com/r/…/comments/…", ["Comment on this Reddit post"], ["Open the post", "Leave a relevant comment", "Screenshot", "Submit proof"], "Subreddit rules apply."),
+    S("rd_upvotes", "like", "Reddit Upvotes", "Reddit upvotes", 0.3, 0.21, 0.09, "upvotes", 100, 10000, [100, 250, 500, 1000], "~48h", "https://www.reddit.com/r/…/comments/…", ["Upvote this Reddit post"], ["Open the post", "Upvote", "Submit proof"], "Follow subreddit rules."),
+    S("rd_comments", "comment", "Reddit Comments", "Relevant Reddit comments", 0.5, 0.35, 0.15, "comments", 20, 2000, [20, 50, 100], "~72h", "https://www.reddit.com/r/…/comments/…", ["Comment on this Reddit post"], ["Open the post", "Leave a relevant comment", "Submit proof"], "Follow subreddit rules; no spam."),
+    S("rd_followers", "follow", "Reddit Follow", "Follow a Reddit user", 0.8, 0.56, 0.24, "follows", 10, 5000, [10, 25, 50, 100], "~72h", "https://www.reddit.com/user/…", ["Follow this Reddit user"], ["Open the profile", "Follow", "Submit proof"], "Follow Reddit rules."),
+    S("rd_communities", "join", "Reddit Community Join", "Join a Reddit community", 0.6, 0.42, 0.18, "joins", 10, 10000, [10, 25, 50, 100], "~72h", "https://www.reddit.com/r/…", ["Join this Reddit community"], ["Open the community", "Join", "Submit proof"], "Follow community rules."),
+    S("rd_posts", "post", "Reddit Posts", "Create a genuine post where permitted", 1.0, 0.7, 0.3, "posts", 10, 2000, [10, 25, 50, 100], "~96h", "https://www.reddit.com/r/…", ["Create a genuine Reddit post"], ["Open the permitted community", "Create the requested genuine post", "Submit proof"], "Must comply with subreddit rules; no spam or manipulation."),
   ],
   twitch: [
     S("tw_followers", "follow", "Twitch Followers", "Real followers on Twitch", 0.025, 0.0175, 0.0075, "followers", 100, 10000, [100, 250, 500, 1000], "~48h", "https://www.twitch.tv/yourname", ["Follow this Twitch channel"], ["Open the channel", "Tap Follow", "Screenshot", "Submit proof"], "Twitch only."),
@@ -190,6 +212,13 @@ export const QTY_UNIT_LABEL: Record<string, string> = {
   actions: "actions",
   playlists: "playlists",
   package: "package",
+  installs: "installs",
+  stars: "stars",
+  follows: "follows",
+  joins: "joins",
+  forks: "forks",
+  watches: "watches",
+  posts: "posts",
   seconds: "seconds",
 };
 
