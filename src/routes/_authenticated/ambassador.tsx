@@ -124,33 +124,31 @@ function AmbassadorPage() {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Challenge</p>
-              <p className="mt-1 text-sm font-semibold text-white">{challenge?.validCount ?? 0} valid referrals</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">How the bonus works</p>
+              <p className="mt-1 text-sm font-semibold text-white">400 ≈ $0.0160 USDT total</p>
             </div>
-            <p className="text-xs font-bold text-cyan-200">{challenge?.commissionPercent ?? 10}% commission</p>
+            <p className="text-xs font-bold text-cyan-200">{challenge?.commissionPercent ?? 10}% after withdrawal</p>
           </div>
           <div className="mt-4 space-y-2">
             {[
-              ["join","Join + verify","Required before unlock"],
-              ["tasks",`${challenge?.target.tasks ?? 10} tasks`,"Complete verified tasks"],
-              ["videos",`${challenge?.target.videos ?? 50} videos`,"Complete video watches"],
-              ["games",`${challenge?.target.games ?? 10} games`,"Complete game rounds"],
-              ["ads",`${challenge?.target.ads ?? 50} ads`,"Complete rewarded ads"],
-            ].map(([key,label,desc]) => (
-              <div key={key} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2.5">
-                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-200">
-                  <Check className="size-4" />
-                </span>
+              ["1", "Friend joins channel + community and verifies", "+30", challenge?.bonus.join ?? 0.0012],
+              ["2", "Friend completes " + (challenge?.target.tasks ?? 5) + " tasks", "+100", challenge?.bonus.tasks ?? 0.004],
+              ["3", "Friend watches " + (challenge?.target.ads ?? 20) + " ads", "+180", challenge?.bonus.ads ?? 0.0072],
+              ["4", "Friend claims their first Video lootbox", "+90", challenge?.bonus.videos ?? 0.0036],
+            ].map(([step, label, units, usd]) => (
+              <div key={step} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.025] px-3 py-3">
+                <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-[10px] font-bold text-cyan-200">{step}</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-white">{label}</p>
-                  <p className="text-[10px] text-slate-500">{desc}</p>
+                  <p className="text-[10px] text-slate-500">{units} · ≈ ${Number(usd).toFixed(4)} USDT</p>
                 </div>
-                <p className="text-[10px] font-semibold text-cyan-200">Bonus</p>
               </div>
             ))}
           </div>
+          <p className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-[11px] text-cyan-100/90">
+            💰 Every time they withdraw, after that — {challenge?.commissionPercent ?? 10}% commission.
+          </p>
         </Card>
-
         {(challenge?.members?.length ?? 0) > 0 ? (
           <Card className="p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Your referrals</p>
@@ -213,13 +211,13 @@ function AmbassadorPage() {
         <div className="grid grid-cols-2 gap-3">
           <Card className="p-3">
             <Crown className="size-5 text-cyan-300" />
-            <p className="mt-2 text-xs font-black text-white">USD commission</p>
+            <p className="mt-2 text-xs font-black text-white">Withdrawal commission</p>
             <p className="mt-1 text-[10px] text-slate-500">{challenge?.commissionPercent ?? 10}% of every qualifying withdrawal</p>
           </Card>
           <Card className="p-3">
             <Trophy className="size-5 text-violet-300" />
-            <p className="mt-2 text-xs font-black text-white">Task Points</p>
-            <p className="mt-1 text-[10px] text-slate-500">Profile & leaderboard</p>
+            <p className="mt-2 text-xs font-black text-white">Referral bonus</p>
+            <p className="mt-1 text-[10px] text-slate-500">400 ≈ $0.0160 USDT per completed referral</p>
           </Card>
         </div>
 
