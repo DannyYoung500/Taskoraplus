@@ -59,8 +59,8 @@ const getReferralChallenge = createServerFn({ method: "GET" })
 export const Route = createFileRoute("/_authenticated/ambassador")({
   head: () => ({ meta: [{ title: "Referral — TASKORA" }] }),
   loader: async () => {
-    const dash = await getDashboard().catch(() => null);
-    return { dash };
+    const [dash, challenge] = await Promise.all([getDashboard().catch(() => null), getReferralChallenge().catch(() => null)]);
+    return { dash, challenge };
   },
   component: AmbassadorPage,
 });
@@ -69,7 +69,7 @@ function AmbassadorPage() {
   const { dash, challenge } = Route.useLoaderData();
   const [copied, setCopied] = useState(false);
   const telegramId = dash?.telegramId ?? null;
-  const referrals = Number(dash?.referrals ?? 0);
+  const referrals = Number(challenge?.validCount ?? dash?.referrals ?? 0);
 
   const link = telegramId
     ? `https://t.me/Taskoraplusbot/?startapp=${encodeURIComponent(String(telegramId))}`
@@ -173,7 +173,7 @@ function AmbassadorPage() {
               })}
             </div>
           </Card>
-        ) : null>
+        ) : null}
 
         <Card className="p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Your stats</p>
