@@ -1,5 +1,6 @@
 /**
  * Strong wave: batch payout, stuck SLA, network float, public stats, join proof, new-device lock.
+ * Plus campaign circuit-breaker, payout receipt, owner kill switches.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -321,4 +322,140 @@ export const ownerAlertStuckCampaigns = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
     return alertStuckCampaigns();
+  });
+
+/**
+ * Campaign spend circuit-breaker: if paid rewards exceed budget * multiplier, pause campaign.
+ * Soft when budget/spend columns missing.
+ */
+export async function assertCampaignSpendCircuit(opts: {
+  campaignId: string;
+}): Promise<{ ok: boolean; paused?: boolean; reason?: string }> {
+  try {
+    const { RULES } = await import("@/lib/platform-rules");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: c } = await supabaseAdmin
+      .from("campaigns")
+      .select("id, status, budget_usd, spent_usd, title")
+      .eq("id", opts.campaignId)
+      .maybeSingle();
+    if (!c) return { ok: true };
+    const budget = Number((c as { budget_usd?: number }).budget_usd ?? 0);
+    const spent = Number((c as { spent_usd?: number }).spent_usd ?? 0);
+    if (budget <= 0) return { ok: true };
+    const limit = budget * RULES.campaignSpendCircuitMultiplier;
+    if (spent >= limit) {
+      await supabaseAdmin
+        .from("campaigns")
+        .update({ status: "paused" } as never)
+        .eq("id", opts.campaignId)
+        .eq("status", "active");
+      try {
+        const { sendOwnerHtml } = await import("@/lib/notify-owner");
+        await sendOwnerHtml(
+          `⛔ <b>Campaign circuit-breaker</b>\n<code>${opts.campaignId.slice(0, 8)}</code> paused\nSpent $${spent.toFixed(2)} / budget $${budget.toFixed(2)}`,
+        );
+      } catch {
+        /* soft */
+      }
+      return {
+        ok: false,
+        paused: true,
+        reason: "Campaign paused: spend limit reached. Contact advertiser/owner.",
+      };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: true };
+  }
+}
+
+/** Store immutable payout receipt hash when marking paid. Soft on missing column. */
+export async function attachPayoutReceipt(opts: {
+  withdrawalId: string;
+  address: string;
+  amount: number;
+  method: string;
+  txHash?: string | null;
+}): Promise<{ receiptHash: string }> {
+  const { payoutReceiptHash } = await import("@/lib/strong-ops");
+  const receiptHash = payoutReceiptHash(opts);
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("withdrawals")
+      .update({
+        receipt_hash: receiptHash,
+        processed_at: new Date().toISOString(),
+      } as never)
+      .eq("id", opts.withdrawalId);
+  } catch {
+    /* column may not exist */
+  }
+  return { receiptHash };
+}
+
+/** Owner kill-switch snapshot for health panel. */
+export const getOwnerKillSwitches = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "maintenance_switches")
+        .maybeSingle();
+      const v = (data?.value ?? {}) as Record<string, unknown>;
+      return {
+        read_only: Boolean(v.read_only),
+        withdrawals_paused: Boolean(v.withdrawals_paused),
+        deposits_paused: Boolean(v.deposits_paused),
+        task_creation_paused: Boolean(v.task_creation_paused),
+        verification_paused: Boolean(v.verification_paused),
+        watches_paused: Boolean(v.watches_paused),
+      };
+    } catch {
+      return {
+        read_only: false,
+        withdrawals_paused: false,
+        deposits_paused: false,
+        task_creation_paused: false,
+        verification_paused: false,
+        watches_paused: false,
+      };
+    }
+  });
+
+export const setOwnerKillSwitch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      key:
+        | "read_only"
+        | "withdrawals_paused"
+        | "deposits_paused"
+        | "task_creation_paused"
+        | "verification_paused"
+        | "watches_paused";
+      value: boolean;
+    }) => d,
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "maintenance_switches")
+      .maybeSingle();
+    const cur = { ...((existing?.value ?? {}) as Record<string, unknown>) };
+    cur[data.key] = data.value;
+    const { error } = await supabaseAdmin.from("app_settings").upsert(
+      { key: "maintenance_switches", value: cur, updated_at: new Date().toISOString() } as never,
+      { onConflict: "key" },
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true, switches: cur };
   });
