@@ -24,8 +24,11 @@ export function TaskoraLogo({
         alt="TASKORA"
         width={size}
         height={size}
-        className="shrink-0 rounded-full object-cover ring-1 ring-sky-400/30"
-        style={{ width: size, height: size }}
+        className="tk-logo shrink-0 rounded-full object-cover ring-1 ring-sky-400/30"
+        style={{ width: size, height: size, pointerEvents: "none" }}
+        draggable={false}
+        data-no-preview
+        onContextMenu={(e) => e.preventDefault()}
       />
       {withWordmark ? (
         <span

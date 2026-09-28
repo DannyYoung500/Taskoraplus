@@ -18,7 +18,11 @@ export function ScreenTitle({ title, subtitle }: { title: string; subtitle?: str
         <img
           src={TASKORA_LOGO}
           alt=""
-          className="size-9 rounded-full object-cover ring-2 ring-blue-400/40"
+          className="tk-logo size-9 rounded-full object-cover ring-2 ring-blue-400/40"
+          draggable={false}
+          data-no-preview
+          onContextMenu={(e) => e.preventDefault()}
+          style={{ pointerEvents: "none" }}
         />
         <span
           className="text-[11px] font-extrabold uppercase tracking-[0.28em]"
