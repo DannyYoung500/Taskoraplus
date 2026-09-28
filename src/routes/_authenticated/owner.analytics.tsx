@@ -21,7 +21,7 @@ function OwnerAnalytics() {
   const { data, error } = Route.useLoaderData();
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
+    <main className="mx-auto min-h-screen w-full max-w-[1440px] bg-[#05070c] px-4 pb-16 pt-6 sm:px-6 lg:px-8 text-white">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">Analytics</h1>
@@ -39,14 +39,14 @@ function OwnerAnalytics() {
 
       {data ? (
         <>
-          <section className="mt-4 grid grid-cols-2 gap-2">
+          <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Kpi label="Total users" value={String(data.totalUsers)} icon={Users} tone="cyan" />
             <Kpi label="Online now" value={String(data.online)} icon={Activity} tone="green" />
             <Kpi label="Recent (1h)" value={String(data.recent)} icon={Activity} tone="amber" />
             <Kpi label="Offline" value={String(data.offline)} icon={Users} tone="slate" />
           </section>
 
-          <section className="mt-3 grid grid-cols-3 gap-2">
+          <section className="mt-3 grid grid-cols-3 gap-3">
             <Mini label="New 24h" value={String(data.new24h)} />
             <Mini label="New 7d" value={String(data.new7d)} />
             <Mini label="New 30d" value={String(data.new30d)} />
@@ -65,7 +65,7 @@ function OwnerAnalytics() {
             </h2>
             <p className="mb-2 text-[10px] text-white/40">Users · online now · share of base</p>
             {data.countries.length === 0 ? (
-              <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm text-white/40">
+              <p className="rounded-2xl border border-white/8 bg-[#0b1422] p-4 text-sm text-white/40">
                 No country data yet. Run PRESENCE_COUNTRY_RUN_ONCE.sql and have users open the app.
               </p>
             ) : (
