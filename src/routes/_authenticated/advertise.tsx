@@ -10,7 +10,9 @@ import {
   Type,
   Link2,
   AlertTriangle,
-  Sparkles,
+  ListChecks,
+  Wallet,
+  CheckCircle2,
 } from "lucide-react";
 import {
   PLATFORM_META,
@@ -39,18 +41,31 @@ export const Route = createFileRoute("/_authenticated/advertise")({
   component: AdvertisePage,
 });
 
-type Mode = "quick" | "custom";
-
 function formatUsd(n: number) {
-  if (Math.abs(n) < 0.01 && n !== 0) return `$${n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
+  if (Math.abs(n) < 0.01 && n !== 0)
+    return `$${n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
   return `$${n.toFixed(2)}`;
+}
+
+function taskTypeLabel(taskType: string): string {
+  const map: Record<string, string> = {
+    follow: "Follow",
+    like: "Like",
+    comment: "Comment",
+    view: "View",
+    subscribe: "Subscribe",
+    watch: "Watch",
+    join: "Join",
+    repost: "Repost",
+    review: "Review",
+  };
+  return map[taskType] ?? taskType.charAt(0).toUpperCase() + taskType.slice(1);
 }
 
 function AdvertisePage() {
   const { balance, catalog } = Route.useLoaderData();
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [service, setService] = useState<ServiceDef | null>(null);
-  const [mode, setMode] = useState<Mode>("quick");
 
   const [link, setLink] = useState("");
   const [qty, setQty] = useState(50);
@@ -63,7 +78,9 @@ function AdvertisePage() {
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
   const [screenshotsRequired, setScreenshotsRequired] = useState(1);
   const [featured, setFeatured] = useState(false);
-  const [verificationMode, setVerificationMode] = useState<"automatic" | "screenshot">("automatic");
+  const [verificationMode, setVerificationMode] = useState<"automatic" | "screenshot">(
+    "automatic",
+  );
 
   const [watchMinutes, setWatchMinutes] = useState(1);
   const [watchSeconds, setWatchSeconds] = useState(0);
@@ -102,7 +119,6 @@ function AdvertisePage() {
   function openService(raw: ServiceDef) {
     const s = priced(raw);
     setService(s);
-    setMode("quick");
     setQty(s.minQty);
     setLink("");
     setNotes("");
@@ -231,7 +247,10 @@ function AdvertisePage() {
 
   function applyWarningTemplate() {
     if (!service) return;
-    setWarningText(service.defaultWarning || "Real engagement only. Do not reverse the action after submitting proof.");
+    setWarningText(
+      service.defaultWarning ||
+        "Real engagement only. Do not reverse the action after submitting proof.",
+    );
   }
 
   function toggleProof(p: string) {
@@ -264,8 +283,8 @@ function AdvertisePage() {
       setMsg("Watch time cannot be longer than the detected YouTube video duration.");
       return;
     }
-    if (mode === "custom" && !title.trim()) {
-      setMsg("Task title is required for Custom Task.");
+    if (!title.trim()) {
+      setMsg("Task title is required.");
       return;
     }
     if (insufficient) {
@@ -277,49 +296,24 @@ function AdvertisePage() {
     setBusy(true);
     setMsg(null);
     try {
-      const finalTitle =
-        mode === "quick"
-          ? service.suggestedTitles[0] || service.title
-          : title.trim() || service.title;
-      const finalDesc =
-        mode === "quick"
-          ? `Complete this task: ${service.title}. Follow the steps carefully and submit clear proof.`
-          : description;
-      const finalInstr =
-        mode === "quick" ? service.defaultSteps.join("\n") : instructions;
-      const finalWarning =
-        mode === "quick" ? service.defaultWarning || "" : warningText;
-      const finalProof =
-        mode === "quick"
-          ? ["screenshot"]
-          : proofRequirements.length
-            ? proofRequirements
-            : ["screenshot"];
-      const finalDifficulty = mode === "quick" ? "easy" : difficulty;
-      const finalShots = mode === "quick" ? 1 : screenshotsRequired;
-
       const result = await createAdvertiseCampaign({
         data: {
           serviceId: service.id,
-          title: isWatch ? undefined : finalTitle,
+          title: isWatch ? undefined : title.trim() || service.title,
           link: ytId ? youtubeWatchUrl(ytId) : link.trim(),
           quantity: qtyNum,
           watchSeconds: isWatch ? watchTotalSeconds : undefined,
           videoDurationSeconds: isWatch ? videoDuration ?? undefined : undefined,
           videoSource: isWatch ? "external_url" : undefined,
-          description: finalDesc,
-          instructions: finalInstr,
-          warningText: finalWarning,
-          proofRequirements: finalProof,
-          difficulty: finalDifficulty,
-          screenshotsRequired: finalShots,
+          description: description.trim() || `Complete this task: ${service.title}.`,
+          instructions: instructions.trim() || service.defaultSteps.join("\n"),
+          warningText: warningText.trim() || service.defaultWarning || "",
+          proofRequirements: proofRequirements.length ? proofRequirements : ["screenshot"],
+          difficulty,
+          screenshotsRequired,
           featured,
           verificationMode:
-            platform === "telegram" || platform === "discord"
-              ? mode === "quick"
-                ? "automatic"
-                : verificationMode
-              : undefined,
+            platform === "telegram" || platform === "discord" ? verificationMode : undefined,
         },
       });
       setMsg(`Order placed · ${result.task.id.slice(0, 8)}… Waiting for activation.`);
@@ -332,10 +326,12 @@ function AdvertisePage() {
     }
   }
 
-  /* ───────── Service form (EarnIT-style) ───────── */
+  /* ───────── Service form ───────── */
   if (platform && service) {
     const meta = PLATFORM_META[platform];
     const isTgOrDiscord = platform === "telegram" || platform === "discord";
+    const typeLabel = taskTypeLabel(service.taskType);
+    const formHeading = `${meta.label} ${typeLabel} Task`;
 
     return (
       <main className="mx-auto min-h-screen w-full max-w-md bg-[#0a0c10] px-4 pb-28 pt-4 text-white">
@@ -365,51 +361,31 @@ function AdvertisePage() {
           </div>
         </div>
 
-        {/* Quick Boost / Custom Task toggle */}
-        <div className="mb-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setMode("quick")}
-            className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition ${
-              mode === "quick"
-                ? "bg-sky-500 text-white"
-                : "border border-white/10 bg-white/[0.04] text-white/45"
-            }`}
-          >
-            <Zap className="size-3.5" /> Quick Boost
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("custom")}
-            className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition ${
-              mode === "custom"
-                ? "bg-violet-500 text-white"
-                : "border border-white/10 bg-white/[0.04] text-white/45"
-            }`}
-          >
-            <Sparkles className="size-3.5" /> Custom Task
-          </button>
+        {/* Task type banner */}
+        <div className="mb-4 rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2.5">
+          <p className="text-[12px] font-bold text-sky-100">
+            <ListChecks className="mr-1.5 inline size-3.5 text-sky-300" />
+            {formHeading}
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-sky-100/80">
+            Set your link, quantity, title, steps, and proof. Pricing is catalog-locked
+            (earner reward + TASKORA margin).
+          </p>
         </div>
-
-        {mode === "quick" ? (
-          <p className="mb-4 rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2.5 text-[11px] leading-relaxed text-sky-100/90">
-            <Zap className="mr-1 inline size-3.5 text-sky-300" />
-            Quick Boost auto-generates the task title, description, instructions, and proof
-            requirements. Just provide your link and quantity.
-          </p>
-        ) : (
-          <p className="mb-4 rounded-xl border border-violet-400/20 bg-violet-400/10 px-3 py-2.5 text-[11px] leading-relaxed text-violet-100/90">
-            <Sparkles className="mr-1 inline size-3.5 text-violet-300" />
-            Custom Task lets you write your own title, description, instructions, and proof
-            rules. Pricing stays catalog-locked (tasker reward + TASKORA margin).
-          </p>
-        )}
 
         <div className="space-y-3">
           {/* Target URL */}
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
-              {isWatch ? "YouTube Video URL" : `${meta.label} ${service.taskType === "follow" || service.taskType === "subscribe" || service.taskType === "join" ? "Profile / Channel URL" : "Target URL"}`}
+              {isWatch
+                ? "YouTube Video URL"
+                : `${meta.label} ${
+                    service.taskType === "follow" ||
+                    service.taskType === "subscribe" ||
+                    service.taskType === "join"
+                      ? "Profile / Channel URL"
+                      : "Target URL"
+                  }`}
             </label>
             <input
               value={link}
@@ -443,7 +419,7 @@ function AdvertisePage() {
             </div>
           ) : null}
 
-          {/* Watch time (watch service only) */}
+          {/* Watch time */}
           {isWatch ? (
             <div>
               <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
@@ -523,272 +499,271 @@ function AdvertisePage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Any special instructions…"
+              placeholder="Any special instructions for earners…"
               className="w-full resize-none rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none transition focus:border-sky-400/50"
             />
           </div>
 
-          {/* Custom Task Details */}
-          {mode === "custom" ? (
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-[#12151c] p-4">
-              <p className="text-[11px] font-bold text-white/70">
-                <span className="mr-1">✎</span> Task Details
-              </p>
+          {/* Task Details — always shown, labeled by task type */}
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-[#12151c] p-4">
+            <p className="text-[11px] font-bold text-white/70">
+              <span className="mr-1">✎</span> {formHeading} details
+            </p>
 
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
-                  Task Title <span className="text-red-400">*</span>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
+                Task Title <span className="text-red-400">*</span>
+              </label>
+              <p className="mb-1.5 text-[10px] text-white/35">Suggested titles</p>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {service.suggestedTitles.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTitle(t)}
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/60"
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={`e.g. ${service.suggestedTitles[0] || service.title}`}
+                className="w-full rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none focus:border-sky-400/50"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-white/55">
+                  Description{" "}
+                  <span className="font-normal text-white/30">(optional)</span>
                 </label>
-                <p className="mb-1.5 text-[10px] text-white/35">Suggested titles</p>
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {service.suggestedTitles.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTitle(t)}
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/60"
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={applyDescTemplate}
+                  className="text-[10px] font-bold text-emerald-400"
+                >
+                  ✦ Use a template
+                </button>
+              </div>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                placeholder="Describe what earners need to do…"
+                className="w-full resize-none rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none focus:border-sky-400/50"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-white/55">
+                  Instructions{" "}
+                  <span className="font-normal text-white/30">(optional)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={applyInstrTemplate}
+                  className="text-[10px] font-bold text-emerald-400"
+                >
+                  ✦ Use a template
+                </button>
+              </div>
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                rows={4}
+                placeholder={
+                  "1. Visit the link\n2. Complete the action\n3. Take a screenshot\n4. Submit proof"
+                }
+                className="w-full resize-none rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 font-mono text-[12px] leading-relaxed outline-none focus:border-sky-400/50"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-white/55">
+                  Warning Text{" "}
+                  <span className="font-normal text-white/30">(optional)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={applyWarningTemplate}
+                  className="text-[10px] font-bold text-emerald-400"
+                >
+                  ✦ Use a template
+                </button>
+              </div>
+              <p className="mb-1.5 text-[10px] text-white/35">Common warnings</p>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWarningText(
+                      "Real engagement only. Reversed actions may lead to rejection.",
+                    )
+                  }
+                  className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/60"
+                >
+                  Real engagement only
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWarningText("Do not unfollow after submitting proof.")
+                  }
+                  className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/60"
+                >
+                  Do not unfollow after proof
+                </button>
+              </div>
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-3 size-3.5 shrink-0 text-amber-300" />
                 <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={`e.g. ${service.suggestedTitles[0] || service.title}`}
+                  value={warningText}
+                  onChange={(e) => setWarningText(e.target.value)}
+                  placeholder="e.g. Do not unfollow after submitting proof"
                   className="w-full rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none focus:border-sky-400/50"
                 />
               </div>
+            </div>
 
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-white/55">
-                    Description{" "}
-                    <span className="font-normal text-white/30">(optional, auto-generated if blank)</span>
-                  </label>
+            {/* TG/Discord verification */}
+            {isTgOrDiscord && !isWatch ? (
+              <div className="rounded-xl border border-sky-400/15 bg-sky-400/[0.05] p-3">
+                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sky-200/70">
+                  Verification method
+                </label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={applyDescTemplate}
-                    className="text-[10px] font-bold text-emerald-400"
+                    onClick={() => {
+                      setVerificationMode("automatic");
+                      setProofRequirements([]);
+                      setScreenshotsRequired(0);
+                    }}
+                    className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${
+                      verificationMode === "automatic"
+                        ? "border-sky-300/60 bg-sky-300/15 text-sky-100"
+                        : "border-white/10 bg-black/20 text-white/45"
+                    }`}
                   >
-                    ✦ Use a template
+                    Automatic
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVerificationMode("screenshot");
+                      setProofRequirements(["screenshot"]);
+                      setScreenshotsRequired(1);
+                    }}
+                    className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${
+                      verificationMode === "screenshot"
+                        ? "border-sky-300/60 bg-sky-300/15 text-sky-100"
+                        : "border-white/10 bg-black/20 text-white/45"
+                    }`}
+                  >
+                    Screenshot
                   </button>
                 </div>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Describe what earners need to do…"
-                  className="w-full resize-none rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none focus:border-sky-400/50"
-                />
+                <p className="mt-2 text-[10px] leading-relaxed text-white/40">
+                  {verificationMode === "automatic"
+                    ? "Membership is checked automatically. If it cannot run, the task stays unverified — no soft fallback to screenshot."
+                    : "Users submit screenshots; owner reviews. Automatic is not used for this campaign."}
+                </p>
               </div>
+            ) : null}
 
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-white/55">
-                    Instructions{" "}
-                    <span className="font-normal text-white/30">(optional, auto-generated if blank)</span>
+            {!isWatch && !(isTgOrDiscord && verificationMode === "automatic") ? (
+              <>
+                <div>
+                  <label className="mb-2 block text-[11px] font-semibold text-white/55">
+                    Proof Requirements
                   </label>
-                  <button
-                    type="button"
-                    onClick={applyInstrTemplate}
-                    className="text-[10px] font-bold text-emerald-400"
-                  >
-                    ✦ Use a template
-                  </button>
-                </div>
-                <textarea
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
-                  rows={4}
-                  placeholder={"1. Visit the link\n2. Complete the action\n3. Take a screenshot\n4. Submit proof"}
-                  className="w-full resize-none rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 font-mono text-[12px] leading-relaxed outline-none focus:border-sky-400/50"
-                />
-              </div>
-
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-white/55">
-                    Warning Text{" "}
-                    <span className="font-normal text-white/30">(optional, auto-generated if blank)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={applyWarningTemplate}
-                    className="text-[10px] font-bold text-emerald-400"
-                  >
-                    ✦ Use a template
-                  </button>
-                </div>
-                <p className="mb-1.5 text-[10px] text-white/35">Common warnings</p>
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setWarningText(
-                        "Real engagement only. Reversed actions may lead to rejection.",
-                      )
-                    }
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/60"
-                  >
-                    Real engagement only. Reversed actions re…
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setWarningText("Do not unfollow after submitting proof.")
-                    }
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/60"
-                  >
-                    Do not unfollow after submitting
-                  </button>
-                </div>
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-3 size-3.5 shrink-0 text-amber-300" />
-                  <input
-                    value={warningText}
-                    onChange={(e) => setWarningText(e.target.value)}
-                    placeholder="e.g. Do not unfollow after submitting proof"
-                    className="w-full rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none focus:border-sky-400/50"
-                  />
-                </div>
-              </div>
-
-              {/* TG/Discord verification choice in custom */}
-              {isTgOrDiscord && !isWatch ? (
-                <div className="rounded-xl border border-sky-400/15 bg-sky-400/[0.05] p-3">
-                  <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sky-200/70">
-                    Verification method
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setVerificationMode("automatic");
-                        setProofRequirements([]);
-                        setScreenshotsRequired(0);
-                      }}
-                      className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${
-                        verificationMode === "automatic"
-                          ? "border-sky-300/60 bg-sky-300/15 text-sky-100"
-                          : "border-white/10 bg-black/20 text-white/45"
-                      }`}
-                    >
-                      Automatic
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setVerificationMode("screenshot");
-                        setProofRequirements(["screenshot"]);
-                        setScreenshotsRequired(1);
-                      }}
-                      className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${
-                        verificationMode === "screenshot"
-                          ? "border-sky-300/60 bg-sky-300/15 text-sky-100"
-                          : "border-white/10 bg-black/20 text-white/45"
-                      }`}
-                    >
-                      Screenshot
-                    </button>
-                  </div>
-                  <p className="mt-2 text-[10px] leading-relaxed text-white/40">
-                    {verificationMode === "automatic"
-                      ? "Membership is checked automatically. If it cannot run, the task stays unverified — no soft fallback to screenshot."
-                      : "Users submit screenshots; owner reviews. Automatic is not used for this campaign."}
-                  </p>
-                </div>
-              ) : null}
-
-              {!isWatch && !(isTgOrDiscord && verificationMode === "automatic") ? (
-                <>
-                  <div>
-                    <label className="mb-2 block text-[11px] font-semibold text-white/55">
-                      Proof Requirements
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {(
-                        [
-                          ["screenshot", "Screenshot", Camera],
-                          ["text", "Text/Comment", Type],
-                          ["link", "Link/URL", Link2],
-                        ] as const
-                      ).map(([value, label, Icon]) => {
-                        const checked = proofRequirements.includes(value);
-                        return (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => toggleProof(value)}
-                            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold ${
-                              checked
-                                ? "border-emerald-400/50 bg-emerald-500 text-white"
-                                : "border-white/10 bg-white/[0.04] text-white/45"
-                            }`}
-                          >
-                            <Icon className="size-3.5" />
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[11px] font-semibold text-white/55">
-                      Difficulty
-                    </label>
-                    <div className="flex gap-2">
-                      {(["easy", "medium", "hard"] as const).map((level) => (
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        ["screenshot", "Screenshot", Camera],
+                        ["text", "Text/Comment", Type],
+                        ["link", "Link/URL", Link2],
+                      ] as const
+                    ).map(([value, label, Icon]) => {
+                      const checked = proofRequirements.includes(value);
+                      return (
                         <button
-                          key={level}
+                          key={value}
                           type="button"
-                          onClick={() => setDifficulty(level)}
-                          className={`flex-1 rounded-xl border px-3 py-2.5 text-xs font-bold capitalize ${
-                            difficulty === level
-                              ? level === "hard"
-                                ? "border-red-400/60 bg-red-500/15 text-red-200"
-                                : "border-emerald-400/50 bg-emerald-500/15 text-emerald-200"
-                              : "border-white/10 bg-white/[0.04] text-white/40"
+                          onClick={() => toggleProof(value)}
+                          className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold ${
+                            checked
+                              ? "border-emerald-400/50 bg-emerald-500 text-white"
+                              : "border-white/10 bg-white/[0.04] text-white/45"
                           }`}
                         >
-                          {level}
+                          <Icon className="size-3.5" />
+                          {label}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
+                </div>
 
-                  <div>
-                    <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
-                      Screenshots required
-                    </label>
-                    <select
-                      value={screenshotsRequired}
-                      onChange={(e) => setScreenshotsRequired(Number(e.target.value))}
-                      disabled={!proofRequirements.includes("screenshot")}
-                      className="w-full rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none"
-                    >
-                      <option value={0}>0 screenshots</option>
-                      <option value={1}>1 screenshot</option>
-                      <option value={2}>2 screenshots</option>
-                      <option value={3}>3 screenshots</option>
-                    </select>
-                    <p className="mt-1.5 text-[10px] leading-relaxed text-white/35">
-                      How many screenshots each performer must upload as proof. Use 2 or 3 for
-                      tasks needing multiple verification steps (e.g. follow + comment + share).
-                    </p>
+                <div>
+                  <label className="mb-2 block text-[11px] font-semibold text-white/55">
+                    Difficulty
+                  </label>
+                  <div className="flex gap-2">
+                    {(["easy", "medium", "hard"] as const).map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => setDifficulty(level)}
+                        className={`flex-1 rounded-xl border px-3 py-2.5 text-xs font-bold capitalize ${
+                          difficulty === level
+                            ? level === "hard"
+                              ? "border-red-400/60 bg-red-500/15 text-red-200"
+                              : "border-emerald-400/50 bg-emerald-500/15 text-emerald-200"
+                            : "border-white/10 bg-white/[0.04] text-white/40"
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    ))}
                   </div>
-                </>
-              ) : null}
+                </div>
 
-              {isWatch ? (
-                <p className="rounded-xl border border-sky-400/15 bg-sky-400/5 px-3 py-2.5 text-[11px] text-sky-100/80">
-                  <ShieldCheck className="mr-1 inline size-3.5" />
-                  Automatic watch verification — no screenshot needed.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold text-white/55">
+                    Screenshots required
+                  </label>
+                  <select
+                    value={screenshotsRequired}
+                    onChange={(e) => setScreenshotsRequired(Number(e.target.value))}
+                    disabled={!proofRequirements.includes("screenshot")}
+                    className="w-full rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none"
+                  >
+                    <option value={0}>0 screenshots</option>
+                    <option value={1}>1 screenshot</option>
+                    <option value={2}>2 screenshots</option>
+                    <option value={3}>3 screenshots</option>
+                  </select>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-white/35">
+                    How many screenshots each performer must upload as proof.
+                  </p>
+                </div>
+              </>
+            ) : null}
+
+            {isWatch ? (
+              <p className="rounded-xl border border-sky-400/15 bg-sky-400/5 px-3 py-2.5 text-[11px] text-sky-100/80">
+                <ShieldCheck className="mr-1 inline size-3.5" />
+                Automatic watch verification — no screenshot needed.
+              </p>
+            ) : null}
+          </div>
 
           {/* Feature checkbox */}
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-400/25 bg-amber-500/[0.06] p-3.5">
@@ -803,8 +778,8 @@ function AdvertisePage() {
                 Feature this task for more visibility
               </p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-white/45">
-                Your task will appear in the "Featured" section on the tasks page,
-                getting more attention from earners and faster completion.
+                Your task appears in the Featured section so earners see it first and
+                complete it faster.
               </p>
             </div>
           </label>
@@ -820,15 +795,9 @@ function AdvertisePage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Mode</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    mode === "quick"
-                      ? "bg-sky-500/20 text-sky-300"
-                      : "bg-violet-500/20 text-violet-300"
-                  }`}
-                >
-                  {mode === "quick" ? "Quick" : "Custom"}
+                <span>Task type</span>
+                <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">
+                  {typeLabel}
                 </span>
               </div>
               {isWatch ? (
@@ -841,18 +810,14 @@ function AdvertisePage() {
                 <span>Price per {service.unit.replace(/s$/, "")}</span>
                 <span className="text-white">{formatUsd(unitCustomer)}</span>
               </div>
-              {mode === "custom" ? (
-                <>
-                  <div className="flex justify-between">
-                    <span>Earner payouts</span>
-                    <span className="text-white">{formatUsd(earnerPayouts)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>TASKORA margin</span>
-                    <span className="text-white">{formatUsd(platformFee)}</span>
-                  </div>
-                </>
-              ) : null}
+              <div className="flex justify-between">
+                <span>Earner payouts</span>
+                <span className="text-white">{formatUsd(earnerPayouts)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>TASKORA margin</span>
+                <span className="text-white">{formatUsd(platformFee)}</span>
+              </div>
               <div className="flex justify-between">
                 <span>Estimated delivery</span>
                 <span className="text-white">{service.delivery.replace("~", "")}</span>
@@ -901,11 +866,7 @@ function AdvertisePage() {
             🚀{" "}
             {busy
               ? "Placing order…"
-              : insufficient
-                ? `Place Order — ${formatUsd(total)}`
-                : mode === "custom"
-                  ? `Create Task — ${formatUsd(total)}`
-                  : `Place Order — ${formatUsd(total)}`}
+              : `Create ${typeLabel} Task — ${formatUsd(total)}`}
           </button>
         </div>
       </main>
@@ -979,24 +940,66 @@ function AdvertisePage() {
       <div className="mb-5">
         <h1 className="text-xl font-black tracking-tight">Advertise</h1>
         <p className="mt-1 text-[12px] text-white/45">
-          Create a task · Quick Boost or Custom · catalog pricing
+          Create a task · catalog pricing · real earners
         </p>
       </div>
-      <section className="mb-5 rounded-2xl border border-white/10 bg-[#12151c] p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/10">
-            <Zap className="size-5 text-emerald-300" />
+
+      {/* How it works — rebuilt */}
+      <section className="mb-5 overflow-hidden rounded-2xl border border-sky-400/20 bg-gradient-to-br from-sky-500/10 via-[#12151c] to-emerald-500/5 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-sky-400/15">
+            <Zap className="size-4 text-sky-300" />
           </div>
-          <div>
-            <h2 className="text-sm font-bold">How it works</h2>
-            <p className="mt-1 text-[11px] leading-relaxed text-white/50">
-              Pick a platform and service, choose <strong className="text-white/70">Quick Boost</strong>{" "}
-              (auto-filled) or <strong className="text-white/70">Custom Task</strong> (your own
-              title, steps & proof), set quantity, and place the order from your wallet.
-            </p>
-          </div>
+          <h2 className="text-sm font-bold text-white">How it works</h2>
+        </div>
+        <ol className="space-y-2.5">
+          <li className="flex gap-3">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-black text-sky-200">
+              1
+            </span>
+            <div>
+              <p className="text-[12px] font-semibold text-white/90">Pick platform & service</p>
+              <p className="text-[11px] leading-relaxed text-white/45">
+                Instagram, YouTube, TikTok, Telegram and more — choose the growth action you need.
+              </p>
+            </div>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-black text-sky-200">
+              2
+            </span>
+            <div>
+              <p className="text-[12px] font-semibold text-white/90">Set link, quantity & task details</p>
+              <p className="text-[11px] leading-relaxed text-white/45">
+                Paste your URL, choose how many, write the title and steps earners will follow.
+              </p>
+            </div>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-black text-sky-200">
+              3
+            </span>
+            <div>
+              <p className="text-[12px] font-semibold text-white/90">Pay from wallet & go live</p>
+              <p className="text-[11px] leading-relaxed text-white/45">
+                Catalog price (70% earners / 30% TASKORA). Order activates after review.
+              </p>
+            </div>
+          </li>
+        </ol>
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-white/8 pt-3">
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] text-white/55">
+            <CheckCircle2 className="size-3 text-emerald-400" /> Catalog pricing
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] text-white/55">
+            <Wallet className="size-3 text-sky-300" /> Wallet balance
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] text-white/55">
+            <ShieldCheck className="size-3 text-sky-300" /> Verified earners
+          </span>
         </div>
       </section>
+
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-bold">Choose platform</p>
         <span className="text-[10px] text-white/40">Balance {formatUsd(balance)}</span>
