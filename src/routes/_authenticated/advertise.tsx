@@ -237,7 +237,7 @@ function AdvertisePage() {
           difficulty,
           screenshotsRequired: screenshotCount,
           featured,
-          verificationMode: (platform === "telegram" || platform === "discord") ? verificationMode : undefined,
+          ...(platform === "telegram" || platform === "discord" ? { verificationMode } : {}),
         },
       });
       setMsg(`Created · ${campaign.task.id.slice(0, 8)}… Ready for the marketplace.`);
