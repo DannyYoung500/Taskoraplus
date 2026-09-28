@@ -66,6 +66,27 @@ export const RULES = {
   advertiserTrustMaxCampaignUsd: 25,
   /** Default min screenshots for follow/like/subscribe when screenshot verification */
   minScreenshotsFollowLike: 2,
+  /** Max approved completions per platform per user per rolling 24h */
+  maxCompletionsPerPlatform24h: 25,
+  /** Platforms that require a connected account handle before submit */
+  requireConnectedAccountPlatforms: [
+    "instagram",
+    "tiktok",
+    "youtube",
+    "x",
+    "facebook",
+    "telegram",
+  ] as readonly string[],
+  /** Earner quality: min completed submissions before ratio applies */
+  earnerQualityMinSamples: 8,
+  /** Earner quality: max reject rate (0–1) before submit is blocked */
+  earnerMaxRejectRate: 0.55,
+  /** Campaign value (USD) at/above which advertiser bond is required */
+  advertiserBondThresholdUsd: 50,
+  /** Bond as fraction of campaign value (held until campaign closes cleanly) */
+  advertiserBondRate: 0.1,
+  /** Soft dual when profile country mismatches local payout method; hard-block if true */
+  geoMismatchHardBlock: true,
 } as const;
 
 /** Platform hostname allow-lists for target URL validation */
