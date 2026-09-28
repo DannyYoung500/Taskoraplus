@@ -58,11 +58,10 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     ? Number((Number(service.customer_unit_price)*watchSeconds).toFixed(8))
     : Number(service.customer_unit_price);
 
-  const isCommunityService=service.platform==="telegram"||service.platform==="discord";
   const verificationMode=service.pricing_model==="watch_second"
     ? "automatic"
-    : isCommunityService
-      ? (data.verificationMode==="screenshot"?"screenshot":"automatic")
+    : data.verificationMode==="automatic"
+      ? "automatic"
       : "screenshot";
   const verificationMethods=[verificationMode];
 
@@ -136,7 +135,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     verification_methods:verificationMethods,primary_method:verificationMode,
     screenshot_required:verificationMode==="screenshot",automatic_required:verificationMode==="automatic",
     reward_locked_until_verified:true,owner_review_required:requiresReview,
-    evidence_fields:["submission_id","proof_hash","proof_url","proof_text","submitted_at","reviewed_at","reviewed_by"],
+    evidence_fields:["submission_id","proof_url","proof_hash","proof_text","submitted_at","reviewed_at","reviewed_by"],
     watch_seconds:service.pricing_model==="watch_second"?watchSeconds:null
   };
   const {error:requirementError}=await supabaseAdmin.from("campaign_verification_requirements").insert({
