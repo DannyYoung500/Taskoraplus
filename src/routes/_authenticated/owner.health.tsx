@@ -97,7 +97,7 @@ function OwnerHealthPage() {
   ];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
+    <main className="mx-auto min-h-screen w-full max-w-[1440px] bg-[#05070c] px-4 pb-16 pt-6 sm:px-6 lg:px-8 text-white">
       <div className="mb-4 flex items-center gap-2">
         <Link to="/owner" className="rounded-full border border-white/10 p-2 text-white/60">
           <ChevronLeft className="size-4" />
@@ -110,7 +110,7 @@ function OwnerHealthPage() {
       {msg ? <p className="mb-3 text-xs text-cyan-300">{msg}</p> : null}
 
       {webhook ? (
-        <div className="mb-3 rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3">
+        <div className="mb-3 rounded-2xl border border-white/8 bg-[#0b1422] px-4 py-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">Telegram webhook</p>
             <span
