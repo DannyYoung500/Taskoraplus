@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { calculateAdvertiseOrder } from "@/lib/advertise-economy";
+import {
+  RULES,
+  assertPlatformUrl,
+  hoursSince,
+  normalizeTargetUrl,
+} from "@/lib/platform-rules";
 
 export const listAdvertiseServices=createServerFn({method:"GET"}).handler(async()=>{
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
@@ -20,7 +26,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   if(economyError) throw new Error(economyError.message);
   if(!service) throw new Error("Advertise service is unavailable.");
 
-  const quantity=Math.floor(Number(data.quantity));
+  let quantity=Math.floor(Number(data.quantity));
   if(quantity<Number(service.min_quantity)||quantity>Number(service.max_quantity)) throw new Error(`Quantity must be between ${service.min_quantity.toLocaleString()} and ${service.max_quantity.toLocaleString()}.`);
   const minWatch=Number(economy?.youtube_watch_min_seconds??1);
   const maxWatch=Number(economy?.youtube_watch_max_seconds??10800);
@@ -35,6 +41,55 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const allowOtherCountriesIfUnavailable=data.allowOtherCountriesIfUnavailable!==false;
   if(targetCountryCode&&!/^[A-Z]{2}$/.test(targetCountryCode)) throw new Error("Choose a valid country.");
   if(!/^https?:\/\//i.test(target)) throw new Error("Enter a valid video or target URL.");
+  assertPlatformUrl(String(service.platform), target);
+
+  const normalizedTarget = normalizeTargetUrl(target);
+
+  // Same-link campaign cap (active + draft)
+  try {
+    const { data: sameLinkRows } = await supabaseAdmin
+      .from("campaigns")
+      .select("id, target_url, status")
+      .in("status", ["draft", "active", "pending", "funded"])
+      .limit(200);
+    const sameCount = (sameLinkRows ?? []).filter(
+      (r: { target_url?: string }) =>
+        normalizeTargetUrl(String(r.target_url || "")) === normalizedTarget,
+    ).length;
+    if (sameCount >= RULES.maxActiveCampaignsPerTargetUrl) {
+      throw new Error(
+        `This link already has ${sameCount} active campaigns (max ${RULES.maxActiveCampaignsPerTargetUrl}).`,
+      );
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("already has")) throw e;
+  }
+
+  // Advertiser velocity + trust hold
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count: campaigns24h } = await supabaseAdmin
+    .from("campaigns")
+    .select("id", { count: "exact", head: true })
+    .eq("advertiser_user_id", context.userId)
+    .gte("created_at", since24h);
+  if ((campaigns24h ?? 0) >= RULES.maxCampaignsPerAdvertiser24h) {
+    throw new Error(
+      `You can create at most ${RULES.maxCampaignsPerAdvertiser24h} campaigns per 24 hours.`,
+    );
+  }
+
+  let advertiserAgeHours = 9999;
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("created_at")
+      .eq("id", context.userId)
+      .maybeSingle();
+    advertiserAgeHours = hoursSince(profile?.created_at);
+  } catch {
+    /* soft */
+  }
+  const underTrustHold = advertiserAgeHours < RULES.advertiserTrustHoldHours;
 
   const unitService={
     serviceId:service.service_id,platform:service.platform,serviceName:service.service_name,taskType:service.task_type,
@@ -51,6 +106,19 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   if(globalMin>0&&customerTotalWithFeature<globalMin) throw new Error(`Campaign value must be at least $${globalMin.toFixed(2)}.`);
   if(globalMax>0&&customerTotalWithFeature>globalMax) throw new Error(`Campaign value cannot exceed $${globalMax.toFixed(2)}.`);
 
+  if (underTrustHold) {
+    if (quantity > RULES.advertiserTrustMaxQty) {
+      throw new Error(
+        `New advertisers (first ${RULES.advertiserTrustHoldHours}h) are limited to ${RULES.advertiserTrustMaxQty.toLocaleString()} units per campaign.`,
+      );
+    }
+    if (customerTotalWithFeature > RULES.advertiserTrustMaxCampaignUsd) {
+      throw new Error(
+        `New advertisers are limited to $${RULES.advertiserTrustMaxCampaignUsd} per campaign until trust unlocks.`,
+      );
+    }
+  }
+
   const perTaskReward=service.pricing_model==="watch_second"
     ? Number((Number(service.tasker_unit_reward)*watchSeconds).toFixed(8))
     : Number(service.tasker_unit_reward);
@@ -65,11 +133,37 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
       : "screenshot";
   const verificationMethods=[verificationMode];
 
-  const proofRequirements=Array.isArray(data.proofRequirements)
+  const taskType = String(service.task_type || "");
+  const followLikeTypes = new Set(["follow", "like", "subscribe", "repost"]);
+  const defaultShots =
+    verificationMode === "screenshot"
+      ? followLikeTypes.has(taskType)
+        ? RULES.minScreenshotsFollowLike
+        : 1
+      : 0;
+
+  let proofRequirements=Array.isArray(data.proofRequirements)
     ? data.proofRequirements.filter((v)=>["screenshot","text","link","watch_completion"].includes(String(v)))
     : service.pricing_model==="watch_second" ? ["watch_completion"] : verificationMode==="automatic" ? ["automatic"] : ["screenshot"];
+  if (
+    verificationMode === "screenshot" &&
+    followLikeTypes.has(taskType) &&
+    !proofRequirements.includes("text")
+  ) {
+    proofRequirements = [...proofRequirements, "text"];
+  }
+  if (
+    verificationMode === "screenshot" &&
+    !proofRequirements.includes("screenshot") &&
+    !proofRequirements.includes("automatic")
+  ) {
+    proofRequirements = ["screenshot", ...proofRequirements];
+  }
   const difficulty=data.difficulty==="hard"?"hard":data.difficulty==="medium"?"medium":"easy";
-  const screenshotsRequired=Math.max(0,Math.min(3,Math.floor(Number(data.screenshotsRequired??(verificationMode==="screenshot"?1:0)))));
+  const screenshotsRequired=Math.max(
+    verificationMode === "screenshot" ? defaultShots : 0,
+    Math.min(3, Math.floor(Number(data.screenshotsRequired ?? defaultShots))),
+  );
   const featured=Boolean(data.featured);
   const campaignTitle=String(data.title||"").trim()||service.service_name;
   const taskTitle=service.pricing_model==="watch_second"?"Watch video and earn":campaignTitle;
@@ -99,7 +193,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const {error:fundingError}=await supabaseAdmin.rpc("reserve_campaign_budget",{p_advertiser_id:context.userId,p_campaign_id:campaign.id,p_amount:customerTotalWithFeature});
   if(fundingError){ await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id); throw new Error(fundingError.message); }
 
-  const taskType=service.pricing_model==="watch_second"?"video_watch":service.task_type;
+  const taskTypeDb=service.pricing_model==="watch_second"?"video_watch":service.task_type;
   const proof=verificationMode==="screenshot"?"screenshot":verificationMode==="automatic"?"auto":"username";
   const requiresReview=verificationMode==="screenshot";
   const taskMetadata={
@@ -118,7 +212,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const {data:task,error:taskError}=await supabaseAdmin.from("tasks").insert({
     platform:service.platform,title:taskTitle,advertiser:"TASKORA Advertiser",reward:perTaskReward,
     seconds:service.pricing_model==="watch_second"?watchSeconds:30,slots_left:quantity,steps,proof,link:target,
-    is_active:false,status:"draft",task_type:taskType,target,slots_total:quantity,budget:customerTotalWithFeature,
+    is_active:false,status:"draft",task_type:taskTypeDb,target,slots_total:quantity,budget:customerTotalWithFeature,
     campaign_id:campaign.id,created_by:context.userId,instructions:taskInstructions,description,
     warning_text:warningText,requires_review:requiresReview,difficulty,screenshots_required:screenshotsRequired,
     proof_requirements:proofRequirements,featured,task_metadata:taskMetadata,
