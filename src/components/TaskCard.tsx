@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Clock3, ChevronRight } from "lucide-react";
 import { PlatformLogo, type Platform } from "@/components/PlatformIcon";
+import { AppLink } from "@/components/AppLink";
 
 export type TaskCardTask = {
   id: string;
@@ -19,7 +19,7 @@ export function TaskCard({
   status?: "pending" | "verified" | "rejected" | null;
 }) {
   return (
-    <Link
+    <AppLink
       to="/tasks/$taskId"
       params={{ taskId: task.id }}
       className="card-surface flex items-center gap-3 p-3 transition-transform active:scale-[0.98]"
@@ -48,6 +48,6 @@ export function TaskCard({
         </span>
         <ChevronRight className="size-4 text-muted-foreground" />
       </div>
-    </Link>
+    </AppLink>
   );
 }

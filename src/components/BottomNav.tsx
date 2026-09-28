@@ -9,7 +9,6 @@ const ITEMS = [
   { to: "/profile", label: "Profile", Icon: User },
 ] as const;
 
-/** Fullscreen lock screens — no bottom nav (user cannot escape via Home). */
 const HIDE_EXACT = new Set([
   "/",
   "/banned",
