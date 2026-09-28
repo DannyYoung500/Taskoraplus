@@ -87,6 +87,10 @@ export const RULES = {
   advertiserBondRate: 0.1,
   /** Soft dual when profile country mismatches local payout method; hard-block if true */
   geoMismatchHardBlock: true,
+  /** Min seconds between submissions on the same platform (anti-bot farm) */
+  platformSubmitCooldownSeconds: 90,
+  /** Lifetime paid USD above which soft KYC (connected account + country) is required for further WDs */
+  softKycLifetimePaidUsd: 50,
 } as const;
 
 /** Platform hostname allow-lists for target URL validation */
