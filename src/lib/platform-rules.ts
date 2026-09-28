@@ -54,7 +54,72 @@ export const RULES = {
   minVisibleWatchRatio: 0.85,
   /** Campaign circuit-breaker: pause if spend exceeds this multiple of expected */
   campaignSpendCircuitMultiplier: 1.5,
+  /** Max active/draft campaigns sharing the same normalized target URL (global) */
+  maxActiveCampaignsPerTargetUrl: 3,
+  /** Max campaigns one advertiser can create per rolling 24h */
+  maxCampaignsPerAdvertiser24h: 15,
+  /** New advertiser: account age (hours) below which qty is capped */
+  advertiserTrustHoldHours: 48,
+  /** New advertiser max quantity per campaign while under trust hold */
+  advertiserTrustMaxQty: 500,
+  /** New advertiser max campaign value USD while under trust hold */
+  advertiserTrustMaxCampaignUsd: 25,
+  /** Default min screenshots for follow/like/subscribe when screenshot verification */
+  minScreenshotsFollowLike: 2,
 } as const;
+
+/** Platform hostname allow-lists for target URL validation */
+export const PLATFORM_URL_HOSTS: Record<string, string[]> = {
+  instagram: ["instagram.com", "www.instagram.com"],
+  youtube: ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"],
+  tiktok: ["tiktok.com", "www.tiktok.com", "vm.tiktok.com"],
+  x: ["x.com", "twitter.com", "www.x.com", "www.twitter.com", "mobile.twitter.com"],
+  facebook: ["facebook.com", "www.facebook.com", "m.facebook.com", "fb.com", "www.fb.com"],
+  linkedin: ["linkedin.com", "www.linkedin.com"],
+  threads: ["threads.net", "www.threads.net"],
+  telegram: ["t.me", "telegram.me", "www.t.me"],
+  whatsapp: ["whatsapp.com", "www.whatsapp.com", "chat.whatsapp.com", "wa.me"],
+  discord: ["discord.gg", "discord.com", "www.discord.com"],
+  spotify: ["open.spotify.com", "spotify.com"],
+  soundcloud: ["soundcloud.com", "www.soundcloud.com"],
+  audiomack: ["audiomack.com", "www.audiomack.com"],
+  pinterest: ["pinterest.com", "www.pinterest.com", "pin.it"],
+  reddit: ["reddit.com", "www.reddit.com", "old.reddit.com"],
+  twitch: ["twitch.tv", "www.twitch.tv"],
+};
+
+export function normalizeTargetUrl(raw: string): string {
+  try {
+    const u = new URL(raw.trim());
+    u.hash = "";
+    ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid", "gclid"].forEach(
+      (k) => u.searchParams.delete(k),
+    );
+    let host = u.hostname.toLowerCase().replace(/^www\./, "");
+    u.hostname = host;
+    let path = u.pathname.replace(/\/+$/, "") || "/";
+    return `${u.protocol}//${host}${path}${u.search}`.toLowerCase();
+  } catch {
+    return raw.trim().toLowerCase();
+  }
+}
+
+export function assertPlatformUrl(platform: string, rawUrl: string): void {
+  const hosts = PLATFORM_URL_HOSTS[platform];
+  if (!hosts || hosts.length === 0) return;
+  let hostname = "";
+  try {
+    hostname = new URL(rawUrl).hostname.toLowerCase();
+  } catch {
+    throw new Error("Enter a valid URL.");
+  }
+  const ok = hosts.some(
+    (h) => hostname === h || hostname.endsWith(`.${h.replace(/^www\./, "")}`),
+  );
+  if (!ok) {
+    throw new Error(`URL must be a valid ${platform} link.`);
+  }
+}
 
 export function hoursSince(iso: string | null | undefined): number {
   if (!iso) return 9999;
