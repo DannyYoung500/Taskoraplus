@@ -85,14 +85,20 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     ? `Watch the video for ${watchSeconds} seconds. Taskora verifies the qualifying playback automatically.`
     : customInstructions||`Complete the ${service.service_name} action and submit the required proof.`;
 
+  const campaignId=crypto.randomUUID();
   const {data:campaign,error:campaignError}=await supabaseAdmin.from("campaigns").insert({
+    id:campaignId,
     advertiser_user_id:context.userId,advertiser_id:context.userId,platform:service.platform,task_type:service.task_type,
     title:campaignTitle,instructions:taskInstructions,target_url:target,reward:perTaskReward,slots:quantity,remaining_slots:quantity,
     budget:customerTotalWithFeature,amount_spent:0,status:"draft",
     target_country_code:targetCountryCode||null,target_country_name:targetCountryName,
-    allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable
+    allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable,
+    funding_status:"unfunded",funding_reserved:0,funding_spent:0
   } as never).select("*").single();
   if(campaignError||!campaign) throw new Error(campaignError?.message??"Could not create campaign.");
+
+  const {error:fundingError}=await supabaseAdmin.rpc("reserve_campaign_budget",{p_advertiser_id:context.userId,p_campaign_id:campaign.id,p_amount:customerTotalWithFeature});
+  if(fundingError){ await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id); throw new Error(fundingError.message); }
 
   const taskType=service.pricing_model==="watch_second"?"video_watch":service.task_type;
   const proof=verificationMode==="screenshot"?"screenshot":verificationMode==="automatic"?"auto":"username";
