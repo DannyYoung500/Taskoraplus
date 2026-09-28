@@ -39,8 +39,7 @@ function ProfileScreen() {
         level_num?: number | null;
         streak?: number | null;
         photo_url?: string | null;
-        task_points?: number | null;
-      }
+        }
     | null
     | undefined;
 
@@ -50,7 +49,6 @@ function ProfileScreen() {
   const level = profile?.level ?? `Level ${levelNum}`;
   const photo = profile?.photo_url ?? null;
   const streak = Number(profile?.streak ?? 0);
-  const taskPoints = Number(profile?.task_points ?? 0);
   const isOwner = Boolean(dash?.isOwner);
 
   const txs = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
@@ -117,7 +115,7 @@ function ProfileScreen() {
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Stat label="Balance" value={formatUsd(balance)} />
-          <Stat label="Task Points" value={taskPoints.toLocaleString()} />
+          <Stat label="Activity level" value={level} />
           <Stat label="Streak" value={`${streak}d`} />
         </div>
       </section>
@@ -146,7 +144,7 @@ function ProfileScreen() {
       </section>
 
       <section className="mb-3 overflow-hidden rounded-2xl border border-white/8 bg-[#0b1628]">
-        <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="Task Points + commission" />
+        <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="Commission & referrals" />
         <Row to="/connected" icon={Link2} label="Connected accounts" sub={`${accounts.length} linked`} />
         <Row to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
         <Row to="/terms" icon={Shield} label="Terms & Conditions" sub="TaskoraPlus rules and policies" />
