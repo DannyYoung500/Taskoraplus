@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap, PlayCircle, MapPin, Camera, Type, Link2, AlertTriangle } from "lucide-react";
 import { PLATFORM_META, PLATFORM_ORDER, CATEGORY_LABELS, PlatformLogo, type Platform } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
@@ -7,6 +7,19 @@ import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.
 import { SERVICES, type ServiceDef } from "@/lib/advertise-services";
 import { extractYoutubeId, youtubeWatchUrl } from "@/lib/youtube-url";
 import { COUNTRIES, countryNameFromCode } from "@/lib/task-country";
+
+function actionLabel(taskType: string) {
+  const labels: Record<string, string> = {
+    watch: "Watch", follow: "Follow", like: "Like", comment: "Comment",
+    repost: "Repost", subscribe: "Subscribe", join: "Join", review: "Review",
+    visit: "Visit", signup: "Sign up", vote: "Vote", save: "Save", play: "Play",
+  };
+  return labels[taskType] ?? "Task";
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return <div><label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">{label}</label>{children}</div>;
+}
 
 export const Route = createFileRoute("/_authenticated/advertise")({
   head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }),
