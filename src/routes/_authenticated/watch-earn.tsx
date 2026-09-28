@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  Bell,
-  Gift,
-  Play,
-  Zap,
-} from "lucide-react";
+import { ArrowLeft, Bell, Gift, Play, Zap } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import {
   completeWatchVideo,
@@ -30,7 +24,10 @@ export const Route = createFileRoute("/_authenticated/watch-earn")({
   component: WatchEarnPage,
 });
 
-/** Bonus-ad slot — wire your ad SDK (Adsgram / Monetag / etc.) into onBonusAd. */
+/**
+ * Bonus-ad slot — wire your rewarded ad SDK (Adsgram / Monetag / GigaPub / etc.)
+ * into onBonusAd. On successful ad completion, call creditBonus().
+ */
 const BONUS_AD = {
   rewardUsd: 0.003,
   dailyLimit: 5,
@@ -58,9 +55,28 @@ function WatchEarnPage() {
   const progress = Math.min(100, Math.round((elapsed / required) * 100));
   const canComplete = Boolean(sessionId && elapsed >= required && !busy);
 
+  /** Live accrual while watching (display only; claim still requires full watch). */
+  const liveSessionDisplay = useMemo(() => {
+    if (!active) return sessionEarned;
+    const reward = Number(active.rewardUsdt ?? 0);
+    const secs = Math.max(30, Number(active.durationSeconds ?? 60));
+    if (reward <= 0) return sessionEarned;
+    const perSec = reward / secs;
+    const accrued = Math.min(reward, perSec * elapsed);
+    return sessionEarned + accrued;
+  }, [active, elapsed, sessionEarned]);
+
+  const hourlyRateForActive = useMemo(() => {
+    if (!active) return 0;
+    const reward = Number(active.rewardUsdt ?? 0);
+    const secs = Math.max(30, Number(active.durationSeconds ?? 60));
+    if (reward <= 0) return 0;
+    return reward * (3600 / secs);
+  }, [active]);
+
   const upNext = useMemo(() => {
-    if (!activeId) return videos.slice(0, 8);
-    return videos.filter((v) => v.id !== activeId).slice(0, 8);
+    if (!activeId) return videos.slice(0, 10);
+    return videos.filter((v) => v.id !== activeId).slice(0, 10);
   }, [videos, activeId]);
 
   useEffect(() => {
@@ -119,18 +135,25 @@ function WatchEarnPage() {
     setMessage(null);
   }
 
-  /** Placeholder for ad-network integration (Adsgram, Monetag, etc.). */
+  /**
+   * Integrate your ad network here.
+   * Example: Adsgram / Monetag / GigaPub show() → onRewarded → creditBonus().
+   */
   function onBonusAd() {
     if (bonusLeft <= 0 || bonusBusy) return;
     setBonusBusy(true);
     setMessage(null);
-    // TODO: open your rewarded ad SDK here, then on success:
+    // TODO: replace this timeout with real ad SDK callback
     window.setTimeout(() => {
-      setBonusLeft((n) => Math.max(0, n - 1));
-      setSessionEarned((v) => v + BONUS_AD.rewardUsd);
-      setMessage(`Bonus ad · +${formatUsd(BONUS_AD.rewardUsd)}`);
+      creditBonus();
       setBonusBusy(false);
-    }, 600);
+    }, 800);
+  }
+
+  function creditBonus() {
+    setBonusLeft((n) => Math.max(0, n - 1));
+    setSessionEarned((v) => v + BONUS_AD.rewardUsd);
+    setMessage(`Bonus ad · +${formatUsd(BONUS_AD.rewardUsd)}`);
   }
 
   if (active) {
@@ -138,14 +161,14 @@ function WatchEarnPage() {
       <WatchPlayer
         active={active}
         upNext={upNext}
-        profile={profile}
         elapsed={elapsed}
         required={required}
         progress={progress}
         canComplete={canComplete}
         busy={busy}
         message={message}
-        sessionEarned={sessionEarned}
+        sessionDisplay={liveSessionDisplay}
+        hourlyRate={hourlyRateForActive}
         onBack={closePlayer}
         onComplete={() => void onComplete()}
         onSelect={setActiveId}
@@ -155,6 +178,7 @@ function WatchEarnPage() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#05080f] pb-28 text-white">
+      {/* Header — TASKORA brand, matches NEWTUBE chrome */}
       <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-[#05080f]/95 px-3.5 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <img
@@ -207,34 +231,36 @@ function WatchEarnPage() {
           <p className="text-[13px] font-bold text-slate-100">Watch videos, earn</p>
         </div>
 
+        {/* Bonus ad banner — exact NEWTUBE placement; wire your ad SDK to onBonusAd */}
         <button
           type="button"
           disabled={bonusLeft <= 0 || bonusBusy}
           onClick={onBonusAd}
-          className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-amber-400/25 bg-gradient-to-r from-amber-500/15 to-orange-500/10 px-3.5 py-3 text-left active:scale-[0.99] disabled:opacity-50"
+          className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-500/18 to-orange-500/12 px-3.5 py-3.5 text-left shadow-[0_0_24px_rgba(245,158,11,0.12)] active:scale-[0.99] disabled:opacity-45"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/20 text-amber-200">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-400/25 text-amber-100">
             <Gift className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black text-amber-50">Watch a bonus ad</p>
-            <p className="mt-0.5 text-[11px] text-amber-200/80">
+            <p className="text-[15px] font-black text-amber-50">Watch a bonus ad</p>
+            <p className="mt-0.5 text-[11px] font-medium text-amber-200/85">
               +{formatUsd(BONUS_AD.rewardUsd)} · {bonusLeft}/{BONUS_AD.dailyLimit} left today
             </p>
           </div>
-          <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-[10px] font-black text-amber-100">
+          <span className="rounded-full bg-amber-400/25 px-2.5 py-1 text-[10px] font-black tracking-wide text-amber-50">
             {bonusBusy ? "…" : "AD"}
           </span>
         </button>
 
         {message ? (
-          <p className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-center text-[11px] text-cyan-100">
+          <p className="mt-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-center text-[11px] font-semibold text-cyan-100">
             {message}
           </p>
         ) : null}
       </section>
 
-      <section className="mt-4 space-y-4">
+      {/* Vertical video feed — NEWTUBE style */}
+      <section className="mt-4 space-y-5">
         {videos.length === 0 ? (
           <div className="mx-3.5 rounded-3xl border border-white/10 bg-white/[0.03] p-10 text-center">
             <Play className="mx-auto size-10 text-slate-600" />
@@ -255,6 +281,13 @@ function WatchEarnPage() {
           ))
         )}
       </section>
+
+      {/* Floating session coin — NEWTUBE bottom-right badge */}
+      {sessionEarned > 0 ? (
+        <div className="pointer-events-none fixed bottom-24 right-4 z-30 flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-[11px] font-black text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.45)] ring-2 ring-amber-300/40">
+          {formatUsd(sessionEarned).replace("$", "")}
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -327,26 +360,24 @@ function VideoFeedCard({
               <Play className="size-10 fill-white/90 text-white/90" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" />
           <span className="absolute inset-0 flex items-center justify-center">
-            <span className="flex size-14 items-center justify-center rounded-full bg-black/45 text-white shadow-2xl ring-1 ring-white/25 backdrop-blur-sm">
+            <span className="flex size-14 items-center justify-center rounded-full bg-black/50 text-white shadow-2xl ring-1 ring-white/30 backdrop-blur-sm">
               <Play className="ml-0.5 size-6 fill-white" />
             </span>
           </span>
           {done ? (
-            <span className="absolute right-2.5 top-2.5 rounded-full bg-emerald-400 px-2 py-1 text-[8px] font-black text-slate-950">
+            <span className="absolute right-2.5 top-2.5 rounded-full bg-emerald-400 px-2.5 py-1 text-[8px] font-black text-slate-950">
               DONE
             </span>
           ) : null}
         </div>
         <div className="flex items-start justify-between gap-3 px-0.5 pt-2.5">
-          <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-[14px] font-extrabold leading-snug text-slate-100">
-              {video.title || "Watch & Earn video"}
-            </h3>
-          </div>
+          <h3 className="min-w-0 flex-1 line-clamp-2 text-[14px] font-extrabold leading-snug text-slate-100">
+            {video.title || "Watch & Earn video"}
+          </h3>
           <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-black text-cyan-300">
-            <Zap className="size-3.5" />
+            <Zap className="size-3.5 fill-cyan-300/40" />
             {hourlyRateLabel(video)}
           </span>
         </div>
@@ -358,28 +389,28 @@ function VideoFeedCard({
 function WatchPlayer({
   active,
   upNext,
-  profile,
   elapsed,
   required,
   progress,
   canComplete,
   busy,
   message,
-  sessionEarned,
+  sessionDisplay,
+  hourlyRate,
   onBack,
   onComplete,
   onSelect,
 }: {
   active: WatchVideo;
   upNext: WatchVideo[];
-  profile: { display_name?: string | null; photo_url?: string | null } | null;
   elapsed: number;
   required: number;
   progress: number;
   canComplete: boolean;
   busy: boolean;
   message: string | null;
-  sessionEarned: number;
+  sessionDisplay: number;
+  hourlyRate: number;
   onBack: () => void;
   onComplete: () => void;
   onSelect: (id: string) => void;
@@ -398,18 +429,19 @@ function WatchPlayer({
         <p className="min-w-0 flex-1 truncate text-sm font-bold">{active.title}</p>
       </header>
 
+      {/* YouTube embed — full width like NEWTUBE */}
       <section className="bg-black">
         <div className="relative aspect-video w-full">
           <VideoPlayer video={active} />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
-          <div className="absolute inset-x-3 bottom-2.5">
-            <div className="mb-1.5 h-1 overflow-hidden rounded-full bg-white/20">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/85 to-transparent" />
+          <div className="absolute inset-x-3 bottom-2">
+            <div className="mb-1 h-1 overflow-hidden rounded-full bg-white/20">
               <div
-                className="h-full rounded-full bg-cyan-300 transition-[width]"
+                className="h-full rounded-full bg-cyan-300 transition-[width] duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex justify-between text-[9px] font-bold text-white/75">
+            <div className="flex justify-between text-[9px] font-bold text-white/80">
               <span>
                 {formatTime(elapsed)} / {formatTime(required)}
               </span>
@@ -419,18 +451,21 @@ function WatchPlayer({
         </div>
       </section>
 
+      {/* Session earnings card — NEWTUBE style */}
       <section className="px-3.5 pt-4">
-        <div className="rounded-2xl border border-cyan-400/20 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,.12),transparent_55%),#0a1424] px-4 py-4 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+        <div className="rounded-2xl border border-cyan-400/25 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,.14),transparent_55%),#0a1424] px-4 py-5 text-center shadow-[0_0_28px_rgba(34,211,238,0.08)]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
             Earned this session
           </p>
-          <p className="mt-1 text-3xl font-black tabular-nums text-cyan-200">
-            {formatUsd(sessionEarned)}
+          <p className="mt-1.5 text-[32px] font-black tabular-nums leading-none text-cyan-200">
+            {formatUsd(sessionDisplay)}
           </p>
-          <p className="mt-1 text-[10px] text-slate-500">
-            {Number(active.rewardUsdt) > 0
-              ? `${formatUsd(active.rewardUsdt)} per completed watch`
-              : `+${Number(active.rewardPoints || 0)} TP per completed watch`}
+          <p className="mt-2 text-[11px] font-medium text-slate-500">
+            {hourlyRate > 0
+              ? `${formatUsd(hourlyRate)} earned per hour watched`
+              : Number(active.rewardUsdt) > 0
+                ? `${formatUsd(active.rewardUsdt)} per completed watch`
+                : `+${Number(active.rewardPoints || 0)} TP per completed watch`}
           </p>
         </div>
 
@@ -438,7 +473,7 @@ function WatchPlayer({
           type="button"
           disabled={!canComplete || busy}
           onClick={onComplete}
-          className="mt-3 w-full rounded-2xl py-3.5 text-sm font-black text-white disabled:opacity-45"
+          className="mt-3.5 w-full rounded-2xl py-3.5 text-sm font-black text-white shadow-lg shadow-blue-500/20 disabled:opacity-45"
           style={{ background: BLUE_GRAD }}
         >
           {busy
@@ -448,12 +483,13 @@ function WatchPlayer({
               : `Watch ${Math.max(0, required - elapsed)}s more`}
         </button>
         {message ? (
-          <p className="mt-2 text-center text-xs text-cyan-200">{message}</p>
+          <p className="mt-2 text-center text-xs font-semibold text-cyan-200">{message}</p>
         ) : null}
       </section>
 
-      <section className="mt-5 px-3.5">
-        <div className="mb-2.5 flex items-center gap-2">
+      {/* Up next — NEWTUBE list */}
+      <section className="mt-6 px-3.5">
+        <div className="mb-3 flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-cyan-400" />
           <p className="text-sm font-black">Up next</p>
         </div>
@@ -467,7 +503,7 @@ function WatchPlayer({
                 onClick={() => onSelect(v.id)}
                 className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2 text-left active:bg-white/[0.06]"
               >
-                <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-[#101722]">
+                <div className="relative size-[4.25rem] shrink-0 overflow-hidden rounded-lg bg-[#101722]">
                   {t ? (
                     <img src={t} alt="" className="size-full object-cover" loading="lazy" />
                   ) : (
@@ -475,15 +511,16 @@ function WatchPlayer({
                       <Play className="size-5 text-slate-500" />
                     </span>
                   )}
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
                     <Play className="size-4 fill-white text-white" />
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[12px] font-bold leading-snug text-slate-100">
+                  <p className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-100">
                     {v.title}
                   </p>
-                  <p className="mt-0.5 text-[10px] font-semibold text-cyan-300/90">
+                  <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-300/90">
+                    <Zap className="size-3 fill-cyan-300/30" />
                     {hourlyRateLabel(v)}
                   </p>
                 </div>
@@ -491,7 +528,7 @@ function WatchPlayer({
             );
           })}
           {upNext.length === 0 ? (
-            <p className="py-6 text-center text-[11px] text-slate-500">No more videos in queue</p>
+            <p className="py-8 text-center text-[11px] text-slate-500">No more videos in queue</p>
           ) : null}
         </div>
       </section>
