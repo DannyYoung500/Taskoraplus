@@ -45,7 +45,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0b1424] px-4 text-white">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight">This page didn&apos;t load</h1>
+        <h1 className="text-xl font-semibold tracking-tight">This page didn't load</h1>
         <p className="mt-2 text-sm text-slate-400">Try again or reopen from @Taskoraplusbot.</p>
         <p className="mt-2 break-all text-[10px] text-slate-500">{error.message}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -120,24 +120,40 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Block Telegram Mini App long-press sheet (Open link / Download / Copy)
+ * on chrome, logos, and internal routes. Keep inputs/textarea usable.
+ */
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
+    const isEditable = (t: EventTarget | null) => {
+      if (!(t instanceof Element)) return false;
+      return Boolean(
+        t.closest("input, textarea, select, [contenteditable='true'], .tk-selectable"),
+      );
+    };
+
     const blockMenu = (event: Event) => {
+      if (isEditable(event.target)) return;
       event.preventDefault();
+      event.stopPropagation();
       return false;
     };
-    const blockDrag = (event: Event) => event.preventDefault();
+    const blockDrag = (event: Event) => {
+      if (isEditable(event.target)) return;
+      event.preventDefault();
+    };
 
     document.addEventListener("contextmenu", blockMenu, { capture: true });
-    document.addEventListener("longpress", blockMenu as EventListener, { capture: true });
     document.addEventListener("dragstart", blockDrag, { capture: true });
+    document.addEventListener("selectstart", blockMenu, { capture: true });
 
     return () => {
-      document.removeEventListener("contextmenu", blockMenu, { capture: true });
-      document.removeEventListener("longpress", blockMenu as EventListener, { capture: true });
-      document.removeEventListener("dragstart", blockDrag, { capture: true });
+      document.removeEventListener("contextmenu", blockMenu, true);
+      document.removeEventListener("dragstart", blockDrag, true);
+      document.removeEventListener("selectstart", blockMenu, true);
     };
   }, []);
 
