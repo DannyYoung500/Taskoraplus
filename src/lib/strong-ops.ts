@@ -3,6 +3,7 @@
  * Soft-fail when optional columns / tables are missing.
  */
 import { createHash } from "node:crypto";
+import { RULES } from "@/lib/platform-rules";
 
 export function hashProof(input: string): string {
   const normalized = input.trim().toLowerCase().replace(/\s+/g, " ");
@@ -18,7 +19,6 @@ export function fingerprintFromHeaders(headers: {
   return createHash("sha256").update(raw).digest("hex").slice(0, 32);
 }
 
-/** Reject if same proof hash already used by any user (recycled screenshots). */
 export async function assertProofNotRecycled(opts: {
   proofText?: string | null;
   proofUrl?: string | null;
@@ -61,7 +61,6 @@ export async function assertProofNotRecycled(opts: {
   return { proofHash };
 }
 
-/** Record device fingerprint; flag multi-account clusters. */
 export async function touchDeviceFingerprint(opts: {
   userId: string;
   fingerprint: string;
@@ -80,13 +79,11 @@ export async function touchDeviceFingerprint(opts: {
         last_seen_at: new Date().toISOString(),
       })
       .eq("id", opts.userId);
-
     const { data: siblings } = await supabaseAdmin
       .from("profiles")
       .select("id, status, wallet_frozen")
       .eq("device_fp", opts.fingerprint)
       .limit(20);
-
     const multi = (siblings ?? []).length;
     return { multiAccountCount: multi, capped: multi >= 4 };
   } catch {
@@ -104,7 +101,6 @@ export async function assertAddressAllowlisted(opts: {
   if (!addr) throw new Error("Enter a valid wallet address.");
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
     const { data: paid } = await supabaseAdmin
       .from("withdrawals")
       .select("id, created_at, status")
@@ -113,14 +109,12 @@ export async function assertAddressAllowlisted(opts: {
       .in("status", ["paid", "completed", "approved"])
       .limit(1);
     if (paid && paid.length > 0) return;
-
     const { data: saved } = await supabaseAdmin
       .from("payout_address_allowlist")
       .select("address, created_at")
       .eq("user_id", opts.userId)
       .eq("address", addr)
       .maybeSingle();
-
     if (saved?.created_at) {
       const ageMs = Date.now() - new Date(saved.created_at).getTime();
       const needMs = ALLOWLIST_HOURS * 60 * 60 * 1000;
@@ -132,13 +126,8 @@ export async function assertAddressAllowlisted(opts: {
       }
       return;
     }
-
     const { error: insErr } = await supabaseAdmin.from("payout_address_allowlist").upsert(
-      {
-        user_id: opts.userId,
-        address: addr,
-        created_at: new Date().toISOString(),
-      },
+      { user_id: opts.userId, address: addr, created_at: new Date().toISOString() },
       { onConflict: "user_id,address" },
     );
     if (insErr) {
@@ -160,7 +149,6 @@ export async function assertAddressAllowlisted(opts: {
       console.warn("[allowlist] payout_address_allowlist missing; soft-allow first address");
       return;
     }
-
     throw new Error(
       "Address saved. For security, wait 24 hours before the first withdrawal to a new payout address.",
     );
@@ -213,11 +201,9 @@ export async function assertActionRateLimit(opts: {
 }): Promise<void> {
   const limit = opts.limitPerMinute ?? 8;
   try {
-    const { RULES } = await import("@/lib/platform-rules");
     const max = Math.max(3, limit || RULES.maxActionsPerMinute);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const since = new Date(Date.now() - 60_000).toISOString();
-
     if (opts.kind === "submit") {
       const { count } = await supabaseAdmin
         .from("submissions")
@@ -260,7 +246,6 @@ export async function isReferralUnlocked(refereeUserId: string): Promise<{
   needTasks: number;
   needWatches: number;
 }> {
-  const { RULES } = await import("@/lib/platform-rules");
   const needTasks = RULES.referralUnlockApprovedTasks;
   const needWatches = RULES.referralUnlockWatchCompletions;
   try {
@@ -287,13 +272,7 @@ export async function isReferralUnlocked(refereeUserId: string): Promise<{
       needWatches,
     };
   } catch {
-    return {
-      unlocked: false,
-      approvedTasks: 0,
-      watchCompletions: 0,
-      needTasks,
-      needWatches,
-    };
+    return { unlocked: false, approvedTasks: 0, watchCompletions: 0, needTasks, needWatches };
   }
 }
 
@@ -305,7 +284,6 @@ export async function maybeCreditReferralShare(opts: {
   if (opts.rewardUsd <= 0) return { credited: false, reason: "zero_reward" };
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { RULES } = await import("@/lib/platform-rules");
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("referred_by")
@@ -313,7 +291,6 @@ export async function maybeCreditReferralShare(opts: {
       .maybeSingle();
     const inviterId = (profile as { referred_by?: string | null } | null)?.referred_by;
     if (!inviterId) return { credited: false, reason: "no_inviter" };
-
     const gate = await isReferralUnlocked(opts.refereeUserId);
     if (!gate.unlocked) {
       return {
@@ -321,10 +298,8 @@ export async function maybeCreditReferralShare(opts: {
         reason: `locked:${gate.approvedTasks}/${gate.needTasks}tasks:${gate.watchCompletions}/${gate.needWatches}watches`,
       };
     }
-
     const amount = Number((opts.rewardUsd * RULES.referralRate).toFixed(4));
     if (amount <= 0) return { credited: false, reason: "dust" };
-
     try {
       const { data: fps } = await supabaseAdmin
         .from("profiles")
@@ -339,7 +314,6 @@ export async function maybeCreditReferralShare(opts: {
     } catch {
       /* soft */
     }
-
     await supabaseAdmin.from("transactions").insert({
       user_id: inviterId,
       label: opts.label ?? "Referral share (unlocked)",
@@ -357,7 +331,6 @@ export async function assertIpFamilyVelocity(opts: {
   userId: string;
   ipHint?: string | null;
 }): Promise<{ accounts: number; dualRequired: boolean; blocked?: string }> {
-  const { RULES } = await import("@/lib/platform-rules");
   const ip = (opts.ipHint ?? "").trim();
   if (!ip || ip.length < 4) return { accounts: 1, dualRequired: false };
   const family = ip.includes(".")
@@ -380,10 +353,7 @@ export async function assertIpFamilyVelocity(opts: {
         blocked: "Too many accounts from this network. Contact support.",
       };
     }
-    return {
-      accounts,
-      dualRequired: accounts >= RULES.maxAccountsPerIpFamily24h,
-    };
+    return { accounts, dualRequired: accounts >= RULES.maxAccountsPerIpFamily24h };
   } catch {
     return { accounts: 1, dualRequired: false };
   }
@@ -393,7 +363,6 @@ export async function applyGraduatedWithdrawalHold(opts: {
   userId: string;
   requiresDual: boolean;
 }): Promise<{ requiresDual: boolean; paidCount: number }> {
-  const { RULES } = await import("@/lib/platform-rules");
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { count } = await supabaseAdmin
@@ -444,12 +413,10 @@ export function payoutReceiptHash(opts: {
   return createHash("sha256").update(raw).digest("hex");
 }
 
-/** A: Require connected account handle for platform tasks. */
 export async function assertConnectedAccountForPlatform(opts: {
   userId: string;
   platform: string;
 }): Promise<void> {
-  const { RULES } = await import("@/lib/platform-rules");
   const platform = String(opts.platform || "").toLowerCase();
   if (!RULES.requireConnectedAccountPlatforms.includes(platform)) return;
   try {
@@ -471,12 +438,10 @@ export async function assertConnectedAccountForPlatform(opts: {
   }
 }
 
-/** Platform daily completion cap. */
 export async function assertPlatformDailyCompletionCap(opts: {
   userId: string;
   platform: string;
 }): Promise<void> {
-  const { RULES } = await import("@/lib/platform-rules");
   const platform = String(opts.platform || "").toLowerCase();
   if (!platform) return;
   try {
@@ -511,11 +476,9 @@ export async function assertPlatformDailyCompletionCap(opts: {
   }
 }
 
-/** F: Earner quality score — block high reject-rate accounts. */
 export async function assertEarnerQuality(opts: {
   userId: string;
 }): Promise<{ rejectRate: number; samples: number }> {
-  const { RULES } = await import("@/lib/platform-rules");
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin
@@ -545,7 +508,6 @@ export async function assertEarnerQuality(opts: {
   }
 }
 
-/** B: Flag suspicious proof for owner review queue. */
 export async function flagProofForReviewQueue(opts: {
   userId: string;
   submissionHint?: string;
@@ -553,7 +515,6 @@ export async function flagProofForReviewQueue(opts: {
   proofUrl: string;
   proofHash: string | null;
 }): Promise<{ flagged: boolean; reasons: string[] }> {
-  const { RULES } = await import("@/lib/platform-rules");
   const reasons: string[] = [];
   const text = opts.proofText.trim();
   const url = opts.proofUrl.trim();
@@ -589,13 +550,11 @@ export async function flagProofForReviewQueue(opts: {
   return { flagged: reasons.some((r) => r !== "hash_recorded"), reasons };
 }
 
-/** C: Geo mismatch — hard-block local payout methods when profile country mismatches. */
 export function assertGeoMethodMatch(opts: {
   countryCode: string;
   method: string;
   hardBlock?: boolean;
 }): { dualRequired: boolean; blocked?: string } {
-  const { RULES } = await import("@/lib/platform-rules");
   const cc = String(opts.countryCode || "")
     .trim()
     .toUpperCase();
