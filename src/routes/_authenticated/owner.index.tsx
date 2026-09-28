@@ -41,7 +41,7 @@ const NAV = [
 ] as const;
 
 function OwnerHub() {
-  const { overview, submissions, withdrawals, error } = Route.useLoaderData();
+  const { overview, submissions, withdrawals, health, error } = Route.useLoaderData();
   const o = (overview ?? {}) as Record<string, any>;
   const reviews = Array.isArray(submissions) ? submissions.slice(0, 5) : [];
   const payouts = Array.isArray(withdrawals) ? withdrawals.slice(0, 5) : [];
@@ -86,15 +86,15 @@ function OwnerHub() {
   return (
     <OwnerShell>
       <div className="min-h-screen bg-[#06101d] text-white">
-        <div className="sticky top-0 z-20 border-b border-cyan-400/10 bg-[#071221]/95 px-4 py-3 backdrop-blur-xl">
+        <div className="sticky top-0 z-20 border-b border-white/10 bg-[#071221]/95 px-4 py-3 backdrop-blur-xl">
           <div className="mx-auto flex max-w-5xl items-center gap-3">
             <TaskoraLogo size={40} />
             <div className="min-w-0 flex-1">
               <p className="text-base font-black tracking-tight">Owner</p>
               <p className="text-[10px] text-cyan-300/70">Control Center</p>
             </div>
-            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/5 px-2.5 py-1 text-[10px] font-bold text-emerald-300">
-              Online
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold text-slate-300">
+              {health?.overall === "ok" ? "Operational" : health?.overall === "warn" ? "Attention" : "Health check"}
             </span>
             <Crown className="size-4 text-cyan-300" />
           </div>
@@ -196,9 +196,11 @@ function OwnerHub() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
-                <span className="rounded-full bg-white/[0.04] px-2.5 py-1">DB · OK</span>
-                <span className="rounded-full bg-white/[0.04] px-2.5 py-1">API · OK</span>
-                <span className="rounded-full bg-white/[0.04] px-2.5 py-1">Bot · OK</span>
+                {(health?.checks ?? []).slice(0, 3).map((check) => (
+                  <span key={check.name} className="rounded-full bg-white/[0.04] px-2.5 py-1">
+                    {check.name} · {check.status.toUpperCase()}
+                  </span>
+                ))}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
