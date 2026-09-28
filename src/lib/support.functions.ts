@@ -40,6 +40,84 @@ export const createSupportTicket = createServerFn({ method: "POST" })
     return row;
   });
 
+/** G: Dispute / appeal a rejected submission */
+export const createSubmissionAppeal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { submissionId: string; reason: string }) => d)
+  .handler(async ({ data, context }) => {
+    const reason = data.reason.trim();
+    if (reason.length < 12) throw new Error("Explain why this should be reconsidered (min 12 characters).");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sub, error: subErr } = await supabaseAdmin
+      .from("submissions")
+      .select("id, user_id, status, task_id")
+      .eq("id", data.submissionId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (subErr) throw new Error(subErr.message);
+    if (!sub) throw new Error("Submission not found.");
+    if (String((sub as { status?: string }).status) !== "rejected") {
+      throw new Error("Only rejected submissions can be appealed.");
+    }
+    const { data: existing } = await supabaseAdmin
+      .from("support_tickets")
+      .select("id")
+      .eq("user_id", context.userId)
+      .eq("status", "open")
+      .ilike("subject", `%appeal:${data.submissionId}%`)
+      .maybeSingle();
+    if (existing) throw new Error("You already have an open appeal for this submission.");
+
+    const { data: row, error } = await supabaseAdmin
+      .from("support_tickets")
+      .insert({
+        user_id: context.userId,
+        subject: `appeal:${data.submissionId}`,
+        body: reason,
+        status: "open",
+      } as never)
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+
+    try {
+      await supabaseAdmin.from("verification_cases").insert({
+        subject_type: "submission",
+        subject_id: data.submissionId,
+        verification_type: "submission_appeal",
+        status: "pending",
+        evidence: {
+          user_id: context.userId,
+          task_id: (sub as { task_id?: string }).task_id,
+          reason,
+          ticket_id: (row as { id?: string })?.id,
+          at: new Date().toISOString(),
+        },
+      } as never);
+    } catch {
+      /* soft */
+    }
+    return row;
+  });
+
+export const listMyAppeals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("support_tickets")
+      .select("*")
+      .eq("user_id", context.userId)
+      .ilike("subject", "appeal:%")
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) {
+      if (error.message.includes("does not exist")) return [];
+      throw new Error(error.message);
+    }
+    return data ?? [];
+  });
+
 export const ownerListTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
