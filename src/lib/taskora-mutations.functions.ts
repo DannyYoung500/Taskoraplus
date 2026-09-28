@@ -83,6 +83,29 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       .eq("task_id", data.taskId)
       .maybeSingle();
     if (existing) throw new Error("You already submitted this task.");
+
+    // A + D + F: connected account, platform daily cap, earner quality
+    try {
+      const {
+        assertConnectedAccountForPlatform,
+        assertPlatformDailyCompletionCap,
+        assertEarnerQuality,
+      } = await import("@/lib/strong-ops");
+      const platform = String((task as { platform?: string }).platform ?? "");
+      await assertConnectedAccountForPlatform({ userId, platform });
+      await assertPlatformDailyCompletionCap({ userId, platform });
+      await assertEarnerQuality({ userId });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        (e.message.includes("Connect your") ||
+          e.message.includes("Daily limit") ||
+          e.message.includes("Quality hold"))
+      ) {
+        throw e;
+      }
+    }
+
     const proofText = (data.proofText ?? "").trim();
     const proofUrl = (data.proofUrl ?? "").trim();
     if (!proofText && !proofUrl) {
@@ -101,7 +124,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
           const tid = (prof as { telegram_id?: number | string } | null)?.telegram_id;
           if (!tid) throw new Error("Link your Telegram account first.");
           const { verifyTelegramChannelMembership } = await import("@/lib/strong-wave.functions");
-          // channel id or @username from link
           let channelId = link;
           const m = link.match(/t\.me\/([A-Za-z0-9_]+)/);
           if (m) channelId = `@${m[1]}`;
@@ -124,9 +146,16 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
 
     let proofHash: string | null = null;
     try {
-      const { assertProofNotRecycled } = await import("@/lib/strong-ops");
+      const { assertProofNotRecycled, flagProofForReviewQueue } = await import("@/lib/strong-ops");
       const r = await assertProofNotRecycled({ proofText, proofUrl, userId });
       proofHash = r.proofHash;
+      await flagProofForReviewQueue({
+        userId,
+        submissionHint: data.taskId,
+        proofText,
+        proofUrl,
+        proofHash,
+      });
     } catch (e) {
       if (e instanceof Error && e.message.toLowerCase().includes("proof")) throw e;
     }
@@ -169,7 +198,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 24h address allowlist cool-down (anti-theft)
     try {
       const { assertAddressAllowlisted } = await import("@/lib/strong-ops");
       await assertAddressAllowlisted({ userId, address });
@@ -179,7 +207,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       }
     }
 
-    // Multi-account same device → hard-cap large withdrawals
     try {
       const { data: profFp } = await supabaseAdmin
         .from("profiles")
@@ -194,7 +221,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
           .eq("device_fp", fp)
           .limit(12);
         const n = (cluster ?? []).length;
-        // Hard policy: max 3 accounts / device; soft $10 cap at 2+; block at 3+
         if (n >= 3) {
           throw new Error(
             "Withdrawal blocked: this device is linked to too many accounts. Contact support.",
@@ -248,14 +274,13 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && (e.message.includes("Daily float") || e.message.includes("New-device"))) throw e;
     }
 
-    // Graduated hold: first 3 paid WDs always dual
     try {
       const { applyGraduatedWithdrawalHold, assertIpFamilyVelocity } = await import("@/lib/strong-ops");
       const gh = await applyGraduatedWithdrawalHold({ userId, requiresDual });
       if (gh.requiresDual) requiresDual = true;
       const { data: ipProf } = await supabaseAdmin
         .from("profiles")
-        .select("last_ip_hint")
+        .select("last_ip_hint, country_code")
         .eq("id", userId)
         .maybeSingle();
       const ipV = await assertIpFamilyVelocity({
@@ -264,10 +289,31 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       });
       if (ipV.blocked) throw new Error(ipV.blocked);
       if (ipV.dualRequired) requiresDual = true;
+      const cc = String(
+        (ipProf as { country_code?: string | null } | null)?.country_code ?? "",
+      )
+        .trim()
+        .toUpperCase();
+      if (cc) {
+        const { assertGeoMethodMatch } = await import("@/lib/strong-ops");
+        const geo = assertGeoMethodMatch({
+          countryCode: cc,
+          method: data.method,
+          hardBlock: RULES.geoMismatchHardBlock,
+        });
+        if (geo.blocked) throw new Error(geo.blocked);
+        if (geo.dualRequired) requiresDual = true;
+      }
     } catch (e) {
-      if (e instanceof Error && (e.message.includes("network") || e.message.includes("Too many accounts"))) throw e;
+      if (
+        e instanceof Error &&
+        (e.message.includes("network") ||
+          e.message.includes("Too many accounts") ||
+          e.message.includes("payout method requires"))
+      ) {
+        throw e;
+      }
     }
-
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -357,7 +403,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       kind: "withdrawal",
     });
 
-    // Notify owners on dual / large withdrawals
     if (requiresDual || data.amount >= dualThreshold) {
       try {
         const { data: prof } = await supabaseAdmin
