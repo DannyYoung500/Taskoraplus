@@ -9,7 +9,7 @@ export const listAdvertiseServices=createServerFn({method:"GET"}).handler(async(
 });
 
 export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
-.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number;targetCountryCode?:string;targetCountryName?:string;allowOtherCountriesIfUnavailable?:boolean})=>d)
+.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number;targetCountryCode?:string;targetCountryName?:string;allowOtherCountriesIfUnavailable?:boolean;description?:string;instructions?:string;warningText?:string;proofRequirements?:string[];difficulty?:"easy"|"medium"|"hard";screenshotsRequired?:number;featured?:boolean;verificationMode?:"automatic"|"screenshot"})=>d)
 .handler(async({data,context})=>{
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
   const [{data:service,error:serviceError},{data:economy,error:economyError}]=await Promise.all([
@@ -44,8 +44,8 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const pricing=calculateAdvertiseOrder(unitService,quantity,watchSeconds);
   const globalMin=Number(economy?.global_min_campaign_value_usd??0);
   const globalMax=Number(economy?.global_max_campaign_value_usd??0);
-  if(globalMin>0&&pricing.customerTotal<globalMin) throw new Error(`Campaign value must be at least $${globalMin.toFixed(2)}.`);
-  if(globalMax>0&&pricing.customerTotal>globalMax) throw new Error(`Campaign value cannot exceed $${globalMax.toFixed(2)}.`);
+  if(globalMin>0&&customerTotalWithFeature<globalMin) throw new Error(`Campaign value must be at least $${globalMin.toFixed(2)}.`);
+  if(globalMax>0&&customerTotalWithFeature>globalMax) throw new Error(`Campaign value cannot exceed $${globalMax.toFixed(2)}.`);
 
   const perTaskReward=service.pricing_model==="watch_second"
     ? Number((Number(service.tasker_unit_reward)*watchSeconds).toFixed(8))
@@ -53,12 +53,19 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const perTaskCustomer=service.pricing_model==="watch_second"
     ? Number((Number(service.customer_unit_price)*watchSeconds).toFixed(8))
     : Number(service.customer_unit_price);
-  const verificationMethods=service.pricing_model==="watch_second"
-    ? ["automatic"]
-    : service.platform==="telegram"||service.platform==="discord"
-      ? ["automatic","screenshot"]
-      : ["screenshot"];
-  const verificationMode=verificationMethods[0];
+  const isCommunityService=service.platform==="telegram"||service.platform==="discord";
+  const verificationMode=service.pricing_model==="watch_second"
+    ? "automatic"
+    : isCommunityService
+      ? (data.verificationMode==="screenshot" ? "screenshot" : "automatic")
+      : "screenshot";
+  const verificationMethods=[verificationMode];
+  const proofRequirements=Array.isArray(data.proofRequirements)?data.proofRequirements.filter((v)=>["screenshot","text","link","watch_completion"].includes(String(v))):[];
+  const difficulty=data.difficulty==="medium"||data.difficulty==="hard"?"medium":data.difficulty==="hard"?"hard":"easy";
+  const screenshotsRequired=Math.max(0,Math.min(3,Math.floor(Number(data.screenshotsRequired??(verificationMode==="screenshot"?1:0)))));
+  const featured=Boolean(data.featured);
+  const featureFee=featured?5:0;
+  const customerTotalWithFeature=Number((pricing.customerTotal+featureFee).toFixed(8));
   const campaignTitle=data.title?.trim()||service.service_name;
   const taskTitle=service.pricing_model==="watch_second"?"Watch video and earn":campaignTitle;
   const instructions=service.pricing_model==="watch_second"
@@ -67,8 +74,8 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
 
   const {data:campaign,error:campaignError}=await supabaseAdmin.from("campaigns").insert({
     advertiser_user_id:context.userId,advertiser_id:context.userId,platform:service.platform,task_type:service.task_type,
-    title:campaignTitle,instructions,target_url:target,reward:perTaskReward,slots:quantity,remaining_slots:quantity,
-    budget:pricing.customerTotal,amount_spent:0,status:"draft",target_country_code:targetCountryCode||null,target_country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable
+    title:campaignTitle,instructions:taskInstructions,target_url:target,reward:perTaskReward,slots:quantity,remaining_slots:quantity,
+    budget:customerTotalWithFeature,amount_spent:0,status:"draft",target_country_code:targetCountryCode||null,target_country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable
   } as never).select("*").single();
   if(campaignError||!campaign) throw new Error(campaignError?.message??"Could not create campaign.");
 
@@ -88,11 +95,11 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   };
   const {data:task,error:taskError}=await supabaseAdmin.from("tasks").insert({
     platform:service.platform,title:taskTitle,advertiser:"TASKORA Advertiser",reward:perTaskReward,
-    seconds:service.pricing_model==="watch_second"?watchSeconds:30,slots_left:quantity,steps:service.pricing_model==="watch_second"?[`Watch for ${Math.floor(watchSeconds/60)}m ${watchSeconds%60}s`,"Wait for automatic verification"]:service.default_steps??[`Complete: ${service.service_name}`],
-    proof:verificationMode,link:target,is_active:false,status:"draft",task_type:taskType,target,slots_total:quantity,budget:pricing.customerTotal,
-    campaign_id:campaign.id,created_by:context.userId,instructions,requires_review:verificationMode==="screenshot",
+    seconds:service.pricing_model==="watch_second"?watchSeconds:30,slots_left:quantity,steps,proof:verificationMode==="screenshot"?"screenshot":verificationMode==="automatic"?"auto":"username",link:target,is_active:false,status:"draft",task_type:taskType,target,slots_total:quantity,budget:customerTotalWithFeature,
+    campaign_id:campaign.id,created_by:context.userId,instructions:taskInstructions,description,warning_text:warningText,requires_review:verificationMode==="screenshot",difficulty,screenshots_required:screenshotsRequired,proof_requirements:proofRequirements,featured,
+    task_metadata:{creation_form:{description,instructions:customInstructions,warning_text:warningText,proof_requirements:proofRequirements,difficulty,screenshots_required:screenshotsRequired,featured},verification:{mode:verificationMode,methods:verificationMethods,screenshot_fallback:false},country_targeting:{country_code:targetCountryCode||null,country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable}},
     target_country_code:targetCountryCode||null,target_country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable,
-    task_metadata:{...taskMetadata,country_targeting:{country_code:targetCountryCode||null,country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable}},warning_text:null,description:null,featured:false
+    task_metadata:{...taskMetadata,country_targeting:{country_code:targetCountryCode||null,country_name:targetCountryName,allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable}},warning_text:warningText,description,featured,
   } as never).select("*").single();
   if(taskError||!task){await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id);throw new Error(taskError?.message??"Could not create campaign task.");}
   const evidenceRequirements = { campaign_id: campaign.id, task_id: task.id, service_id: service.service_id, platform: service.platform, verification_methods: verificationMethods, primary_method: verificationMode, screenshot_required: verificationMethods.includes("screenshot"), automatic_required: verificationMethods.includes("automatic"), reward_locked_until_verified: true, owner_review_required: verificationMode === "screenshot", evidence_fields: ["submission_id","proof_hash","proof_url","proof_text","submitted_at","reviewed_at","reviewed_by"], watch_seconds: service.pricing_model === "watch_second" ? watchSeconds : null };
@@ -102,5 +109,5 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   if (advertiserCaseError) { await supabaseAdmin.from("tasks").delete().eq("id",task.id); await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id); throw new Error(advertiserCaseError.message); }
   const {error: taskCaseError} = await supabaseAdmin.from("verification_cases").insert({subject_type:"task",subject_id:task.id,verification_type:"campaign_completion_evidence",status:"pending",evidence:evidenceRequirements});
   if (taskCaseError) { await supabaseAdmin.from("tasks").delete().eq("id",task.id); await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id); throw new Error(taskCaseError.message); }
-  return {campaign,task,pricing:{...pricing,watchSeconds,perTaskReward,perTaskCustomer,verificationMethods},status:"draft" as const};
+  return {campaign,task,pricing:{...pricing,customerTotal:customerTotalWithFeature,featureFee,watchSeconds,perTaskReward,perTaskCustomer,verificationMethods},status:"draft" as const};
 });

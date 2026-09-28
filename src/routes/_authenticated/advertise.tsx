@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap, PlayCircle, MapPin } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Sparkles, ShieldCheck, Wallet, Zap, PlayCircle, MapPin, Camera, Type, Link2, AlertTriangle } from "lucide-react";
 import { PLATFORM_META, PLATFORM_ORDER, CATEGORY_LABELS, PlatformLogo, type Platform } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
 import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
@@ -36,6 +36,14 @@ function AdvertisePage() {
   const youtubeHostRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [warningText, setWarningText] = useState("");
+  const [proofRequirements, setProofRequirements] = useState<string[]>(["screenshot"]);
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
+  const [screenshotsRequired, setScreenshotsRequired] = useState(1);
+  const [featured, setFeatured] = useState(false);
+  const [verificationMode, setVerificationMode] = useState<"automatic" | "screenshot">("automatic");
 
   const grouped = useMemo(() => {
     const map = new Map<string, Platform[]>();
@@ -177,6 +185,14 @@ function AdvertisePage() {
           targetCountryCode: targetCountryCode || undefined,
           targetCountryName: targetCountryCode ? countryNameFromCode(targetCountryCode) : undefined,
           allowOtherCountriesIfUnavailable: targetCountryCode ? allowOtherCountriesIfUnavailable : true,
+          description,
+          instructions,
+          warningText,
+          proofRequirements,
+          difficulty,
+          screenshotsRequired,
+          featured,
+          verificationMode: (platform === "telegram" || platform === "discord") ? verificationMode : undefined,
         },
       });
       setMsg(`Campaign created · ${result.task.id.slice(0, 8)}… Waiting for activation.`);
@@ -211,9 +227,60 @@ function AdvertisePage() {
             <span className="text-xs text-white/50">Price</span>
             <span className="text-sm font-extrabold text-sky-300">${service.fromUsd.toFixed(6).replace(/0+$/,"").replace(/\.$/,"")} / {service.unit.replace(/s$/,"")}</span>
           </div>
-          <div className="rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.04] p-3"><div className="flex items-center gap-2"><ShieldCheck className="size-4 text-emerald-300" /><span className="text-xs font-semibold text-emerald-200">Verification plan</span></div><p className="mt-1 text-[10px] leading-relaxed text-white/45">{isWatch ? "Watch time is recorded against the task and the reward stays locked until qualifying playback is confirmed." : platform === "telegram" || platform === "discord" ? "Automatic checks are used first, with screenshot evidence available as a review fallback." : "Screenshot evidence is collected for owner review. A screenshot is evidence, not automatic proof of the action by itself."}</p></div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Campaign title (optional)" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
-          <input value={link} onChange={(e) => setLink(e.target.value)} placeholder={service.linkPlaceholder} className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+          <div className="rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.04] p-3">
+            <div className="flex items-center gap-2"><ShieldCheck className="size-4 text-emerald-300" /><span className="text-xs font-semibold text-emerald-200">Verification</span></div>
+            <p className="mt-1 text-[10px] leading-relaxed text-white/45">{isWatch ? "Watch time is verified automatically and the reward stays locked until qualifying playback is confirmed." : platform === "telegram" || platform === "discord" ? "Choose one verification method for this campaign. Automatic and Screenshot are separate methods — Screenshot is never used as an automatic fallback." : "Choose the proof your task requires. Screenshot submissions go to owner review."}</p>
+          </div>
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Task title</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={service.suggestedTitles[0] || service.title} className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+              <div className="mt-2 flex flex-wrap gap-1.5">{service.suggestedTitles.map((t) => <button key={t} type="button" onClick={() => setTitle(t)} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[10px] text-white/60">{t}</button>)}</div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Description</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Describe what earners need to do…" className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Instructions</label>
+              <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={4} placeholder="Give clear step-by-step instructions…" className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 font-mono text-[12px] leading-relaxed outline-none focus:border-sky-400/40" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Warning text</label>
+              <div className="flex items-start gap-2"><AlertTriangle className="mt-2.5 size-3.5 shrink-0 text-amber-300" /><input value={warningText} onChange={(e) => setWarningText(e.target.value)} placeholder="Optional warning or important rule" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" /></div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Target URL</label>
+              <input value={link} onChange={(e) => setLink(e.target.value)} placeholder={service.linkPlaceholder} inputMode="url" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-400/40" />
+            </div>
+          </div>
+          {(platform === "telegram" || platform === "discord") && !isWatch ? (
+            <div className="rounded-2xl border border-sky-400/15 bg-sky-400/[0.05] p-3">
+              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sky-200/70">Verification method</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => { setVerificationMode("automatic"); setProofRequirements([]); setScreenshotsRequired(0); }} className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${verificationMode === "automatic" ? "border-sky-300/60 bg-sky-300/15 text-sky-100" : "border-white/10 bg-black/20 text-white/45"}`}>Automatic</button>
+                <button type="button" onClick={() => { setVerificationMode("screenshot"); setProofRequirements(["screenshot"]); setScreenshotsRequired(1); }} className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${verificationMode === "screenshot" ? "border-sky-300/60 bg-sky-300/15 text-sky-100" : "border-white/10 bg-black/20 text-white/45"}`}>Screenshot</button>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-white/40">{verificationMode === "automatic" ? "Uses the Telegram/Discord integration to verify the member action. If automatic verification cannot run, the task stays unverified; it does not switch to screenshot." : "Users submit screenshot evidence and the owner reviews it. Automatic verification is not used for this campaign."}</p>
+            </div>
+          ) : null}
+          {!isWatch && !(platform === "telegram" || platform === "discord") ? (
+            <div>
+              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Proof requirements</label>
+              <div className="flex flex-wrap gap-2">
+                {[["screenshot","Screenshot",Camera],["text","Text / Comment",Type],["link","Link / URL",Link2]].map(([value,label,Icon]) => {
+                  const v = String(value); const checked = proofRequirements.includes(v);
+                  return <button key={v} type="button" onClick={() => setProofRequirements((cur) => checked ? cur.filter((x) => x !== v) : [...cur, v])} className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[10px] font-bold ${checked ? "border-emerald-300/50 bg-emerald-300/15 text-emerald-200" : "border-white/10 bg-white/[0.04] text-white/45"}`}><Icon className="size-3.5" />{String(label)}</button>;
+                })}
+              </div>
+            </div>
+          ) : null}
+          {isWatch ? null : (
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Difficulty</label><div className="flex rounded-xl border border-white/10 bg-black/30 p-1">{(["easy","medium","hard"] as const).map((level) => <button key={level} type="button" onClick={() => setDifficulty(level)} className={`flex-1 rounded-lg px-2 py-2 text-[10px] font-bold capitalize ${difficulty === level ? "bg-emerald-400/20 text-emerald-200" : "text-white/35"}`}>{level}</button>)}</div></div>
+              <div><label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-white/40">Screenshots required</label><select value={screenshotsRequired} onChange={(e) => setScreenshotsRequired(Number(e.target.value))} disabled={!proofRequirements.includes("screenshot")} className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none"><option value={0}>0</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option></select></div>
+            </div>
+          )}
           {isWatch && ytId ? (
             <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
               <div className="flex items-center justify-between border-b border-white/8 px-3 py-2">
@@ -279,11 +346,17 @@ function AdvertisePage() {
             <span className="text-white/45 inline-flex items-center gap-1"><Wallet className="size-3.5" /> Wallet balance</span>
             <span className={insufficient ? "font-bold text-rose-300" : "font-bold text-emerald-300"}>${balance.toFixed(2)}</span>
           </div>
-          <div className="flex items-center justify-between border-t border-white/8 pt-3">
-            <span className="text-sm font-semibold">Campaign total</span>
-            <span className="text-lg font-extrabold text-sky-300">${total.toFixed(6).replace(/0+$/,"").replace(/\.$/,"")}</span>
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Order summary</p>
+            <div className="mt-2 space-y-1.5 text-xs text-white/50">
+              <div className="flex justify-between"><span>{service.title}</span><span>{qtyNum.toLocaleString()} {service.unit}</span></div>
+              <div className="flex justify-between"><span>Reward / person</span><span className="text-white">${(isWatch ? Number(service.taskerUsd)*watchTotalSeconds : Number(service.taskerUsd)).toFixed(6).replace(/0+$/,"").replace(/\.$/,"")}</span></div>
+              <div className="flex justify-between"><span>Verification</span><span className="text-white">{isWatch ? "Automatic watch verification" : (platform === "telegram" || platform === "discord" ? verificationMode : "Proof review")}</span></div>
+              <div className="flex justify-between"><span>Delivery</span><span>{service.delivery}</span></div>
+              <div className="mt-2 flex justify-between border-t border-white/8 pt-2 text-sm font-bold text-emerald-300"><span>Campaign total</span><span>${total.toFixed(6).replace(/0+$/,"").replace(/\.$/,"")}</span></div>
+            </div>
           </div>
-          <button type="button" disabled={busy || insufficient} onClick={() => void publish()} className="w-full rounded-2xl bg-gradient-to-r from-sky-400 to-blue-500 py-3.5 text-sm font-bold text-[#0a0c12] disabled:opacity-50">
+          <button type="button" disabled={busy || insufficient || !title.trim()} onClick={() => void publish()} className="w-full rounded-2xl bg-gradient-to-r from-sky-400 to-blue-500 py-3.5 text-sm font-bold text-[#0a0c12] disabled:opacity-50">
             {busy ? "Creating…" : insufficient ? "Insufficient balance" : "Create campaign"}
           </button>
           {msg ? <p className="text-center text-xs text-amber-200/90">{msg}</p> : null}
