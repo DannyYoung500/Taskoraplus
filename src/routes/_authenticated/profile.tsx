@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Bell,
   ChevronRight,
@@ -15,6 +15,7 @@ import { getDashboard } from "@/lib/taskora.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
+import { AppLink } from "@/components/AppLink";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   loader: async () => {
@@ -77,9 +78,9 @@ function ProfileScreen() {
           </p>
           <p className="text-[10px] text-slate-500">Account · security · links</p>
         </div>
-        <Link to="/notifications" className="rounded-full border border-white/10 bg-[#0b1628] p-2.5">
+        <AppLink to="/notifications" className="rounded-full border border-white/10 bg-[#0b1628] p-2.5">
           <Bell className="size-4 text-slate-300" />
-        </Link>
+        </AppLink>
       </header>
 
       <section
@@ -105,12 +106,12 @@ function ProfileScreen() {
             </span>
           </div>
           {isOwner ? (
-            <Link
+            <AppLink
               to="/owner"
               className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-2 text-cyan-200"
             >
               <Crown className="size-5" />
-            </Link>
+            </AppLink>
           ) : null}
         </div>
 
@@ -122,7 +123,7 @@ function ProfileScreen() {
       </section>
 
       <section className="mb-3 grid grid-cols-2 gap-2">
-        <Link
+        <AppLink
           to="/wallet"
           className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5"
         >
@@ -131,8 +132,8 @@ function ProfileScreen() {
             <p className="text-xs font-black">Wallet</p>
             <p className="text-[10px] text-slate-500">Deposit · withdraw</p>
           </div>
-        </Link>
-        <Link
+        </AppLink>
+        <AppLink
           to="/leaderboard"
           className="flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3.5"
         >
@@ -141,7 +142,7 @@ function ProfileScreen() {
             <p className="text-xs font-black">Rank</p>
             <p className="text-[10px] text-slate-500">Leaderboard</p>
           </div>
-        </Link>
+        </AppLink>
       </section>
 
       <section className="mb-3 overflow-hidden rounded-2xl border border-white/8 bg-[#0b1628]">
@@ -196,7 +197,7 @@ function Row({
   sub: string;
 }) {
   return (
-    <Link
+    <AppLink
       to={to}
       className="flex items-center gap-3 border-b border-white/5 px-3.5 py-3.5 last:border-0 active:bg-white/5"
     >
@@ -208,6 +209,6 @@ function Row({
         <p className="text-[10px] text-slate-500">{sub}</p>
       </div>
       <ChevronRight className="size-4 text-slate-600" />
-    </Link>
+    </AppLink>
   );
 }
