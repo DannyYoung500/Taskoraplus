@@ -34,7 +34,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const targetCountryName=String(data.targetCountryName||"").trim()||null;
   const allowOtherCountriesIfUnavailable=data.allowOtherCountriesIfUnavailable!==false;
   if(targetCountryCode&&!/^[A-Z]{2}$/.test(targetCountryCode)) throw new Error("Choose a valid country.");
-  if(!/^https?:\\/\\//i.test(target)) throw new Error("Enter a valid video or target URL.");
+  if(!/^https?:\/\//i.test(target)) throw new Error("Enter a valid video or target URL.");
 
   const unitService={
     serviceId:service.service_id,platform:service.platform,serviceName:service.service_name,taskType:service.task_type,
@@ -77,7 +77,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   const description=String(data.description||service.service_name).trim();
   const customInstructions=String(data.instructions||"").trim();
   const warningText=String(data.warningText||"").trim();
-  const instructionLines=customInstructions.split(/\\r?\\n/).map((s)=>s.trim()).filter(Boolean);
+  const instructionLines=customInstructions.split(/\r?\n/).map((s)=>s.trim()).filter(Boolean);
   const steps=service.pricing_model==="watch_second"
     ? [`Watch for ${Math.floor(watchSeconds/60)}m ${watchSeconds%60}s`,"Wait for automatic verification"]
     : instructionLines.length?instructionLines:[`Complete: ${service.service_name}`,"Return to TASKORA and submit proof"];
