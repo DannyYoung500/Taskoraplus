@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { AppLink } from "@/components/AppLink";
 import { useState } from "react";
 import {
   ArrowDownLeft,
@@ -327,7 +328,7 @@ function WalletScreen() {
       {tab === "withdraw" ? (
         <section className="space-y-3">
           <p className="text-xs text-slate-400">{`Min ${formatUsd(minWd)} · processed by owner after review · first withdrawals may need extra checks.`}</p>
-          <Link to="/payout-proofs" className="block text-center text-[11px] font-semibold text-cyan-300 underline-offset-2 hover:underline">View public payout proofs →</Link>
+          <AppLink to="/payout-proofs" className="block text-center text-[11px] font-semibold text-cyan-300 underline-offset-2 hover:underline">View public payout proofs →</AppLink>
           <div className="grid grid-cols-2 gap-2">
             {WITHDRAW_METHODS.map((m) => {
               const active = wMethod === m.id;
