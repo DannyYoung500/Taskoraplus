@@ -50,7 +50,7 @@ const SECTIONS: { label: string; items: Item[] }[] = [
       { to: "/owner/tasks", title: "Tasks", Icon: ListChecks },
       { to: "/owner/campaigns", title: "Campaigns", Icon: Landmark },
       { to: "/owner/reviews", title: "Task Review", Icon: ClipboardCheck },
-      { to: "/owner/connected", title: "Connected Accounts", Icon: Link2 },
+      { to: "/owner/connected", title: "Connected Accounts", Icon: Link2 },\n      { to: "/owner/verification", title: "Verification & Trust", Icon: ShieldCheck },
       { to: "/owner/tickets", title: "Support", Icon: LifeBuoy },
     ],
   },
