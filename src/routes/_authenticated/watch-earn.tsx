@@ -381,9 +381,19 @@ function VideoFeedCard({
             {hourlyRateLabel(video)}
           </span>
         </div>
+        <div className="px-0.5 pt-1 text-[11px] font-medium text-slate-500">
+          {formatCompactViews(video.viewsCount)} views · {formatTime(video.durationSeconds)} watch time
+        </div>
       </button>
     </article>
   );
+}
+
+function formatCompactViews(count: number) {
+  const n = Math.max(0, Number(count) || 0);
+  if (n >= 1000000) return `${(n / 1000000).toFixed(n >= 10000000 ? 0 : 1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`;
+  return String(n);
 }
 
 function WatchPlayer({
