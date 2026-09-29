@@ -8,12 +8,11 @@ import {
   Shield,
   Trophy,
   WalletCards,
-  Star,
   Users,
 } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
-import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO } from "@/lib/brand";
 import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
 import { AppLink } from "@/components/AppLink";
 
