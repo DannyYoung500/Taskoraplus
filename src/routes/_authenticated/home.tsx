@@ -18,6 +18,7 @@ import {
 import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
 import { AppLink } from "@/components/AppLink";
 import { listDailyMissions } from "@/lib/daily-missions.functions";
+import { recordSecuritySignal } from "@/lib/security-engine.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -116,6 +117,45 @@ function HomePage() {
   useEffect(() => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (timezone) void syncMyTimezone({ data: { timezone } }).catch(() => {});
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const nav = navigator;
+        const stable = [
+          nav.userAgent,
+          nav.platform,
+          nav.language,
+          timezone,
+          String(nav.hardwareConcurrency ?? ""),
+          String((nav as Navigator & { deviceMemory?: number }).deviceMemory ?? ""),
+          String(window.screen?.width ?? ""),
+          String(window.screen?.height ?? ""),
+          String(window.screen?.colorDepth ?? ""),
+          String(window.devicePixelRatio ?? ""),
+        ].join("|");
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stable));
+        const deviceFp = Array.from(new Uint8Array(digest))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        if (!cancelled) {
+          await recordSecuritySignal({
+            data: {
+              deviceFp,
+              timezone,
+              language: nav.language,
+              screen: `${window.screen?.width ?? 0}x${window.screen?.height ?? 0}`,
+            },
+          });
+        }
+      } catch {
+        // Security telemetry must never block the app.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const submissions = dash?.submissions ?? [];
