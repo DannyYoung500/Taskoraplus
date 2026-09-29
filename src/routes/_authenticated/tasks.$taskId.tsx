@@ -23,7 +23,6 @@ function TaskDetail() {
   const [proofText, setProofText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [useScreenshot, setUseScreenshot] = useState(false);
   const [autoStatus, setAutoStatus] = useState<string | null>(null);
   const platform = task.platform as Platform;
   const isTelegramJoin =
@@ -121,7 +120,7 @@ function TaskDetail() {
 
       <section className="card-surface mt-4 p-4">
         <h2 className="text-sm font-bold">Verification</h2>
-        {isTelegramJoin && !useScreenshot ? (
+        {isTelegramJoin && String(task.proof) === "auto" ? (
           <>
             <p className="mt-1 text-xs text-muted-foreground">
               Automatic membership check via Telegram bot (bot must be admin). Screenshot is optional — only if you choose it. No soft fallback.
@@ -136,28 +135,17 @@ function TaskDetail() {
             >
               {busy ? "Verifying…" : "Verify membership (auto)"}
             </button>
-            <button
-              type="button"
-              disabled={submitted}
-              onClick={() => {
-                setUseScreenshot(true);
-                setError(null);
-              }}
-              className="mt-2 w-full rounded-2xl border border-white/15 py-2.5 text-xs font-bold text-white/70"
-            >
-              Choose screenshot verification instead
-            </button>
           </>
         ) : (
           <>
             <p className="mt-1 text-xs text-muted-foreground">
               {isWatch
-                ? "Watch verification is automatic after required watch time in the player."
-                : useScreenshot
-                  ? "Screenshot path selected. Reward only after review."
-                  : "Pending until owner verifies."}
+                ? "Watch verification is automatic after the required watch time."
+                : String(task.proof) === "screenshot"
+                  ? "Screenshot verification selected for this task. Your proof is reviewed before reward approval."
+                  : "Automatic verification is required for this task."}
             </p>
-            {!isWatch ? (
+            {!isWatch && String(task.proof) === "screenshot" ? (
               <input
                 value={proofText}
                 onChange={(e) => setProofText(e.target.value)}
@@ -180,7 +168,7 @@ function TaskDetail() {
           <div className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3.5 text-sm font-semibold">
             <CheckCircle2 className="size-4" /> Submitted — awaiting verification
           </div>
-        ) : isTelegramJoin && !useScreenshot ? null : (
+        ) : isTelegramJoin && String(task.proof) === "auto" ? null : (
           <button
             disabled={busy}
             onClick={() => (started ? void onSubmitScreenshot() : setStarted(true))}
