@@ -107,7 +107,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
           })
           .eq("id", userId);
 
-        await supabaseAdmin.from("risk_signal_events").insert({
+        await (supabaseAdmin as any).from("risk_signal_events").insert({
           user_id: userId,
           event_type: changed ? "identity_signal_changed" : "activity_seen",
           ip_hint: ipHint,
