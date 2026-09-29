@@ -44,8 +44,15 @@ export const Route = createFileRoute("/_authenticated/advertise")({
 
 function formatUsd(n: number) {
   if (Math.abs(n) < 0.01 && n !== 0)
-    return `$${n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
-  return `$${n.toFixed(2)}`;
+    return `${n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
+  return `${n.toFixed(2)}`;
+}
+
+function formatTimeLabel(totalSeconds: number) {
+  const total = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 function taskTypeLabel(taskType: string): string {
@@ -69,7 +76,6 @@ function AdvertisePage() {
   const [service, setService] = useState<ServiceDef | null>(null);
   const [link, setLink] = useState("");
   const [qty, setQty] = useState(50);
-  const [notes, setNotes] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -116,7 +122,6 @@ function AdvertisePage() {
     setService(s);
     setQty(s.minQty);
     setLink("");
-    setNotes("");
     setTitle("");
     setDescription("");
     setInstructions("");
@@ -141,9 +146,12 @@ function AdvertisePage() {
   const qtyNum = Math.max(1, Math.floor(Number(qty) || 1));
   const isWatch = service?.id === "yt_watch";
   const watchTotalSeconds = isWatch ? Math.max(1, Math.floor(watchMinutes) * 60 + Math.floor(watchSeconds)) : 0;
-  const unitCustomer = service ? Number(service.fromUsd) * (isWatch ? watchTotalSeconds : 1) : 0;
-  const unitTasker = service ? Number(service.taskerUsd) * (isWatch ? watchTotalSeconds : 1) : 0;
-  const unitMargin = service ? Number(service.taskoraUsd) * (isWatch ? watchTotalSeconds : 1) : 0;
+  const customerRate = service ? Number(service.fromUsd) : 0;
+  const taskerRate = service ? Number(service.taskerUsd) : 0;
+  const marginRate = service ? Number(service.taskoraUsd) : 0;
+  const unitCustomer = isWatch ? customerRate * watchTotalSeconds : customerRate;
+  const unitTasker = isWatch ? taskerRate * watchTotalSeconds : taskerRate;
+  const unitMargin = isWatch ? marginRate * watchTotalSeconds : marginRate;
   const earnerPayouts = unitTasker * qtyNum;
   const platformFee = unitMargin * qtyNum;
   const baseTotal = unitCustomer * qtyNum;
@@ -491,10 +499,10 @@ function AdvertisePage() {
           <div className="rounded-2xl border border-white/10 bg-[#12151c] p-4">
             <p className="mb-3 text-[13px] font-bold">Order Summary</p>
             <div className="space-y-2 text-[12px] text-white/55">
-              <div className="flex justify-between"><span>{service.title}</span><span className="text-white">{qtyNum.toLocaleString()} {service.unit}</span></div>
+              <div className="flex justify-between"><span>{isWatch ? "Quantity" : service.title}</span><span className="text-white">{isWatch ? qtyNum.toLocaleString() + " watches" : qtyNum.toLocaleString() + " " + service.unit}</span></div>
               <div className="flex justify-between"><span>Task type</span><span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">{typeLabel}</span></div>
-              {isWatch ? <div className="flex justify-between"><span>Watch time</span><span className="text-white">{watchTotalSeconds}s</span></div> : null}
-              <div className="flex justify-between"><span>Price per {service.unit.replace(/s$/, "")}</span><span className="text-white">{formatUsd(unitCustomer)}</span></div>
+              {isWatch ? <div className="flex justify-between"><span>Watch time per viewer</span><span className="text-white">{formatTimeLabel(watchTotalSeconds)}</span></div> : null}
+              <div className="flex justify-between"><span>{isWatch ? "Price per second" : "Price per " + service.unit.replace(/s$/, "")}</span><span className="text-white">{formatUsd(isWatch ? customerRate : unitCustomer)}</span></div>
               <div className="flex justify-between"><span>Earner payouts</span><span className="text-white">{formatUsd(earnerPayouts)}</span></div>
               <div className="flex justify-between"><span>TASKORA margin</span><span className="text-white">{formatUsd(platformFee)}</span></div>
               <div className="flex justify-between"><span>Estimated delivery</span><span className="text-white">{service.delivery.replace("~", "")}</span></div>
