@@ -1,0 +1,1 @@
+LOAD_FROM:/tmp/owner_mod_b.ts
