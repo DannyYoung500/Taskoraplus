@@ -27,13 +27,18 @@ export const listDailyMissions=createServerFn({method:"GET"}).middleware([requir
 });
 
 export const claimRewardedAd=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).inputValidator((d:{missionId:string})=>d).handler(async({data,context})=>{
- const s=await db();const {data:p}=await s.from("profiles").select("timezone,status").eq("id",context.userId).maybeSingle();if(p&&String((p as any).status??"active")!=="active")throw new Error("Account is not active.");
+ const s=await db();const {data:p}=await s.from("profiles").select("timezone,status,risk_score,risk_band").eq("id",context.userId).maybeSingle();if(p&&String((p as any).status??"active")!=="active")throw new Error("Account is not active.");
+ const riskScore=Number((p as any)?.risk_score??0);
+ if(riskScore>=80) throw new Error("This account is temporarily ineligible for rewarded ads while security checks are pending.");
  const date=localDate(String((p as any)?.timezone||"UTC"));const {data:m}=await (s as any).from("daily_missions").select("*").eq("id",data.missionId).eq("mission_type","rewarded_ad").eq("is_active",true).maybeSingle();if(!m)throw new Error("This ad mission is unavailable.");
  const now=new Date();if(m.starts_at&&new Date(m.starts_at)>now)throw new Error("This mission has not started yet.");if(m.ends_at&&new Date(m.ends_at)<now)throw new Error("This mission has ended.");
  const {data:provider}=await (s as any).from("monetization_providers").select("enabled,placement_id").eq("provider_key",m.provider_key).maybeSingle();if(String(m.provider_key)!=="adsgram")throw new Error("This ad network is not connected to TaskoraPlus yet.");if(!provider?.enabled||!provider?.placement_id)throw new Error("Rewarded ads are not configured yet.");
  const {data:completedClaims}=await (s as any).from("daily_mission_claims").select("id").eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).eq("status","completed");
  const completedCount=completedClaims?.length??0;
+ const providerSettings=((provider as any)?.settings??{}) as Record<string,unknown>;
+ const maxDailyReward=Number(providerSettings.maxDailyRewardUsdt??0);
  if(completedCount>=Number(m.daily_limit))throw new Error("Today's ad mission limit is reached.");
+ if(maxDailyReward>0 && completedCount*Number(m.reward_usdt??0)>=maxDailyReward)throw new Error("Today's provider reward budget is reached.");
  const {data:pendingClaim}=await (s as any).from("daily_mission_claims").select("id,status,claim_number").eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).eq("status","pending").maybeSingle();
  if(pendingClaim?.id)return {claimId:String(pendingClaim.id),placementId:String(provider.placement_id)};
  const claimNumber=completedCount+1;
