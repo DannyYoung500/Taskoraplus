@@ -428,7 +428,6 @@ function WatchPlayer({
   canComplete,
   busy,
   message,
-  sessionDisplay,
   completionReward,
   isPlaying,
   onPlayingChange,
@@ -444,7 +443,6 @@ function WatchPlayer({
   canComplete: boolean;
   busy: boolean;
   message: string | null;
-  sessionDisplay: number;
   completionReward: number;
   isPlaying: boolean;
   onPlayingChange: (playing: boolean) => void;

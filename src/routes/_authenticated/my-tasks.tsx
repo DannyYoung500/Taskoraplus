@@ -33,17 +33,9 @@ function MyPostedTasks() {
   const { posted } = Route.useLoaderData();
   const [refreshing, setRefreshing] = useState(false);
 
-  async function refresh() {
+  function refresh() {
     setRefreshing(true);
-    try {
-      const fresh = await listMyPostedTasks();
-      // TanStack loader data is intentionally left stable; a navigation refresh is safer than
-      // mutating loader internals. This button simply requests a route reload.
-      window.location.reload();
-      void fresh;
-    } finally {
-      setRefreshing(false);
-    }
+    window.location.reload();
   }
 
   const videos = (posted as any[]).filter((task) => Boolean(task.postedVideo));

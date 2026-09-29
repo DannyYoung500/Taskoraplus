@@ -66,14 +66,25 @@ security definer
 set search_path=''
 as $$
 begin
-  if (select task_type from public.tasks where id = new.task_id) = 'video_watch'
-     and (tg_op = 'INSERT' or old.status is distinct from 'verified')
-     and new.status = 'verified' then
-    update public.tasks
-    set watch_completion_count = watch_completion_count + 1,
-        watch_reward_paid = watch_reward_paid + coalesce(reward,0),
-        updated_at = now()
-    where id = new.task_id;
+  if tg_op = 'INSERT' then
+    if (select task_type from public.tasks where id = new.task_id) = 'video_watch'
+       and new.status = 'verified' then
+      update public.tasks
+      set watch_completion_count = watch_completion_count + 1,
+          watch_reward_paid = watch_reward_paid + coalesce(reward,0),
+          updated_at = now()
+      where id = new.task_id;
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if (select task_type from public.tasks where id = new.task_id) = 'video_watch'
+       and old.status is distinct from 'verified'
+       and new.status = 'verified' then
+      update public.tasks
+      set watch_completion_count = watch_completion_count + 1,
+          watch_reward_paid = watch_reward_paid + coalesce(reward,0),
+          updated_at = now()
+      where id = new.task_id;
+    end if;
   end if;
   return new;
 end;
