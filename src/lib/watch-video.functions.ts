@@ -30,6 +30,7 @@ export type WatchVideo = {
   rewardUsdt: number;
   rewardPoints: number;
   durationSeconds: number;
+  viewsCount: number;
   status: string;
 };
 
@@ -46,6 +47,7 @@ function mapVideo(row: Record<string, unknown>): WatchVideo {
     rewardUsdt: Number(row.reward_usdt ?? 0),
     rewardPoints: Number(row.reward_points ?? 0),
     durationSeconds: Number(row.duration_seconds ?? 0),
+    viewsCount: Number(row.views_count ?? 0),
     status: String(row.status ?? "active"),
   };
 }
@@ -64,7 +66,7 @@ export const listWatchVideos = createServerFn({ method: "GET" })
     const { data, error } = await (s as any)
       .from("watch_videos")
       .select(
-        "id,title,description,thumbnail_url,video_url,source_type,provider_name,provider_video_id,reward_usdt,reward_points,duration_seconds,status",
+        "id,title,description,thumbnail_url,video_url,source_type,provider_name,provider_video_id,reward_usdt,reward_points,duration_seconds,views_count,status",
       )
       .eq("status", "active")
       .order("created_at", { ascending: false })
