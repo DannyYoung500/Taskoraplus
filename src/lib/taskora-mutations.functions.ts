@@ -67,26 +67,20 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
 
     const proofText = (data.proofText ?? "").trim();
     const proofUrl = (data.proofUrl ?? "").trim();
-    if (!proofText && !proofUrl) throw new Error("Add proof text or a proof link/screenshot URL.");
-    if (proofText === "auto:telegram_membership" || (task as { proof?: string }).proof === "auto") {
-      const link = String((task as { link?: string | null }).link ?? "");
-      if (/t\.me\//i.test(link) || String(task.platform).toLowerCase() === "telegram") {
-        try {
-          const { data: prof } = await supabaseAdmin.from("profiles").select("telegram_id").eq("id", userId).maybeSingle();
-          const tid = (prof as { telegram_id?: number | string } | null)?.telegram_id;
-          if (!tid) throw new Error("Link your Telegram account first.");
-          const { verifyTelegramChannelMembership } = await import("@/lib/strong-wave.functions");
-          let channelId = link;
-          const m = link.match(/t\.me\/([A-Za-z0-9_]+)/);
-          if (m) channelId = `@${m[1]}`;
-          const vr = await verifyTelegramChannelMembership({ telegramUserId: tid, channelId });
-          if (!vr.ok) {
-            throw new Error(vr.error === "bot_token_missing" ? "Membership check unavailable (bot not configured)." : `Not a member yet (${vr.status || vr.error || "unknown"}). Join the channel, then press Verify again.`);
-          }
-        } catch (e) {
-          if (e instanceof Error) throw e;
-        }
-      }
+    const metadata = ((task as { task_metadata?: unknown }).task_metadata ?? {}) as Record<string, unknown>;
+    const verificationMethods = Array.isArray(metadata.verification_methods) ? metadata.verification_methods.map(String) : [];
+    const automaticSelected =
+      verificationMethods.includes("automatic") ||
+      (String((task as { proof?: string }).proof ?? "").toLowerCase() === "auto" &&
+        ["telegram", "discord"].includes(String(task.platform).toLowerCase()));
+    let autoVerified = false;
+    if (automaticSelected) {
+      const { verifyAutomaticTask } = await import("@/lib/automatic-verification.functions");
+      const result = await verifyAutomaticTask(userId, task);
+      if (!result.ok) throw new Error(result.reason || "Automatic verification could not confirm this task. The task remains unverified.");
+      autoVerified = true;
+    } else if (!proofText && !proofUrl) {
+      throw new Error("Add the proof required by this campaign.");
     }
 
     let proofHash: string | null = null;
@@ -110,6 +104,15 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     );
     if (claimError) {
       throw new Error(claimError.message);
+    }
+    if (autoVerified) {
+      const { data: verificationResult, error: verificationError } = await supabaseAdmin.rpc("review_task_submission", {
+        p_submission_id: String(submissionId),
+        p_decision: "verified",
+        p_reason: "Automatic verification confirmed the required platform action.",
+      } as never);
+      if (verificationError) throw new Error(verificationError.message);
+      return { status: "verified" as const, autoVerified: true, submissionId: String(submissionId), verification: verificationResult };
     }
     return { status: "pending" as const, autoVerified: false, submissionId: String(submissionId) };
   });
