@@ -67,6 +67,21 @@ export function TelegramNativeShell() {
 
     const handleViewport = () => setViewportVars(tg);
     const handleTheme = () => syncTheme(tg);
+    const syncBackButton = () => {
+      const back = tg.BackButton;
+      if (!back?.show || !back.hide || !back.onClick) return;
+      if (window.history.length > 1) {
+        try {
+          back.show();
+          back.onClick(goBack);
+        } catch {}
+      } else {
+        try { back.hide(); } catch {}
+      }
+    };
+    const goBack = () => {
+      if (window.history.length > 1) window.history.back();
+    };
 
     try {
       // Keep the Mini App compact: intentionally do not call expand() or requestFullscreen().
@@ -84,6 +99,8 @@ export function TelegramNativeShell() {
       tg.onEvent?.("themeChanged", handleTheme);
       tg.onEvent?.("safeAreaChanged", syncSafeArea);
       tg.onEvent?.("contentSafeAreaChanged", syncSafeArea);
+      window.addEventListener("popstate", syncBackButton);
+      syncBackButton();
 
       if (tg.performanceClass === "LOW") {
         document.documentElement.dataset.telegramLowPerformance = "true";
@@ -99,6 +116,11 @@ export function TelegramNativeShell() {
       tg.offEvent?.("themeChanged", handleTheme);
       tg.offEvent?.("safeAreaChanged", syncSafeArea);
       tg.offEvent?.("contentSafeAreaChanged", syncSafeArea);
+      window.removeEventListener("popstate", syncBackButton);
+      try {
+        tg.BackButton?.offClick?.(goBack);
+        tg.BackButton?.hide?.();
+      } catch {}
     };
   }, []);
 
