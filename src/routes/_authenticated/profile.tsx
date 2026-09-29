@@ -41,7 +41,6 @@ function ProfileScreen() {
         level_num?: number | null;
         streak?: number | null;
         photo_url?: string | null;
-        task_points?: number | null;
       }
     | null
     | undefined;
@@ -52,7 +51,6 @@ function ProfileScreen() {
   const level = profile?.level ?? `Level ${levelNum}`;
   const photo = profile?.photo_url ?? null;
   const streak = Number(profile?.streak ?? 0);
-  const taskPoints = Number(profile?.task_points ?? 0);
   const isOwner = Boolean(dash?.isOwner);
 
   const txs = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
@@ -60,9 +58,10 @@ function ProfileScreen() {
   const lifetime = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
   const verified = Number(dash?.verifiedCount ?? 0);
   const connectedCount = Array.isArray(accounts) ? accounts.length : 0;
-  const band = 500;
-  const intoBand = taskPoints % band;
+  const band = 10;
+  const intoBand = verified % band;
   const progressPct = Math.min(100, Math.round((intoBand / band) * 100));
+  const nextLevelAt = band - intoBand;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#05080f] pb-28 text-white">
@@ -97,16 +96,17 @@ function ProfileScreen() {
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between text-[10px]">
               <span className="font-semibold text-slate-400">Level progress</span>
-              <span className="font-bold tabular-nums text-cyan-300/90">{intoBand}/{band} TP</span>
+              <span className="font-bold tabular-nums text-cyan-300/90">{intoBand}/{band} verified</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
               <div className="h-full rounded-full transition-[width]" style={{ width: `${progressPct}%`, background: BLUE_GRAD }} />
             </div>
+            <p className="mt-1 text-[9px] text-slate-500">{nextLevelAt} more verified task{nextLevelAt === 1 ? "" : "s"} to next band</p>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2">
             <Stat label="Balance" value={formatUsd(balance)} accent />
-            <Stat label="Task Points" value={taskPoints.toLocaleString()} />
             <Stat label="Verified" value={String(verified)} />
+            <Stat label="Linked" value={String(connectedCount)} />
           </div>
         </section>
 
@@ -122,7 +122,7 @@ function ProfileScreen() {
         </section>
 
         <section className="mt-3.5 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0b1628]">
-          <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="Task Points + commission" />
+          <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="USDT milestones + commission" />
           <Row to="/connected" icon={Link2} label="Connected accounts" sub={connectedCount > 0 ? `${connectedCount} linked · required for some platforms` : "Link TikTok, Instagram, YouTube…"} badge={connectedCount > 0 ? String(connectedCount) : undefined} />
           <Row to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
           <Row to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
