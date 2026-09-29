@@ -28,24 +28,31 @@ function TaskDetail() {
   const isTelegramJoin =
     String(task.platform).toLowerCase() === "telegram" ||
     /t\.me\//i.test(String(task.link ?? ""));
+  const isDiscordJoin =
+    String(task.platform).toLowerCase() === "discord" &&
+    String(task.task_type ?? "").toLowerCase() === "join";
+  const isAutoJoin =
+    String(task.proof) === "auto" &&
+    (isTelegramJoin || isDiscordJoin);
   const isWatch =
     String(task.proof) === "auto" &&
     /watch/i.test(String(task.title ?? "")) &&
-    !isTelegramJoin;
+    !isTelegramJoin &&
+    !isDiscordJoin;
   const rewardDisplay = `$${Number(task.reward).toFixed(6)}`;
 
-  async function onAutoVerifyTelegram() {
+  async function onAutoVerify() {
     setBusy(true);
     setError(null);
     setAutoStatus("Checking membership…");
     try {
-      await submitTaskGuarded({
-        data: { taskId: task.id, proofText: "auto:telegram_membership" },
+      const result = await submitTaskGuarded({
+        data: { taskId: task.id, proofText: "auto:membership" },
       });
       setSubmitted(true);
-      setAutoStatus("Verified · membership confirmed");
+      setAutoStatus(result.autoVerified ? "Verified · reward credited" : "Submitted · awaiting verification");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Auto-verify failed");
+      setError(e instanceof Error ? e.message : "Automatic verification failed");
       setAutoStatus(null);
     } finally {
       setBusy(false);
@@ -119,20 +126,22 @@ function TaskDetail() {
 
       <section className="card-surface mt-4 p-4">
         <h2 className="text-sm font-bold">Verification</h2>
-        {isTelegramJoin && String(task.proof) === "auto" ? (
+        {isAutoJoin ? (
           <>
             <p className="mt-1 text-xs text-muted-foreground">
-              Automatic membership check via Telegram bot (bot must be admin). Screenshot is optional — only if you choose it. No soft fallback.
+              {isTelegramJoin
+                ? "Automatic Telegram membership check. The TASKORA bot must be able to inspect the channel/group. There is no screenshot fallback."
+                : "Automatic Discord server membership check. The TASKORA bot must be able to inspect the server. There is no screenshot fallback."}
             </p>
             {autoStatus ? <p className="mt-2 text-xs text-emerald-400">{autoStatus}</p> : null}
             {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
             <button
               type="button"
               disabled={busy || submitted}
-              onClick={() => void onAutoVerifyTelegram()}
+              onClick={() => void onAutoVerify()}
               className="mt-3 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busy ? "Verifying…" : "Verify membership (auto)"}
+              {busy ? "Verifying…" : "Verify membership"}
             </button>
           </>
         ) : (
@@ -162,7 +171,7 @@ function TaskDetail() {
           <div className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3.5 text-sm font-semibold">
             <CheckCircle2 className="size-4" /> Submitted — awaiting verification
           </div>
-        ) : isTelegramJoin && String(task.proof) === "auto" ? null : (
+        ) : isAutoJoin ? null : (
           <button
             disabled={busy}
             onClick={() => (started ? void onSubmitScreenshot() : setStarted(true))}
