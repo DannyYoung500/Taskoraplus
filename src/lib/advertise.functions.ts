@@ -191,7 +191,8 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   if(campaignError||!campaign) throw new Error(campaignError?.message??"Could not create campaign.");
 
   const {error:fundingError}=await supabaseAdmin.rpc("reserve_campaign_budget",{p_advertiser_id:context.userId,p_campaign_id:campaign.id,p_amount:customerTotalWithFeature});
-  if(fundingError){ await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id); throw new Error(fundingError.message); }
+  if(fundingError){ await supabaseAdmin.rpc("release_campaign_budget",{p_campaign_id:campaign.id});
+    await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id); throw new Error(fundingError.message); }
 
   const taskTypeDb=service.pricing_model==="watch_second"?"video_watch":service.task_type;
   const proof=verificationMode==="screenshot"?"screenshot":verificationMode==="automatic"?"auto":"username";
@@ -220,6 +221,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     allow_other_countries_if_unavailable:allowOtherCountriesIfUnavailable
   } as never).select("*").single();
   if(taskError||!task){
+    await supabaseAdmin.rpc("release_campaign_budget",{p_campaign_id:campaign.id});
     await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id);
     throw new Error(taskError?.message??"Could not create campaign task.");
   }
@@ -237,6 +239,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   });
   if(requirementError){
     await supabaseAdmin.from("tasks").delete().eq("id",task.id);
+    await supabaseAdmin.rpc("release_campaign_budget",{p_campaign_id:campaign.id});
     await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id);
     throw new Error(requirementError.message);
   }
@@ -248,6 +251,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   },{onConflict:"subject_type,subject_id,verification_type"});
   if(advertiserCaseError){
     await supabaseAdmin.from("tasks").delete().eq("id",task.id);
+    await supabaseAdmin.rpc("release_campaign_budget",{p_campaign_id:campaign.id});
     await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id);
     throw new Error(advertiserCaseError.message);
   }
@@ -257,6 +261,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   });
   if(taskCaseError){
     await supabaseAdmin.from("tasks").delete().eq("id",task.id);
+    await supabaseAdmin.rpc("release_campaign_budget",{p_campaign_id:campaign.id});
     await supabaseAdmin.from("campaigns").delete().eq("id",campaign.id);
     throw new Error(taskCaseError.message);
   }

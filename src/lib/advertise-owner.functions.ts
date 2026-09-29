@@ -100,9 +100,11 @@ export const setAdvertiseCampaignStatus = createServerFn({ method: "POST" }).mid
   const db = await guard(context.userId);
   const { data: campaign, error: readError } = await (db as any).from("campaigns").select("*").eq("id", data.id).maybeSingle();
   if (readError || !campaign) throw new Error(readError?.message ?? "Campaign not found.");
+  if (data.status === "active" && String(campaign.funding_status ?? "unfunded") !== "funded") {
+    throw new Error("Campaign must have funded budget before it can be activated.");
+  }
   const { data: updated, error } = await (db as any).from("campaigns").update({ status: data.status, updated_at: new Date().toISOString() }).eq("id", data.id).select("*").single();
   if (error) throw new Error(error.message);
-  if (data.status === "active" && String(campaign.funding_status ?? "unfunded") !== "funded") throw new Error("Campaign must have funded budget before it can be activated.");
   if (["completed","cancelled"].includes(data.status) && String(campaign.funding_status ?? "") === "funded") {
     const { error:releaseError }=await (db as any).rpc("release_campaign_budget",{p_campaign_id:data.id});
     if(releaseError) throw new Error(releaseError.message);
