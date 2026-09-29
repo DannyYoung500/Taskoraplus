@@ -67,7 +67,7 @@ function normalizeYoutubeInput(raw: string): { id: string; url: string } {
   return { id, url: youtubeWatchUrl(id) };
 }
 
-async function fetchYoutubePublicViewCount(videoId: string): Promise<number | null> {
+export async function fetchYoutubePublicViewCount(videoId: string): Promise<number | null> {
   try {
     const apiKey = process.env["YOUTUBE_API_KEY"]?.trim();
     if (apiKey) {

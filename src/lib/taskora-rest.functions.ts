@@ -336,20 +336,41 @@ export const listMyPostedTasks = createServerFn({ method: "GET" })
       byTask.set(key, current);
     }
 
-    return rows.map((task) => {
+    const { fetchYoutubePublicViewCount } = await import("@/lib/watch-video.functions");
+
+    const enriched = await Promise.all(rows.map(async (task) => {
       const stats = byTask.get(String(task.id)) ?? { total: 0, pending: 0, verified: 0, rejected: 0 };
       const isWatch = String(task.task_type ?? "") === "video_watch";
+      let youtubeVideoId = task.youtube_video_id ? String(task.youtube_video_id) : "";
       const completionCount = Number(task.watch_completion_count ?? stats.verified ?? 0);
+      let youtubeViewsCount = Number(task.youtube_view_count ?? 0);
+      const updatedAt = task.youtube_view_count_updated_at
+        ? new Date(String(task.youtube_view_count_updated_at)).getTime()
+        : 0;
+
+      if (isWatch && youtubeVideoId && Date.now() - updatedAt > 10 * 60_000) {
+        const freshViews = await fetchYoutubePublicViewCount(youtubeVideoId);
+        if (freshViews != null) {
+          youtubeViewsCount = freshViews;
+          await (supabaseAdmin as any).from("tasks").update({
+            youtube_view_count: freshViews,
+            youtube_view_count_updated_at: new Date().toISOString(),
+          }).eq("id", task.id).eq("created_by", context.userId);
+        }
+      }
+
       return {
         ...task,
         submissions: stats,
         postedVideo: isWatch,
-        youtubeVideoId: task.youtube_video_id ? String(task.youtube_video_id) : null,
-        youtubeViewsCount: Number(task.youtube_view_count ?? 0),
+        youtubeVideoId: youtubeVideoId || null,
+        youtubeViewsCount,
         watchCompletionCount: completionCount,
         watchRewardPaid: Number(task.watch_reward_paid ?? (completionCount * Number(task.reward ?? 0))),
         remainingSlots: Number(task.slots_left ?? 0),
         targetUrl: String(task.target_url ?? task.link ?? ""),
       };
-    });
+    }));
+
+    return enriched
   });
