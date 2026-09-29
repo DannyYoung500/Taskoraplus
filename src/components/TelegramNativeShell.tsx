@@ -68,10 +68,18 @@ function syncSafeArea(data?: Record<string, number>) {
 
 export function TelegramNativeShell() {
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
 
-    const handleViewport = () => setViewportVars(tg);
+    const initialize = () => {
+      if (disposed) return;
+      const tg = window.Telegram?.WebApp;
+      if (!tg) {
+        retryTimer = setTimeout(initialize, 100);
+        return;
+      }
+
+      const handleViewport = () => setViewportVars(tg);
     const handleTheme = () => syncTheme(tg);
     const syncBackButton = () => {
       const back = tg.BackButton;
@@ -117,8 +125,8 @@ export function TelegramNativeShell() {
       // Telegram APIs are optional; browser/PWA usage continues normally.
     }
 
-    return () => {
-      tg.offEvent?.("viewportChanged", handleViewport);
+      return () => {
+        tg.offEvent?.("viewportChanged", handleViewport);
       tg.offEvent?.("themeChanged", handleTheme);
       tg.offEvent?.("safeAreaChanged", syncSafeArea);
       tg.offEvent?.("contentSafeAreaChanged", syncSafeArea);
@@ -126,7 +134,14 @@ export function TelegramNativeShell() {
       try {
         tg.BackButton?.offClick?.(goBack);
         tg.BackButton?.hide?.();
-      } catch {}
+        } catch {}
+      };
+    };
+
+    initialize();
+    return () => {
+      disposed = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, []);
 
