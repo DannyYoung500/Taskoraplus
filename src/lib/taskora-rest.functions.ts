@@ -194,84 +194,37 @@ export const reviewSubmission = createServerFn({ method: "POST" })
     await assertAdmin(userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const { data: maintRow } = await supabaseAdmin
+      .from("app_settings").select("value").eq("key", "maintenance_switches").maybeSingle();
+    const v = (maintRow?.value ?? {}) as Record<string, unknown>;
+    if (Boolean(v.verification_paused) || Boolean(v.read_only)) {
+      throw new Error("Verification is temporarily paused by the owner.");
+    }
+
+    const { data: result, error } = await supabaseAdmin.rpc("review_task_submission", {
+      p_submission_id: data.submissionId,
+      p_decision: data.decision,
+      p_reason: data.reason ?? null,
+    } as never);
+    if (error) throw new Error(error.message);
+
+    const status = String((result as { status?: string } | null)?.status ?? data.decision);
     try {
-      const { data: maintRow } = await supabaseAdmin
-        .from("app_settings")
-        .select("value")
-        .eq("key", "maintenance_switches")
-        .maybeSingle();
-      const v = (maintRow?.value ?? {}) as Record<string, unknown>;
-      if (Boolean(v.verification_paused) || Boolean(v.read_only)) {
-        throw new Error("Verification is temporarily paused by the owner.");
-      }
-    } catch (e) {
-      if (e instanceof Error && e.message.includes("paused")) throw e;
-    }
-
-    const { data: submission } = await supabaseAdmin
-      .from("submissions")
-      .select("*, tasks(id, reward, advertiser, title)")
-      .eq("id", data.submissionId)
-      .maybeSingle();
-    if (!submission) throw new Error("Submission not found.");
-    if (submission.status !== "pending") {
-      throw new Error(`Submission already ${submission.status}.`);
-    }
-
-    if (data.decision === "rejected") {
-      const { error } = await supabaseAdmin
+      const { data: submission } = await supabaseAdmin
         .from("submissions")
-        .update({ status: "rejected" })
-        .eq("id", data.submissionId)
-        .eq("status", "pending");
-      if (error) throw new Error(error.message);
-      try {
-        const { notifyTaskRejected } = await import("@/lib/notify-user");
-        await notifyTaskRejected(submission.user_id, submission.tasks, data.reason ?? "Requirements were not met.");
-      } catch {}
-      return { status: "rejected" as const };
-    }
-
-    const { data: updated, error: updErr } = await supabaseAdmin
-      .from("submissions")
-      .update({ status: "verified" })
-      .eq("id", data.submissionId)
-      .eq("status", "pending")
-      .select("id")
-      .maybeSingle();
-    if (updErr) throw new Error(updErr.message);
-    if (!updated) throw new Error("Submission was already processed.");
-
-    const task = submission.tasks as { reward: number; advertiser: string; title: string } | null;
-    const reward = Number(task?.reward ?? 0);
-    if (reward > 0) {
-      await supabaseAdmin.from("transactions").insert({
-        user_id: submission.user_id,
-        label: `Verified — ${task?.advertiser ?? "task"}`,
-        amount: reward,
-        kind: "reward",
-      });
-
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("referred_by")
-        .eq("id", submission.user_id)
-        .maybeSingle();
-      if (profile?.referred_by) {
-        await supabaseAdmin.from("transactions").insert({
-          user_id: profile.referred_by,
-          label: "Referral share",
-          amount: Number((reward * 0.1).toFixed(2)),
-          kind: "referral",
-        });
+        .select("user_id, tasks(reward, advertiser, title)")
+        .eq("id", data.submissionId).maybeSingle();
+      if (submission) {
+        if (status === "rejected") {
+          const { notifyTaskRejected } = await import("@/lib/notify-user");
+          await notifyTaskRejected(submission.user_id, submission.tasks, data.reason ?? "Requirements were not met.");
+        } else {
+          const { notifyTaskCompleted } = await import("@/lib/notify-user");
+          await notifyTaskCompleted(submission.user_id, submission.tasks, 0);
+        }
       }
-    }
-
-    try {
-      const { notifyTaskCompleted } = await import("@/lib/notify-user");
-      await notifyTaskCompleted(submission.user_id, task, Number((task as any)?.task_metadata?.task_points ?? 0));
     } catch {}
-    return { status: "verified" as const };
+    return { status: status === "rejected" ? ("rejected" as const) : ("verified" as const) };
   });
 
 export const listPendingSubmissions = createServerFn({ method: "GET" })
