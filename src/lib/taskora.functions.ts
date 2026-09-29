@@ -107,7 +107,7 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
     // initData.start_param. TASKORA referral links use the inviter's Telegram ID.
     // Bind the referral once, server-side, after Telegram initData has been verified.
     const startParam = validated.startParam?.trim() || "";
-    const inviterTelegramId = /^\\d{1,20}$/.test(startParam) ? Number(startParam) : null;
+    const inviterTelegramId = /^\d{1,20}$/.test(startParam) ? Number(startParam) : null;
     if (inviterTelegramId && inviterTelegramId !== telegramId) {
       const { data: inviter } = await supabaseAdmin
         .from("profiles")
