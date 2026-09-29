@@ -14,7 +14,9 @@ function OwnerVideosPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [rewardUsdt, setRewardUsdt] = useState("0.0010");
-  const [durationSeconds, setDurationSeconds] = useState("");\n  const [dailyLimit, setDailyLimit] = useState("1");\n  const [maxViews, setMaxViews] = useState("0");
+  const [durationSeconds, setDurationSeconds] = useState("");
+  const [dailyLimit, setDailyLimit] = useState("1");
+  const [maxViews, setMaxViews] = useState("0");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
