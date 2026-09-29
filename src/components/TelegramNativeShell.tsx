@@ -14,6 +14,8 @@ type TelegramWebApp = {
   viewportHeight?: number;
   viewportStableHeight?: number;
   isFullscreen?: boolean;
+  safeAreaInset?: { top?: number; right?: number; bottom?: number; left?: number };
+  contentSafeAreaInset?: { top?: number; right?: number; bottom?: number; left?: number };
   performanceClass?: "LOW" | "AVERAGE" | "HIGH";
   themeParams?: Record<string, string | undefined>;
   HapticFeedback?: {
@@ -52,17 +54,25 @@ function syncTheme(tg: TelegramWebApp) {
   }
 }
 
-function syncSafeArea(data?: Record<string, number>) {
+function syncSafeArea(tg: TelegramWebApp) {
   const root = document.documentElement;
   root.style.setProperty("--tg-safe-top", "env(safe-area-inset-top, 0px)");
   root.style.setProperty("--tg-safe-right", "env(safe-area-inset-right, 0px)");
   root.style.setProperty("--tg-safe-bottom", "env(safe-area-inset-bottom, 0px)");
   root.style.setProperty("--tg-safe-left", "env(safe-area-inset-left, 0px)");
-  if (data) {
-    root.style.setProperty("--tg-content-safe-top", `${data.top ?? 0}px`);
-    root.style.setProperty("--tg-content-safe-right", `${data.right ?? 0}px`);
-    root.style.setProperty("--tg-content-safe-bottom", `${data.bottom ?? 0}px`);
-    root.style.setProperty("--tg-content-safe-left", `${data.left ?? 0}px`);
+  const safe = tg.safeAreaInset;
+  const content = tg.contentSafeAreaInset;
+  if (safe) {
+    root.style.setProperty("--tg-safe-top", `${safe.top ?? 0}px`);
+    root.style.setProperty("--tg-safe-right", `${safe.right ?? 0}px`);
+    root.style.setProperty("--tg-safe-bottom", `${safe.bottom ?? 0}px`);
+    root.style.setProperty("--tg-safe-left", `${safe.left ?? 0}px`);
+  }
+  if (content) {
+    root.style.setProperty("--tg-content-safe-top", `${content.top ?? 0}px`);
+    root.style.setProperty("--tg-content-safe-right", `${content.right ?? 0}px`);
+    root.style.setProperty("--tg-content-safe-bottom", `${content.bottom ?? 0}px`);
+    root.style.setProperty("--tg-content-safe-left", `${content.left ?? 0}px`);
   }
 }
 
@@ -81,6 +91,7 @@ export function TelegramNativeShell() {
 
       const handleViewport = () => setViewportVars(tg);
     const handleTheme = () => syncTheme(tg);
+    const handleSafeArea = () => syncSafeArea(tg);
     const syncBackButton = () => {
       const back = tg.BackButton;
       if (!back?.show || !back.hide || !back.onClick) return;
@@ -105,14 +116,14 @@ export function TelegramNativeShell() {
       tg.setBottomBarColor?.("#030814");
       tg.enableVerticalSwipes?.();
 
-      syncSafeArea();
+      syncSafeArea(tg);
       syncTheme(tg);
       setViewportVars(tg);
 
       tg.onEvent?.("viewportChanged", handleViewport);
       tg.onEvent?.("themeChanged", handleTheme);
-      tg.onEvent?.("safeAreaChanged", syncSafeArea);
-      tg.onEvent?.("contentSafeAreaChanged", syncSafeArea);
+      tg.onEvent?.("safeAreaChanged", handleSafeArea);
+      tg.onEvent?.("contentSafeAreaChanged", handleSafeArea);
       window.addEventListener("popstate", syncBackButton);
       syncBackButton();
 
@@ -128,8 +139,8 @@ export function TelegramNativeShell() {
       return () => {
         tg.offEvent?.("viewportChanged", handleViewport);
       tg.offEvent?.("themeChanged", handleTheme);
-      tg.offEvent?.("safeAreaChanged", syncSafeArea);
-      tg.offEvent?.("contentSafeAreaChanged", syncSafeArea);
+      tg.offEvent?.("safeAreaChanged", handleSafeArea);
+      tg.offEvent?.("contentSafeAreaChanged", handleSafeArea);
       window.removeEventListener("popstate", syncBackButton);
       try {
         tg.BackButton?.offClick?.(goBack);
