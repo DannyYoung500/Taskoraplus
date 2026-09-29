@@ -269,3 +269,39 @@ export const getOwnerOverview = createServerFn({ method: "GET" })
       rewardsPaid,
     };
   });
+
+
+export const listMyPostedTasks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tasks, error } = await supabaseAdmin
+      .from("tasks")
+      .select("id,platform,title,advertiser,reward,seconds,slots_left,slots_total,steps,proof,link,is_active,created_at,updated_at,campaign_id,task_type,description,instructions,target,status,budget,completion_limit,requires_review,starts_at,ends_at,featured,target_country_name,target_country_code,campaign_status,target_url")
+      .eq("created_by", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    const rows = tasks ?? [];
+    if (!rows.length) return [];
+    const ids = rows.map((task) => String(task.id));
+    const { data: submissions, error: submissionsError } = await supabaseAdmin
+      .from("submissions")
+      .select("id,task_id,status")
+      .in("task_id", ids);
+    if (submissionsError) throw new Error(submissionsError.message);
+    const byTask = new Map<string, { total: number; pending: number; verified: number; rejected: number }>();
+    for (const row of submissions ?? []) {
+      const key = String(row.task_id);
+      const current = byTask.get(key) ?? { total: 0, pending: 0, verified: 0, rejected: 0 };
+      current.total += 1;
+      if (row.status === "pending") current.pending += 1;
+      if (row.status === "verified") current.verified += 1;
+      if (row.status === "rejected") current.rejected += 1;
+      byTask.set(key, current);
+    }
+    return rows.map((task) => ({
+      ...task,
+      submissions: byTask.get(String(task.id)) ?? { total: 0, pending: 0, verified: 0, rejected: 0 },
+    }));
+  });

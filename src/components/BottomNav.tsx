@@ -1,9 +1,10 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { Home, ListChecks, PlayCircle, Wallet, User } from "lucide-react";
+import { Home, ListChecks, PlayCircle, Wallet, User, ClipboardList } from "lucide-react";
 
 const ITEMS = [
   { to: "/home", label: "Home", Icon: Home },
   { to: "/tasks", label: "Tasks", Icon: ListChecks },
+  { to: "/my-tasks", label: "My Tasks", Icon: ClipboardList },
   { to: "/watch-earn", label: "Watch", Icon: PlayCircle },
   { to: "/wallet", label: "Wallet", Icon: Wallet },
   { to: "/profile", label: "Profile", Icon: User },
