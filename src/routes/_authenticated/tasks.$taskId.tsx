@@ -1,6 +1,6 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+declare global { interface Window { Telegram?: { WebApp?: { openTelegramLink?: (url:string)=>void } } } }\n\nimport { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, CheckCircle2, Clock3, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock3, ShieldCheck, Users, Share2 } from "lucide-react";
 import { Screen } from "@/components/Screen";
 import { PlatformBadge, platformLabel } from "@/components/PlatformIcon";
 import type { Platform } from "@/components/PlatformIcon";
@@ -81,9 +81,7 @@ function TaskDetail() {
 
   return (
     <Screen>
-      <Link to="/tasks" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        <ArrowLeft className="size-4" /> Tasks
-      </Link>
+<div className="mb-4 flex items-center justify-between gap-2"><Link to="/tasks" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><ArrowLeft className="size-4" /> Tasks</Link><button type="button" onClick={() => { const url = `https://t.me/Taskoraplusbot/?startapp=task_${task.id}`; const text = encodeURIComponent(`Open this TASKORA task: ${task.title}`); const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${text}`; try { window.Telegram?.WebApp?.openTelegramLink?.(share); } catch { window.open(share, "_blank"); } }} className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-[11px] font-bold text-cyan-200"><Share2 className="size-3.5"/> Share task</button></div>
 
       <div className="card-surface p-4">
         <div className="flex items-center gap-3">
