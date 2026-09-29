@@ -390,6 +390,8 @@ export const registerOwnerVideo = createServerFn({ method: "POST" })
       rewardUsdt: number;
       durationSeconds?: number;
       thumbnailUrl?: string;
+      dailyLimit?: number;
+      maxViews?: number;
     }) => data,
   )
   .handler(async ({ data, context }) => {
@@ -446,6 +448,38 @@ export const registerOwnerVideo = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     return mapVideo(row as Record<string, unknown>);
+  });
+
+export const setOwnerVideoStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { videoId: string; status: "active" | "paused" }) => data)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const s = await adminClient();
+    const { error } = await (s as any)
+      .from("watch_videos")
+      .update({ status: data.status })
+      .eq("id", data.videoId)
+      .eq("created_by", context.userId)
+      .neq("status", "completed");
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const deleteOwnerVideo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { videoId: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const s = await adminClient();
+    const { error } = await (s as any)
+      .from("watch_videos")
+      .update({ status: "completed" })
+      .eq("id", data.videoId)
+      .eq("created_by", context.userId)
+      .neq("status", "completed");
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
   });
 
 export const listOwnerVideos = createServerFn({ method: "GET" })
