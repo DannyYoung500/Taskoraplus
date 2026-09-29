@@ -102,6 +102,34 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
 
     const referralCode = `TASKORA-${String(telegramId).slice(-6).toUpperCase()}`;
     const nowIso = new Date().toISOString();
+
+    // Telegram Main Mini App/direct links pass ?startapp=... as validated
+    // initData.start_param. TASKORA referral links use the inviter's Telegram ID.
+    // Bind the referral once, server-side, after Telegram initData has been verified.
+    const startParam = validated.startParam?.trim() || "";
+    const inviterTelegramId = /^\\d{1,20}$/.test(startParam) ? Number(startParam) : null;
+    if (inviterTelegramId && inviterTelegramId !== telegramId) {
+      const { data: inviter } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("telegram_id", inviterTelegramId)
+        .maybeSingle();
+      if (inviter?.id) {
+        const { data: currentProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("referred_by")
+          .eq("id", userId)
+          .maybeSingle();
+        if (!currentProfile?.referred_by) {
+          await supabaseAdmin
+            .from("profiles")
+            .update({ referred_by: inviter.id })
+            .eq("id", userId)
+            .is("referred_by", null);
+        }
+      }
+    }
+
     await supabaseAdmin.from("profiles").upsert(
       {
         id: userId,
@@ -136,8 +164,9 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
       });
     }
 
-    const url = process.env["SUPABASE_URL"] ?? "https://qvwetjpgplkhxuymsnyx.supabase.co";
-    const anon = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
+    const url = process.env["SUPABASE_URL"];
+    const anon = process.env["SUPABASE_PUBLISHABLE_KEY"];
+    if (!url || !anon) throw new Error("Supabase authentication is not configured on the server.");
     const authClient = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
