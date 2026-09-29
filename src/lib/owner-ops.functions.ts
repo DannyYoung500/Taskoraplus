@@ -218,7 +218,7 @@ export async function computeUserRiskScore(userId: string): Promise<{ score: num
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("created_at, status, streak")
+    .select("created_at, status, streak, device_fp, last_ip_hint")
     .eq("id", userId)
     .maybeSingle();
   const ageH = hoursSince((profile as { created_at?: string } | null)?.created_at);
@@ -232,6 +232,39 @@ export async function computeUserRiskScore(userId: string): Promise<{ score: num
   if (String((profile as { status?: string } | null)?.status ?? "active") !== "active") {
     score += 40;
     signals.push("Account not active");
+  }
+
+  const since30 = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const deviceFp = (profile as { device_fp?: string | null } | null)?.device_fp;
+  const ipHint = (profile as { last_ip_hint?: string | null } | null)?.last_ip_hint;
+  if (deviceFp || ipHint) {
+    const { data: identityEvents } = await supabaseAdmin
+      .from("risk_signal_events")
+      .select("user_id,device_fp,ip_hint")
+      .gte("created_at", since30)
+      .limit(2000);
+    const otherUsers = new Set<string>();
+    let sameDevice = false;
+    let sameIp = false;
+    for (const e of identityEvents ?? []) {
+      if (String(e.user_id) === userId) continue;
+      if (deviceFp && e.device_fp === deviceFp) {
+        sameDevice = true;
+        otherUsers.add(String(e.user_id));
+      }
+      if (ipHint && e.ip_hint === ipHint) {
+        sameIp = true;
+        otherUsers.add(String(e.user_id));
+      }
+    }
+    if (sameDevice) {
+      score += 30;
+      signals.push(`Device signature shared with ${otherUsers.size} other account(s)`);
+    }
+    if (sameIp) {
+      score += 10;
+      signals.push("IP signature shared with another account");
+    }
   }
 
   const since24 = new Date(Date.now() - 24 * 3600_000).toISOString();
