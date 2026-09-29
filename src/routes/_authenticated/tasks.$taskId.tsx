@@ -1,14 +1,11 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, CheckCircle2, Clock3, ShieldCheck, Users, Share2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock3, ShieldCheck, Users } from "lucide-react";
 import { Screen } from "@/components/Screen";
 import { PlatformBadge, platformLabel } from "@/components/PlatformIcon";
 import type { Platform } from "@/components/PlatformIcon";
 import { getTask } from "@/lib/taskora.functions";
 import { submitTaskGuarded } from "@/lib/taskora-mutations.functions";
-
-declare global { interface Window { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } } }
-
 
 export const Route = createFileRoute("/_authenticated/tasks/$taskId")({
   loader: async ({ params }) => {
@@ -26,36 +23,31 @@ function TaskDetail() {
   const [proofText, setProofText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [useScreenshot, setUseScreenshot] = useState(false);
   const [autoStatus, setAutoStatus] = useState<string | null>(null);
   const platform = task.platform as Platform;
   const isTelegramJoin =
     String(task.platform).toLowerCase() === "telegram" ||
-    /t\.me\//i.test(String(task.link ?? ""));
-  const isDiscordJoin =
-    String(task.platform).toLowerCase() === "discord" &&
-    String(task.task_type ?? "").toLowerCase() === "join";
-  const isAutoJoin =
-    String(task.proof) === "auto" &&
-    (isTelegramJoin || isDiscordJoin);
+    /t\.me\//i.test(String(task.link ?? "")) ||
+    String(task.proof) === "auto";
   const isWatch =
     String(task.proof) === "auto" &&
     /watch/i.test(String(task.title ?? "")) &&
-    !isTelegramJoin &&
-    !isDiscordJoin;
+    !isTelegramJoin;
   const rewardDisplay = `$${Number(task.reward).toFixed(6)}`;
 
-  async function onAutoVerify() {
+  async function onAutoVerifyTelegram() {
     setBusy(true);
     setError(null);
     setAutoStatus("Checking membership…");
     try {
-      const result = await submitTaskGuarded({
-        data: { taskId: task.id, proofText: "auto:membership" },
+      await submitTaskGuarded({
+        data: { taskId: task.id, proofText: "auto:telegram_membership" },
       });
       setSubmitted(true);
-      setAutoStatus(result.autoVerified ? "Verified · reward credited" : "Submitted · awaiting verification");
+      setAutoStatus("Verified · membership confirmed");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Automatic verification failed");
+      setError(e instanceof Error ? e.message : "Auto-verify failed");
       setAutoStatus(null);
     } finally {
       setBusy(false);
@@ -84,7 +76,9 @@ function TaskDetail() {
 
   return (
     <Screen>
-<div className="mb-4 flex items-center justify-between gap-2"><Link to="/tasks" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><ArrowLeft className="size-4" /> Tasks</Link><button type="button" onClick={() => { const url = `https://t.me/Taskoraplusbot/?startapp=task_${task.id}`; const text = encodeURIComponent(`Open this TASKORA task: ${task.title}`); const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${text}`; try { window.Telegram?.WebApp?.openTelegramLink?.(share); } catch { window.open(share, "_blank"); } }} className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-[11px] font-bold text-cyan-200"><Share2 className="size-3.5"/> Share task</button></div>
+      <Link to="/tasks" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <ArrowLeft className="size-4" /> Tasks
+      </Link>
 
       <div className="card-surface p-4">
         <div className="flex items-center gap-3">
@@ -127,34 +121,43 @@ function TaskDetail() {
 
       <section className="card-surface mt-4 p-4">
         <h2 className="text-sm font-bold">Verification</h2>
-        {isAutoJoin ? (
+        {isTelegramJoin && !useScreenshot ? (
           <>
             <p className="mt-1 text-xs text-muted-foreground">
-              {isTelegramJoin
-                ? "Automatic Telegram membership check. The TASKORA bot must be able to inspect the channel/group. There is no screenshot fallback."
-                : "Automatic Discord server membership check. The TASKORA bot must be able to inspect the server. There is no screenshot fallback."}
+              Automatic membership check via Telegram bot (bot must be admin). Screenshot is optional — only if you choose it. No soft fallback.
             </p>
             {autoStatus ? <p className="mt-2 text-xs text-emerald-400">{autoStatus}</p> : null}
             {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
             <button
               type="button"
               disabled={busy || submitted}
-              onClick={() => void onAutoVerify()}
+              onClick={() => void onAutoVerifyTelegram()}
               className="mt-3 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busy ? "Verifying…" : "Verify membership"}
+              {busy ? "Verifying…" : "Verify membership (auto)"}
+            </button>
+            <button
+              type="button"
+              disabled={submitted}
+              onClick={() => {
+                setUseScreenshot(true);
+                setError(null);
+              }}
+              className="mt-2 w-full rounded-2xl border border-white/15 py-2.5 text-xs font-bold text-white/70"
+            >
+              Choose screenshot verification instead
             </button>
           </>
         ) : (
           <>
             <p className="mt-1 text-xs text-muted-foreground">
               {isWatch
-                ? "Watch verification is automatic after the required watch time."
-                : String(task.proof) === "screenshot"
-                  ? "Screenshot verification selected for this task. Your proof is reviewed before reward approval."
-                  : "Automatic verification is required for this task."}
+                ? "Watch verification is automatic after required watch time in the player."
+                : useScreenshot
+                  ? "Screenshot path selected. Reward only after review."
+                  : "Pending until owner verifies."}
             </p>
-            {!isWatch && String(task.proof) === "screenshot" ? (
+            {!isWatch ? (
               <input
                 value={proofText}
                 onChange={(e) => setProofText(e.target.value)}
@@ -163,6 +166,11 @@ function TaskDetail() {
               />
             ) : null}
             {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
+            {useScreenshot ? (
+              <button type="button" className="mt-2 text-[11px] text-cyan-300" onClick={() => setUseScreenshot(false)}>
+                ← Back to automatic membership check
+              </button>
+            ) : null}
           </>
         )}
       </section>
@@ -172,7 +180,7 @@ function TaskDetail() {
           <div className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3.5 text-sm font-semibold">
             <CheckCircle2 className="size-4" /> Submitted — awaiting verification
           </div>
-        ) : isAutoJoin ? null : (
+        ) : isTelegramJoin && !useScreenshot ? null : (
           <button
             disabled={busy}
             onClick={() => (started ? void onSubmitScreenshot() : setStarted(true))}
