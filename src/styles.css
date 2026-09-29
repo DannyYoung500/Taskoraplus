@@ -221,3 +221,35 @@
 .taskora-blue-shell [class*="bg-lime-"] {
   background-color: rgba(37,99,235,.14) !important;
 }
+
+
+/* Telegram Mini App safe-area + stable viewport support. */
+:root {
+  --tg-viewport-stable-height: 100dvh;
+  --tg-safe-top: env(safe-area-inset-top, 0px);
+  --tg-safe-right: env(safe-area-inset-right, 0px);
+  --tg-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tg-safe-left: env(safe-area-inset-left, 0px);
+}
+
+.telegram-safe-area {
+  padding-top: var(--tg-safe-top);
+  padding-right: var(--tg-safe-right);
+  padding-bottom: var(--tg-safe-bottom);
+  padding-left: var(--tg-safe-left);
+}
+
+.telegram-stable-height {
+  min-height: var(--tg-viewport-stable-height);
+}
+
+/* Telegram marks LOW-performance Android clients; keep expensive motion modest there. */
+html[data-telegram-low-performance="true"] *,
+html[data-telegram-performance="LOW"] * {
+  scroll-behavior: auto !important;
+}
+
+html[data-telegram-low-performance="true"] .animate-spin,
+html[data-telegram-performance="LOW"] .animate-spin {
+  animation-duration: 1.6s !important;
+}
