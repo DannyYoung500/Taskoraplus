@@ -196,10 +196,18 @@ function TasksScreen() {
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1 text-[10px] text-slate-500">
-                      {platformLabel(t.platform as Platform)}
-                      {t.advertiser ? ` · ${t.advertiser}` : ""}
-                    </p>
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
+                      <span className="truncate">
+                        {task.advertiserProfile?.displayName ?? t.advertiser ?? "TASKORA advertiser"}
+                      </span>
+                      {task.advertiserProfile?.verified ? (
+                        <span className="shrink-0 rounded-full bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-bold text-emerald-300">
+                          Verified
+                        </span>
+                      ) : null}
+                      <span className="shrink-0 text-slate-700">·</span>
+                      <span className="truncate">{platformLabel(t.platform as Platform)}</span>
+                    </div>
                   </div>
                 </div>
 
