@@ -85,6 +85,7 @@ export async function validateTelegramInitData(
   const authDate = Number(params.get("auth_date") || "0");
   if (!authDate) throw new Error("initData is missing auth_date.");
   const age = Math.floor(Date.now() / 1000) - authDate;
+  if (age < -60) throw new Error("Telegram initData timestamp is invalid.");
   if (age > maxAgeSeconds) throw new Error("Telegram initData expired. Re-open the Mini App.");
 
   const userRaw = params.get("user");
