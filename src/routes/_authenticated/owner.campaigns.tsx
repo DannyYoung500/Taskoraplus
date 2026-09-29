@@ -1,23 +1,23 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
-import { ownerListCampaigns } from "@/lib/owner-more.functions";
+import { ChevronLeft, RefreshCw } from "lucide-react";
+import { getAdvertiserAnalytics } from "@/lib/advertise-owner.functions";
 import { setAdvertiseCampaignStatus } from "@/lib/advertise-owner.functions";
 
-export const Route = createFileRoute("/_authenticated/owner/campaigns")({ component: OwnerCampaignsPage });
-
-function OwnerCampaignsPage() {
-  const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
-  const [msg, setMsg] = useState<string | null>(null);
-  async function refresh() { const r = await ownerListCampaigns(); setRows(r.campaigns as never); if (r.error) setMsg(r.error); }
-  useEffect(() => { void refresh().catch((e) => setMsg(e instanceof Error ? e.message : "Load failed")); }, []);
-  async function setStatus(id: string, status: "active" | "paused" | "completed" | "cancelled") {
-    try { await setAdvertiseCampaignStatus({ data: { id, status } }); await refresh(); setMsg(`Campaign ${status}. Related task lifecycle synced.`); }
-    catch (e) { setMsg(e instanceof Error ? e.message : "Failed"); }
-  }
-  return <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
-    <div className="mb-4 flex items-center gap-2"><Link to="/owner" className="rounded-full border border-white/10 p-2 text-white/60"><ChevronLeft className="size-4" /></Link><div><h1 className="text-xl font-bold">Campaigns</h1><p className="text-xs text-white/45">Activate · pause · complete · cancel</p></div></div>
-    {msg ? <p className="mb-2 text-xs text-white/50">{msg}</p> : null}
-    <div className="space-y-2">{rows.length===0 ? <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm text-white/45">No campaigns yet. Create one from Advertise.</p> : rows.map((c) => <div key={String(c.id)} className="rounded-2xl border border-white/8 bg-[#12141c] p-3.5"><p className="text-sm font-semibold">{String(c.title ?? c.id)}</p><p className="mt-1 text-[11px] text-white/40">{String(c.status)} · budget ${Number(c.budget ?? 0).toFixed(2)} · spent ${Number(c.amount_spent ?? 0).toFixed(2)} · slots {Number(c.remaining_slots ?? 0)}/{Number(c.slots ?? 0)}</p><div className="mt-2 flex flex-wrap gap-1.5">{(["active","paused","completed","cancelled"] as const).map((s)=><button key={s} type="button" className="rounded-lg border border-white/10 px-2 py-1 text-[10px] capitalize text-white/70" onClick={()=>void setStatus(String(c.id),s)}>{s}</button>)}</div></div>)}</div>
-  </main>;
+export const Route=createFileRoute("/_authenticated/owner/campaigns")({component:OwnerCampaignsPage});
+const money=(v:any)=>"$"+Number(v??0).toFixed(2);
+function OwnerCampaignsPage(){
+ const [data,setData]=useState<any>({summary:{},campaigns:[]});const[msg,setMsg]=useState<string|null>(null);const[busy,setBusy]=useState(false);
+ async function refresh(){setBusy(true);try{setData(await getAdvertiserAnalytics());setMsg(null)}catch(e){setMsg(e instanceof Error?e.message:"Analytics failed")}finally{setBusy(false)}}
+ useEffect(()=>{void refresh()},[]);
+ async function setStatus(id:string,status:"active"|"paused"|"completed"|"cancelled"){try{await setAdvertiseCampaignStatus({data:{id,status}});await refresh()}catch(e){setMsg(e instanceof Error?e.message:"Update failed")}}
+ const s=data.summary??{};
+ return <main className="mx-auto min-h-screen w-full max-w-6xl bg-[#05070c] px-4 pb-28 pt-5 text-white">
+  <div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Link to="/owner" className="rounded-full border border-white/10 p-2 text-white/60"><ChevronLeft className="size-4"/></Link><div><h1 className="text-xl font-bold">Campaign Performance</h1><p className="text-xs text-white/45">Live campaign delivery, spend and completion analytics</p></div></div><button type="button" onClick={()=>void refresh()} disabled={busy} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70"><RefreshCw className={busy?"mr-1 inline size-3 animate-spin":"mr-1 inline size-3"}/>Refresh</button></div>
+ {msg?<p className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs text-amber-200">{msg}</p>:null}
+ <div className="grid grid-cols-2 gap-2 md:grid-cols-4"><Metric label="Campaigns" value={s.campaigns??0}/><Metric label="Active" value={s.activeCampaigns??0}/><Metric label="Budget" value={money(s.totalBudget)}/><Metric label="Spent" value={money(s.totalSpent)}/><Metric label="Remaining" value={money(s.remainingBudget)}/><Metric label="Verified" value={s.verifiedSubmissions??0}/><Metric label="Pending reviews" value={s.pendingSubmissions??0}/><Metric label="Funded" value={s.fundedCampaigns??0}/></div>
+ <div className="mt-5 space-y-3">{(data.campaigns??[]).length===0?<div className="rounded-2xl border border-white/8 bg-[#12141c] p-6 text-sm text-white/45">No campaigns yet. Create one from Advertise.</div>:(data.campaigns??[]).map((c:any)=><article key={String(c.id)} className="rounded-2xl border border-white/8 bg-[#12141c] p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold">{String(c.title??c.id)}</h2><p className="mt-1 text-[11px] text-white/40">{String(c.platform??"")} · {String(c.task_type??"")} · {String(c.status??"")}</p></div><span className="rounded-full border border-white/10 px-2 py-1 text-[9px] text-white/50">{String(c.funding_status??"unfunded")}</span></div><div className="mt-3 grid grid-cols-2 gap-2 text-[11px] md:grid-cols-4"><Stat label="Budget" value={money(c.budget)}/><Stat label="Spent" value={money(c.amount_spent)}/><Stat label="Remaining" value={money(c.remainingBudget)}/><Stat label="Cost / verified" value={c.costPerVerified?money(c.costPerVerified):"—"}/><Stat label="Submissions" value={c.totalSubmissions}/><Stat label="Verified" value={c.verifiedSubmissions}/><Stat label="Pending" value={c.pendingSubmissions}/><Stat label="Completion" value={c.completionRate+"%"}/></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8"><div className="h-full bg-blue-500" style={{width:Math.min(100,Number(c.completionRate))+"%"}}/></div><div className="mt-3 flex flex-wrap gap-1.5">{(["active","paused","completed","cancelled"] as const).map(x=><button key={x} type="button" onClick={()=>void setStatus(String(c.id),x)} className="rounded-lg border border-white/10 px-2 py-1 text-[10px] capitalize text-white/70">{x}</button>)}</div></article>)}</div>
+ </main>
 }
+function Metric({label,value}:{label:string;value:any}){return <div className="rounded-2xl border border-white/8 bg-[#12141c] p-3"><p className="text-[9px] uppercase tracking-wide text-white/35">{label}</p><p className="mt-1 text-base font-bold">{value}</p></div>}
+function Stat({label,value}:{label:string;value:any}){return <div className="rounded-xl border border-white/6 bg-black/15 p-2"><p className="text-[9px] text-white/35">{label}</p><p className="mt-0.5 font-semibold text-white/80">{value}</p></div>}

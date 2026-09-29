@@ -41,11 +41,10 @@ export const claimRewardedAd=createServerFn({method:"POST"}).middleware([require
 export const finishRewardedAd=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).inputValidator((d:{claimId:string})=>d).handler(async({data,context})=>{
  const s=await db();const {data:c}=await (s as any).from("daily_mission_claims").select("id,mission_id,user_id,status,mission_date").eq("id",data.claimId).eq("user_id",context.userId).maybeSingle();if(!c)throw new Error("Ad reward session not found.");if(c.status==="completed")return {ok:true,already:true};
  const {data:m}=await (s as any).from("daily_missions").select("id,title,reward_usdt,reward_points,daily_limit").eq("id",c.mission_id).maybeSingle();if(!m)throw new Error("Mission not found.");
- const {data:updated,error}=await (s as any).from("daily_mission_claims").update({status:"completed",reward_usdt:Number(m.reward_usdt||0),reward_points:Number(m.reward_points||0),completed_at:new Date().toISOString()}).eq("id",c.id).eq("status","pending").select("id").maybeSingle();if(error)throw new Error(error.message);if(!updated)return {ok:true,already:true};
- if(Number(m.reward_usdt||0)>0){const {error:e}=await s.from("transactions").insert({user_id:context.userId,label:"Daily mission — "+String(m.title),amount:Number(m.reward_usdt),kind:"reward"});if(e)throw new Error(e.message);}
- if(Number(m.reward_points||0)>0){const {data:prof}=await s.from("profiles").select("task_points").eq("id",context.userId).maybeSingle();await s.from("profiles").update({task_points:Number((prof as any)?.task_points||0)+Number(m.reward_points)} as never).eq("id",context.userId);}
- await s.from("notifications").insert({user_id:context.userId,title:"Daily mission completed",body:"You earned a daily mission reward from "+String(m.title)+".",category:"daily_mission"});
- return {ok:true,already:false,rewardUsdt:Number(m.reward_usdt||0),rewardPoints:Number(m.reward_points||0)};
+ if(c.status!=="pending")return {ok:true,already:c.status==="completed",pendingProviderConfirmation:false};
+ // The client-side AdsGram promise is only a UX signal. The reward endpoint is the server authority.
+ // Keep the claim pending until AdsGram calls /api/ads/adsgram/reward?userid=[userId].
+ return {ok:true,already:false,pendingProviderConfirmation:true,rewardUsdt:Number(m.reward_usdt||0),rewardPoints:Number(m.reward_points||0)};
 });
 
 export const ownerListDailyMissions=createServerFn({method:"GET"}).middleware([requireSupabaseAuth]).handler(async({context})=>{await owner(context.userId);const s=await db();const {data,error}=await (s as any).from("daily_missions").select("*,task:tasks(id,title,platform,reward,slots_left,status)").order("created_at",{ascending:false}).limit(100);if(error)throw new Error(error.message);return data??[];});

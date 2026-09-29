@@ -233,3 +233,47 @@ export const saveMonetizationProvider = createServerFn({ method: "POST" })
     if (updateError) throw new Error(updateError.message);
     return map(updated);
   });
+
+
+export const getMonetizationHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const s = await adminClient();
+    const { data: rows, error } = await (s as any)
+      .from("monetization_providers")
+      .select("id,provider_key,provider_name,category,enabled,placement_id,api_base_url,public_id,postback_url,webhook_url,secret_names,settings,updated_at")
+      .order("category")
+      .order("priority");
+    if (error) throw new Error(error.message);
+    const { data: missions } = await (s as any)
+      .from("daily_missions")
+      .select("provider_key,is_active")
+      .eq("mission_type","rewarded_ad");
+    const missionCounts = new Map<string,number>();
+    for (const x of missions ?? []) if (x.is_active) missionCounts.set(String(x.provider_key), (missionCounts.get(String(x.provider_key)) ?? 0) + 1);
+    return (rows ?? []).map((p:any) => {
+      const key = String(p.provider_key);
+      const adapterConnected = key === "adsgram";
+      const placementReady = Boolean(p.placement_id);
+      const credentialsReady = Boolean(p.public_id) || (Array.isArray(p.secret_names) && p.secret_names.length > 0);
+      let status = "not_configured";
+      let message = "No live TaskoraPlus adapter is connected.";
+      if (adapterConnected && p.enabled && placementReady) {
+        status = "ready";
+        message = "Rewarded-ad adapter and placement are configured.";
+      } else if (adapterConnected && (placementReady || credentialsReady || p.enabled)) {
+        status = "needs_configuration";
+        message = "AdsGram is available, but the rewarded placement/configuration is incomplete.";
+      } else if (p.enabled) {
+        status = "adapter_unavailable";
+        message = "Credentials may exist, but TaskoraPlus has no verified reward adapter for this provider.";
+      }
+      return {
+        id:String(p.id), providerKey:key, providerName:String(p.provider_name), category:String(p.category),
+        enabled:Boolean(p.enabled), status, message, placementConfigured:placementReady,
+        credentialsConfigured:credentialsReady, activeDailyMissions:missionCounts.get(key) ?? 0,
+        updatedAt:p.updated_at ?? null
+      };
+    });
+  });

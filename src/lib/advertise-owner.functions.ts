@@ -115,3 +115,53 @@ export const setAdvertiseCampaignStatus = createServerFn({ method: "POST" }).mid
   await audit(context.userId, "advertise_campaign.status_update", campaign, updated, data.id);
   return updated;
 });
+
+
+export const getAdvertiserAnalytics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await guard(context.userId);
+    const [{ data: campaigns, error: ce }, { data: tasks, error: te }, { data: submissions, error: se }, { data: ledger, error: le }] = await Promise.all([
+      (db as any).from("campaigns").select("id,advertiser_id,title,platform,task_type,reward,slots,remaining_slots,budget,amount_spent,status,funding_status,funding_reserved,funding_spent,created_at,starts_at,ends_at").order("created_at",{ascending:false}).limit(200),
+      (db as any).from("tasks").select("id,campaign_id,status,is_active,slots_total,slots_left,budget").limit(1000),
+      (db as any).from("submissions").select("id,task_id,status,created_at").limit(5000),
+      (db as any).from("advertiser_funding_ledger").select("campaign_id,entry_type,amount,currency,created_at").order("created_at",{ascending:false}).limit(5000),
+    ]);
+    if (ce) throw new Error(ce.message);
+    if (te) throw new Error(te.message);
+    if (se) throw new Error(se.message);
+    if (le) throw new Error(le.message);
+    const taskRows = tasks ?? [];
+    const subRows = submissions ?? [];
+    const byCampaign = new Map<string, any[]>();
+    for (const t of taskRows) { const id=String(t.campaign_id ?? ""); if(!id) continue; const arr=byCampaign.get(id) ?? []; arr.push(t); byCampaign.set(id,arr); }
+    const subsByTask = new Map<string, any[]>();
+    for (const s of subRows) { const arr=subsByTask.get(String(s.task_id)) ?? []; arr.push(s); subsByTask.set(String(s.task_id),arr); }
+    const campaignMetrics=(campaigns ?? []).map((c:any)=>{
+      const ct=byCampaign.get(String(c.id)) ?? [];
+      const totalSubmissions=ct.reduce((n,t)=>n+(subsByTask.get(String(t.id))?.length??0),0);
+      const verified=ct.reduce((n,t)=>n+(subsByTask.get(String(t.id))?.filter((s:any)=>s.status==="verified").length??0),0);
+      const pending=ct.reduce((n,t)=>n+(subsByTask.get(String(t.id))?.filter((s:any)=>s.status==="pending").length??0),0);
+      const rejected=ct.reduce((n,t)=>n+(subsByTask.get(String(t.id))?.filter((s:any)=>s.status==="rejected").length??0),0);
+      const spent=Number(c.amount_spent ?? c.funding_spent ?? 0);
+      return {
+        ...c, taskCount:ct.length, activeTaskCount:ct.filter((t:any)=>Boolean(t.is_active)&&String(t.status)==="active").length,
+        totalSubmissions, verifiedSubmissions:verified, pendingSubmissions:pending, rejectedSubmissions:rejected,
+        completionRate:totalSubmissions?Number(((verified/totalSubmissions)*100).toFixed(1)):0,
+        costPerVerified:verified?Number((spent/verified).toFixed(4)):0,
+        remainingBudget:Math.max(0,Number(c.budget??0)-spent),
+        remainingSlots:ct.reduce((n,t)=>n+Number(t.slots_left??0),0)
+      };
+    });
+    const totalBudget=campaignMetrics.reduce((n:any,c:any)=>n+Number(c.budget??0),0);
+    const totalSpent=campaignMetrics.reduce((n:any,c:any)=>n+Number(c.amount_spent??c.funding_spent??0),0);
+    const verified=campaignMetrics.reduce((n:any,c:any)=>n+Number(c.verifiedSubmissions),0);
+    const pending=campaignMetrics.reduce((n:any,c:any)=>n+Number(c.pendingSubmissions),0);
+    const active=campaignMetrics.filter((c:any)=>String(c.status)==="active").length;
+    const funded=campaignMetrics.filter((c:any)=>String(c.funding_status)==="funded").length;
+    const ledgerSpent=(ledger??[]).filter((x:any)=>x.entry_type==="campaign_spend").reduce((n:number,x:any)=>n+Number(x.amount??0),0);
+    return {
+      summary:{campaigns:campaignMetrics.length,activeCampaigns:active,fundedCampaigns:funded,totalBudget,totalSpent,remainingBudget:Math.max(0,totalBudget-totalSpent),verifiedSubmissions:verified,pendingSubmissions:pending,ledgerCampaignSpend:ledgerSpent},
+      campaigns:campaignMetrics
+    };
+  });
