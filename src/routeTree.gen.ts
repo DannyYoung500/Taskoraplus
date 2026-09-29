@@ -27,7 +27,6 @@ import { Route as AuthenticatedProofRulesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
 import { Route as AuthenticatedWatchEarnRouteImport } from './routes/_authenticated/watch-earn'
-import { Route as AuthenticatedMyTasksRouteImport } from './routes/_authenticated/my-tasks'
 import { Route as AuthenticatedOwnerIndexRouteImport } from './routes/_authenticated/owner.index'
 import { Route as AuthenticatedOwnerAnalyticsRouteImport } from './routes/_authenticated/owner.analytics'
 import { Route as AuthenticatedOwnerAnnounceRouteImport } from './routes/_authenticated/owner.announce'
@@ -144,11 +143,6 @@ const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
 const AuthenticatedWatchEarnRoute = AuthenticatedWatchEarnRouteImport.update({
   id: '/watch-earn',
   path: '/watch-earn',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedMyTasksRoute = AuthenticatedMyTasksRouteImport.update({
-  id: '/my-tasks',
-  path: '/my-tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOwnerIndexRoute = AuthenticatedOwnerIndexRouteImport.update({
@@ -318,7 +312,6 @@ export interface FileRoutesByFullPath {
   '/support': typeof AuthenticatedSupportRoute
   '/wallet': typeof AuthenticatedWalletRoute
   '/watch-earn': typeof AuthenticatedWatchEarnRoute
-  '/my-tasks': typeof AuthenticatedMyTasksRoute
   '/owner/analytics': typeof AuthenticatedOwnerAnalyticsRoute
   '/owner/announce': typeof AuthenticatedOwnerAnnounceRoute
   '/owner/audit': typeof AuthenticatedOwnerAuditRoute
@@ -364,7 +357,6 @@ export interface FileRoutesByTo {
   '/support': typeof AuthenticatedSupportRoute
   '/wallet': typeof AuthenticatedWalletRoute
   '/watch-earn': typeof AuthenticatedWatchEarnRoute
-  '/my-tasks': typeof AuthenticatedMyTasksRoute
   '/owner/analytics': typeof AuthenticatedOwnerAnalyticsRoute
   '/owner/announce': typeof AuthenticatedOwnerAnnounceRoute
   '/owner/audit': typeof AuthenticatedOwnerAuditRoute
@@ -412,7 +404,6 @@ export interface FileRoutesById {
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/_authenticated/wallet': typeof AuthenticatedWalletRoute
   '/_authenticated/watch-earn': typeof AuthenticatedWatchEarnRoute
-  '/_authenticated/my-tasks': typeof AuthenticatedMyTasksRoute
   '/_authenticated/owner/analytics': typeof AuthenticatedOwnerAnalyticsRoute
   '/_authenticated/owner/announce': typeof AuthenticatedOwnerAnnounceRoute
   '/_authenticated/owner/audit': typeof AuthenticatedOwnerAuditRoute
@@ -460,7 +451,6 @@ export interface FileRouteTypes {
     | '/support'
     | '/wallet'
     | '/watch-earn'
-    | '/my-tasks'
     | '/owner/analytics'
     | '/owner/announce'
     | '/owner/audit'
@@ -506,7 +496,6 @@ export interface FileRouteTypes {
     | '/support'
     | '/wallet'
     | '/watch-earn'
-    | '/my-tasks'
     | '/owner/analytics'
     | '/owner/announce'
     | '/owner/audit'
@@ -553,7 +542,6 @@ export interface FileRouteTypes {
     | '/_authenticated/support'
     | '/_authenticated/wallet'
     | '/_authenticated/watch-earn'
-    | '/_authenticated/my-tasks'
     | '/_authenticated/owner/analytics'
     | '/_authenticated/owner/announce'
     | '/_authenticated/owner/audit'
@@ -718,13 +706,6 @@ declare module '@tanstack/react-router' {
       path: '/watch-earn'
       fullPath: '/watch-earn'
       preLoaderRoute: typeof AuthenticatedWatchEarnRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/my-tasks': {
-      id: '/_authenticated/my-tasks'
-      path: '/my-tasks'
-      fullPath: '/my-tasks'
-      preLoaderRoute: typeof AuthenticatedMyTasksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/owner/': {
@@ -924,7 +905,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
   AuthenticatedWatchEarnRoute: typeof AuthenticatedWatchEarnRoute
-  AuthenticatedMyTasksRoute: typeof AuthenticatedMyTasksRoute
   AuthenticatedOwnerAnalyticsRoute: typeof AuthenticatedOwnerAnalyticsRoute
   AuthenticatedOwnerAnnounceRoute: typeof AuthenticatedOwnerAnnounceRoute
   AuthenticatedOwnerAuditRoute: typeof AuthenticatedOwnerAuditRoute
@@ -965,7 +945,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedWalletRoute: AuthenticatedWalletRoute,
   AuthenticatedWatchEarnRoute: AuthenticatedWatchEarnRoute,
-  AuthenticatedMyTasksRoute: AuthenticatedMyTasksRoute,
   AuthenticatedOwnerAnalyticsRoute: AuthenticatedOwnerAnalyticsRoute,
   AuthenticatedOwnerAnnounceRoute: AuthenticatedOwnerAnnounceRoute,
   AuthenticatedOwnerAuditRoute: AuthenticatedOwnerAuditRoute,
