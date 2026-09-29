@@ -8,7 +8,6 @@ export type LeaderboardRow = {
   username: string | null;
   photo_url: string | null;
   telegram_id: number | null;
-  task_points: number;
   referrals: number;
   /** Sum of positive ledger amounts (real USDT credits) */
   usdt_earned: number;
@@ -16,16 +15,15 @@ export type LeaderboardRow = {
   tasks_completed: number;
 };
 
-/** Top earners — active users only. Real USDT ledger + Task Points + verified tasks + invites. */
+/** Top earners — active users only. Real USDT ledger + verified tasks + invites. No Task Points. */
 export const getLeaderboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<LeaderboardRow[]> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profiles, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, display_name, username, photo_url, telegram_id, status, task_points, referred_by")
-      .order("task_points", { ascending: false })
-      .limit(100);
+      .select("id, display_name, username, photo_url, telegram_id, status, referred_by")
+      .limit(200);
     if (error) throw new Error(error.message);
 
     const active = (profiles ?? []).filter(
@@ -60,16 +58,19 @@ export const getLeaderboard = createServerFn({ method: "GET" })
       if (ref) refCounts.set(ref, (refCounts.get(ref) ?? 0) + 1);
     }
 
-    return active.map((p, i) => ({
+    const rows = active.map((p) => ({
       user_id: p.id,
-      rank: i + 1,
+      rank: 0,
       display_name: String(p.display_name ?? "").trim() || "Tasker",
       username: (p as { username?: string | null }).username ?? null,
       photo_url: (p as { photo_url?: string | null }).photo_url ?? null,
       telegram_id: (p as { telegram_id?: number | null }).telegram_id ?? null,
-      task_points: Number((p as { task_points?: number | null }).task_points ?? 0),
       referrals: refCounts.get(p.id) ?? 0,
       usdt_earned: Number((usdtMap.get(p.id) ?? 0).toFixed(4)),
       tasks_completed: tasksMap.get(p.id) ?? 0,
     }));
+
+    // Default sort by USDT earned desc
+    rows.sort((a, b) => b.usdt_earned - a.usdt_earned);
+    return rows.slice(0, 100).map((r, i) => ({ ...r, rank: i + 1 }));
   });
