@@ -208,7 +208,8 @@ export const reviewSubmission = createServerFn({ method: "POST" })
     } as never);
     if (error) throw new Error(error.message);
 
-    const status = String((result as { status?: string } | null)?.status ?? data.decision);
+    const reviewResult = (result as { status?: string; reward?: number; customer_cost?: number; customer_cost_released?: number } | null) ?? {};
+    const status = String(reviewResult.status ?? data.decision);
     try {
       const { data: submission } = await supabaseAdmin
         .from("submissions")
@@ -220,11 +221,11 @@ export const reviewSubmission = createServerFn({ method: "POST" })
           await notifyTaskRejected(submission.user_id, submission.tasks, data.reason ?? "Requirements were not met.");
         } else {
           const { notifyTaskCompleted } = await import("@/lib/notify-user");
-          await notifyTaskCompleted(submission.user_id, submission.tasks, 0);
+          await notifyTaskCompleted(submission.user_id, submission.tasks, Number(reviewResult.reward ?? 0));
         }
       }
     } catch {}
-    return { status: status === "rejected" ? ("rejected" as const) : ("verified" as const) };
+    return { status: status === "rejected" ? ("rejected" as const) : ("verified" as const), reward: Number(reviewResult.reward ?? 0) };
   });
 
 export const listPendingSubmissions = createServerFn({ method: "GET" })
