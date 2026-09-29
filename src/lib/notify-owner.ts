@@ -1,3 +1,5 @@
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 async function ownerChatIds(): Promise<{ botToken: string; ownerIds: string[] }> {
   const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
   const ownerIds = String(
@@ -30,7 +32,6 @@ export async function sendOwnerHtml(msg: string) {
   );
 }
 
-/** Notify TASKORA owners when a new Mini App user joins. Never throws. */
 export async function notifyOwnersNewUser(opts: {
   displayName: string;
   username?: string | null;
@@ -45,12 +46,9 @@ export async function notifyOwnersNewUser(opts: {
       `ID: <code>${opts.telegramId}</code>\n` +
       `Time: ${new Date().toISOString()}`;
     await sendOwnerHtml(msg);
-  } catch {
-    /* never block login */
-  }
+  } catch {}
 }
 
-/** Alert owners when a large / dual-approval withdrawal is requested. Never throws. */
 export async function notifyOwnersLargeWithdrawal(opts: {
   userId: string;
   amount: number;
@@ -69,9 +67,7 @@ export async function notifyOwnersLargeWithdrawal(opts: {
       `Address: <code>${opts.address.slice(0, 36)}${opts.address.length > 36 ? "…" : ""}</code>\n` +
       `Time: ${new Date().toISOString()}`;
     await sendOwnerHtml(msg);
-  } catch {
-    /* never block withdrawal */
-  }
+  } catch {}
 }
 
 function escapeHtml(value: unknown) {
@@ -127,7 +123,7 @@ export async function postPayoutProofToChannel(opts: { amount:number; method:str
       "#tx_hash": tx ? escapeHtml(tx.slice(0,64)) : "Pending / not supplied",
       "#reference": escapeHtml(opts.withdrawalId.slice(0,8)), "#time": escapeHtml(new Date().toISOString()),
     });
-    const explorer = tx && /^0x[a-fA-F0-9]{40,}$/.test(tx) ? `\\n<a href="https://etherscan.io/tx/${tx}">View on explorer</a>` : tx && /^[a-fA-F0-9]{64}$/.test(tx) ? `\\n<a href="https://tronscan.org/#/transaction/${tx}">View on Tronscan</a>` : "";
+    const explorer = tx && /^0x[a-fA-F0-9]{40,}$/.test(tx) ? `\\n<a href=\"https://etherscan.io/tx/${tx}\">View on explorer</a>` : tx && /^[a-fA-F0-9]{64}$/.test(tx) ? `\\n<a href=\"https://tronscan.org/#/transaction/${tx}\">View on Tronscan</a>` : "";
     const caption = message + explorer;
     if (settings.payout_image_url) {
       await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({chat_id:channelId,photo:settings.payout_image_url,caption:caption.slice(0,1024),parse_mode:"HTML"}) }).catch(()=>undefined);
@@ -202,7 +198,6 @@ export async function setPayoutPresentation(opts:{messageTemplate:string;imageDa
   const {error}=await supabaseAdmin.from("payout_proof_settings").upsert({id:true,...next},{onConflict:"id"}); if(error) throw new Error(error.message); return getPayoutChannelConfig();
 }
 
-/** Velocity / rate-limit alert to owners. Never throws. */
 export async function notifyOwnersVelocityAlert(opts: {
   userId: string;
   kind: "submissions" | "withdrawals";
@@ -219,11 +214,8 @@ export async function notifyOwnersVelocityAlert(opts: {
       `ID: <code>${opts.userId.slice(0, 12)}</code>\n` +
       `Time: ${new Date().toISOString()}`;
     await sendOwnerHtml(msg);
-  } catch {
-    /* never block */
-  }
+  } catch {}
 }
-
 
 export async function notifyOwnersWithdrawalRequested(opts: { userId: string; amount: number; method: string; address: string; displayName?: string | null; reference?: string | null }) {
   await sendOwnerHtml(
@@ -242,3 +234,94 @@ export async function notifyOwnersWithdrawalFailed(opts: { userId: string; amoun
     `❌ <b>Withdrawal Failed</b>\n\n👤 User: ${esc(opts.displayName || opts.userId)}\n💰 Amount: ${opts.amount.toFixed(2)} USDT\n📍 Network: ${esc(opts.method)}\n📝 Reason: ${esc(opts.reason)}\n🧾 Ref: <code>${esc(opts.reference || "")}</code>`,
   );
 }
+
+/** Resolve task-notification channel (env or app_settings.task_notify_channel). */
+async function resolveTaskNotifyChannelId(): Promise<{ botToken: string; channelId: string }> {
+  const botToken = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
+  let channelId =
+    process.env["TASKORA_TASK_NOTIFY_CHANNEL_ID"] ??
+    process.env["TASK_NOTIFY_CHANNEL_ID"] ??
+    process.env["TASKORA_TASK_CHANNEL_ID"] ??
+    "";
+  if (!channelId) {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "task_notify_channel")
+        .maybeSingle();
+      const v = (data?.value ?? {}) as { channel_id?: string; chat_id?: string };
+      channelId = String(v.channel_id ?? v.chat_id ?? "").trim();
+    } catch {}
+  }
+  return { botToken, channelId: String(channelId).trim() };
+}
+
+export async function getTaskNotifyChannelConfig(): Promise<{ channel_id: string }> {
+  const { channelId } = await resolveTaskNotifyChannelId();
+  return { channel_id: channelId };
+}
+
+export async function setTaskNotifyChannelConfig(channelId: string): Promise<{ channel_id: string }> {
+  const id = String(channelId ?? "").trim();
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { error } = await supabaseAdmin.from("app_settings").upsert(
+    { key: "task_notify_channel", value: { channel_id: id, chat_id: id } } as never,
+    { onConflict: "key" },
+  );
+  if (error) throw new Error(error.message);
+  return { channel_id: id };
+}
+
+/** Post new-task announcement when a task goes active. Never throws. */
+export async function postTaskToNotifyChannel(opts: {
+  title: string;
+  reward: number;
+  platform?: string | null;
+  slots?: number | null;
+  taskId?: string | null;
+}) {
+  try {
+    const { botToken, channelId } = await resolveTaskNotifyChannelId();
+    if (!botToken || !channelId) return;
+    const platform = (opts.platform || "task").toString();
+    const slots =
+      opts.slots != null && Number(opts.slots) > 0 ? `\nSlots: <b>${Number(opts.slots)}</b>` : "";
+    const msg =
+      `🆕 <b>NEW TASK LIVE</b>\n` +
+      `${opts.title}\n` +
+      `Reward: <b>$${Number(opts.reward).toFixed(4)}</b> USDT\n` +
+      `Platform: ${platform}` +
+      slots +
+      (opts.taskId ? `\nRef: <code>${String(opts.taskId).slice(0, 8)}</code>` : "") +
+      `\nTime: ${new Date().toISOString()}`;
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chat_id: channelId,
+        text: msg,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+    });
+  } catch {}
+}
+
+export const ownerGetTaskNotifyChannel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { assertOwner } = await import("@/lib/owner-guard.server");
+    await assertOwner(context.userId);
+    return getTaskNotifyChannelConfig();
+  });
+
+export const ownerSetTaskNotifyChannel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { channelId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { assertOwner } = await import("@/lib/owner-guard.server");
+    await assertOwner(context.userId);
+    return setTaskNotifyChannelConfig(data.channelId);
+  });
