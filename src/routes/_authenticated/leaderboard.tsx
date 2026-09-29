@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, ChevronRight, Trophy, Star, Info, Crown } from "lucide-react";
+import { Bell, ChevronRight, Trophy, Crown } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import { getLeaderboard, type LeaderboardRow } from "@/lib/leaderboard.functions";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/leaderboard")({
   component: RankPage,
 });
 
-type Tab = "usdt" | "points" | "tasks" | "referrers";
+type Tab = "usdt" | "tasks" | "referrers";
 
 function weekLabel() {
   const now = new Date();
@@ -185,7 +185,7 @@ function RankPage() {
           <span>#</span>
           <span>User</span>
           <span className="text-right">
-            {tab === "referrers" ? "Invites" : tab === "usdt" ? "USDT" : tab === "tasks" ? "Tasks" : "Task Points"}
+            {tab === "referrers" ? "Invites" : tab === "usdt" ? "USDT" : "Tasks"}
           </span>
         </div>
         {sorted.length === 0 ? (
@@ -193,7 +193,7 @@ function RankPage() {
             <Trophy className="mx-auto size-8 text-slate-600" />
             <p className="mt-3 text-sm font-bold text-slate-300">No ranked users yet</p>
             <p className="mt-1 text-[12px] text-slate-500">
-              Complete verified tasks and earn USDT / Task Points to appear here.
+              Complete verified activity to appear here.
             </p>
           </div>
         ) : (
@@ -239,7 +239,7 @@ function RankPage() {
       </div>
 
       <p className="mt-3 text-center text-[10px] text-slate-500">
-        Real ranks only · verified tasks · USDT ledger · no demo users.
+        Real profiles only · verified activity · no Task Points.
       </p>
     </main>
   );
