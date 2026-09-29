@@ -281,7 +281,7 @@ export const listMyPostedTasks = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: tasks, error } = await supabaseAdmin
+    const { data: tasks, error } = await (supabaseAdmin as any)
       .from("tasks")
       .select("id,platform,title,advertiser,reward,seconds,slots_left,slots_total,steps,proof,link,is_active,created_at,updated_at,campaign_id,task_type,description,instructions,target,status,budget,completion_limit,requires_review,starts_at,ends_at,featured,target_country_name,target_country_code,campaign_status,target_url,youtube_video_id,youtube_view_count,youtube_view_count_updated_at,watch_completion_count,watch_reward_paid")
       .eq("created_by", context.userId)
@@ -370,7 +370,7 @@ export const listMyPostedTasks = createServerFn({ method: "GET" })
         const fresh = await fetchYoutubeViews(youtubeVideoId);
         if (fresh != null) {
           youtubeViews = fresh;
-          await supabaseAdmin.from("tasks").update({
+          await (supabaseAdmin as any).from("tasks").update({
             youtube_video_id: youtubeVideoId,
             youtube_view_count: fresh,
             youtube_view_count_updated_at: new Date().toISOString(),
