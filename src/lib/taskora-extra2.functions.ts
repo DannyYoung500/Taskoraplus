@@ -63,18 +63,22 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
     const balance = (txs ?? []).reduce((s, t) => s + Number(t.amount), 0);
     if (balance < data.amount) throw new Error("Not enough balance for this withdrawal.");
 
-    const { error } = await supabaseAdmin.from("withdrawals").insert({
-      user_id: userId,
-      method: data.method,
-      address: data.address.trim(),
-      amount: data.amount,
-    });
-    if (error) throw new Error(error.message);
+    const { data: withdrawal, error } = await supabaseAdmin
+      .from("withdrawals")
+      .insert({
+        user_id: userId,
+        method: data.method,
+        address: data.address.trim(),
+        amount: data.amount,
+      })
+      .select("id, reference, amount, method, address, status")
+      .single();
+    if (error || !withdrawal) throw new Error(error?.message ?? "Could not create withdrawal.");
     try {
       const { notifyWithdrawalRequested } = await import("@/lib/notify-user");
       await notifyWithdrawalRequested(userId, withdrawal);
       const { notifyOwnersWithdrawalRequested } = await import("@/lib/notify-owner");
-      await notifyOwnersWithdrawalRequested({ userId, amount: Number(withdrawal.amount), method: String(withdrawal.method), address: String(withdrawal.address), reference: withdrawal.reference });
+      await notifyOwnersWithdrawalRequested({ userId, amount: Number(withdrawal.amount), method: String(withdrawal.method), address: String(withdrawal.address), reference: String(withdrawal.reference ?? withdrawal.id) });
     } catch {}
 
     await supabaseAdmin.from("transactions").insert({
@@ -112,43 +116,25 @@ export const applyReferral = createServerFn({ method: "POST" })
 
     await supabaseAdmin.from("profiles").update({ referred_by: inviter.id }).eq("id", userId);
 
-    const { data: settingsRow } = await supabaseAdmin
-      .from("app_settings")
-      .select("value")
-      .eq("key", "economy")
-      .maybeSingle();
-    const referralPoints = Math.max(
-      0,
-      Math.floor(
-        Number(
-          (settingsRow?.value as { referral_points?: number } | null)?.referral_points ?? 100,
-        ),
-      ),
+    await supabaseAdmin.from("referral_challenge_members").upsert(
+      {
+        referred_user_id: userId,
+        inviter_user_id: inviter.id,
+        joined_verified: false,
+        tasks_completed: 0,
+        videos_watched: 0,
+        games_played: 0,
+        ads_watched: 0,
+        valid_referral: false,
+      } as never,
+      { onConflict: "referred_user_id" } as never,
     );
-
-    const linkBonus = Math.min(25, Math.floor(referralPoints * 0.1));
-    let taskPointTotal = 0;
-    if (linkBonus > 0) {
-      const { data: total, error: pointsError } = await (supabaseAdmin as any).rpc(
-        "award_task_points",
-        {
-          _user_id: inviter.id,
-          _amount: linkBonus,
-          _kind: "referral",
-          _label: "Invite linked (pending first verified task)",
-          _reference: `referral_link:${userId}`,
-        },
-      );
-      if (pointsError) throw new Error(pointsError.message);
-      taskPointTotal = Number(total ?? 0);
-    }
 
     return {
       ok: true,
-      taskPoints: linkBonus,
-      pendingVerifiedBonus: Math.max(0, referralPoints - linkBonus),
-      taskPointTotal,
-      note: "Full invite Task Points unlock after your friend completes their first verified task.",
+      inviterUserId: inviter.id,
+      validReferral: false,
+      note: "Invite linked. The referral becomes valid after the required verified activity is completed.",
     };
   });
 
