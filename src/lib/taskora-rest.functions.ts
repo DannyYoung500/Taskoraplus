@@ -55,20 +55,49 @@ export const listTasks = createServerFn({ method: "GET" })
       supabaseAdmin.from("tasks").select("*").eq("is_active", true).order("reward", { ascending: false }),
     ]);
     if (error) throw new Error(error.message);
+
     const rows = data ?? [];
-    const targets=[...new Set(rows.map((task:any)=>String(task.target_country_code??"").trim().toUpperCase()).filter(Boolean))];
-    const availableTargets=new Set<string>();
+    const targets = [...new Set(rows.map((task: any) => String(task.target_country_code ?? "").trim().toUpperCase()).filter(Boolean))];
+    const availableTargets = new Set<string>();
     if (targets.length) {
-      const {data:users}=await supabaseAdmin.from("profiles").select("country_code").in("country_code",targets).eq("status","active");
-      for(const user of users??[]) availableTargets.add(String(user.country_code??"").toUpperCase());
+      const { data: users } = await supabaseAdmin.from("profiles").select("country_code").in("country_code", targets).eq("status", "active");
+      for (const user of users ?? []) availableTargets.add(String(user.country_code ?? "").toUpperCase());
     }
-    const userCountry=String(profile?.country_code??"").trim().toUpperCase();
-    return rows.filter((task:any)=>{
+
+    const userCountry = String(profile?.country_code ?? "").trim().toUpperCase();
+    const eligibleRows = rows.filter((task: any) => {
       if (task.created_by && String(task.created_by) === String(context.userId)) return false;
-      const target=String(task.target_country_code??"").trim().toUpperCase();
-      if(!target || target===userCountry) return true;
-      if(task.allow_other_countries_if_unavailable===false) return false;
+      const target = String(task.target_country_code ?? "").trim().toUpperCase();
+      if (!target || target === userCountry) return true;
+      if (task.allow_other_countries_if_unavailable === false) return false;
       return !availableTargets.has(target);
+    });
+
+    const creatorIds = [...new Set(eligibleRows.map((task: any) => String(task.created_by ?? "")).filter(Boolean))];
+    const { data: creators } = creatorIds.length
+      ? await supabaseAdmin.from("profiles").select("id,display_name,username,photo_url,verification_status,verification_level,level,streak").in("id", creatorIds)
+      : { data: [] as any[] };
+
+    const creatorMap = new Map((creators ?? []).map((creator: any) => [String(creator.id), creator]));
+
+    return eligibleRows.map((task: any) => {
+      const creator = creatorMap.get(String(task.created_by ?? ""));
+      return {
+        ...task,
+        advertiserProfile: creator
+          ? {
+              displayName: creator.display_name ?? "TASKORA advertiser",
+              username: creator.username ?? null,
+              photoUrl: creator.photo_url ?? null,
+              verified:
+                creator.verification_status === "verified" ||
+                creator.verification_status === "trusted" ||
+                creator.verification_level === "trusted",
+              level: creator.level ?? "Advertiser",
+              streak: Number(creator.streak ?? 0),
+            }
+          : null,
+      };
     });
   });
 
