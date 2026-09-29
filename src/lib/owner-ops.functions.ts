@@ -365,6 +365,69 @@ export const scanFraudSignals = createServerFn({ method: "POST" })
       if (!error) created += 1;
     }
 
+    // Identity overlap scan: compare privacy-preserving device/IP signatures collected by the live security engine.
+    const { data: signals } = await supabaseAdmin
+      .from("risk_signal_events")
+      .select("user_id,device_fp,ip_hint,created_at")
+      .gte("created_at", new Date(Date.now() - 30 * 86400_000).toISOString())
+      .limit(5000);
+
+    const byDevice = new Map<string, Set<string>>();
+    const byIp = new Map<string, Set<string>>();
+    for (const row of signals ?? []) {
+      const uid = String(row.user_id ?? "");
+      if (!uid) continue;
+      if (row.device_fp) {
+        if (!byDevice.has(String(row.device_fp))) byDevice.set(String(row.device_fp), new Set());
+        byDevice.get(String(row.device_fp))!.add(uid);
+      }
+      if (row.ip_hint) {
+        if (!byIp.has(String(row.ip_hint))) byIp.set(String(row.ip_hint), new Set());
+        byIp.get(String(row.ip_hint))!.add(uid);
+      }
+    }
+
+    const identityPairs = new Map<string, { users: Set<string>; device: boolean; ip: boolean }>();
+    const addIdentity = (key: string, users: Set<string>, device: boolean, ip: boolean) => {
+      if (users.size < 2) return;
+      const current = identityPairs.get(key) ?? { users: new Set<string>(), device: false, ip: false };
+      users.forEach((u) => current.users.add(u));
+      current.device ||= device;
+      current.ip ||= ip;
+      identityPairs.set(key, current);
+    };
+    for (const [fp, users] of byDevice) addIdentity(`device:${fp}`, users, true, false);
+    for (const [ip, users] of byIp) addIdentity(`ip:${ip}`, users, false, true);
+
+    for (const [, overlap] of identityPairs) {
+      const users = [...overlap.users];
+      for (const uid of users) {
+        const kind = overlap.device ? "shared_device" : "shared_ip";
+        const { data: existing } = await supabaseAdmin
+          .from("fraud_flags")
+          .select("id")
+          .eq("user_id", uid)
+          .eq("kind", kind)
+          .eq("status", "open")
+          .maybeSingle();
+        if (existing) continue;
+        const details = overlap.device && overlap.ip
+          ? `Same device/IP signature observed across ${users.length} accounts`
+          : overlap.device
+            ? `Same device signature observed across ${users.length} accounts`
+            : `Same IP signature observed across ${users.length} accounts`;
+        const { error } = await supabaseAdmin.from("fraud_flags").insert({
+          user_id: uid,
+          kind,
+          severity: overlap.device ? "high" : "medium",
+          status: "open",
+          details,
+          metadata: { account_count: users.length, signal_window_days: 30 },
+        } as never);
+        if (!error) created += 1;
+      }
+    }
+
     await audit({
       adminId: context.userId,
       action: "fraud_scan",
