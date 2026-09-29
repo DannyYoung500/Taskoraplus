@@ -32,6 +32,9 @@ export type WatchVideo = {
   durationSeconds: number;
   viewsCount: number;
   status: string;
+  postedByName: string | null;
+  postedByUsername: string | null;
+  postedByPhotoUrl: string | null;
 };
 
 function mapVideo(row: Record<string, unknown>): WatchVideo {
@@ -49,6 +52,9 @@ function mapVideo(row: Record<string, unknown>): WatchVideo {
     durationSeconds: Number(row.duration_seconds ?? 0),
     viewsCount: Number(row.views_count ?? 0),
     status: String(row.status ?? "active"),
+    postedByName: (row.posted_by_name as string | null) ?? null,
+    postedByUsername: (row.posted_by_username as string | null) ?? null,
+    postedByPhotoUrl: (row.posted_by_photo_url as string | null) ?? null,
   };
 }
 
@@ -66,13 +72,27 @@ export const listWatchVideos = createServerFn({ method: "GET" })
     const { data, error } = await (s as any)
       .from("watch_videos")
       .select(
-        "id,title,description,thumbnail_url,video_url,source_type,provider_name,provider_video_id,reward_usdt,reward_points,duration_seconds,views_count,status",
+        "id,title,description,thumbnail_url,video_url,source_type,provider_name,provider_video_id,reward_usdt,reward_points,duration_seconds,views_count,status,created_by",
       )
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
-    return ((data ?? []) as Record<string, unknown>[]).map(mapVideo);
+    const rows = (data ?? []) as Record<string, unknown>[];
+    const creatorIds = [...new Set(rows.map((row) => String(row.created_by ?? "")).filter(Boolean))];
+    const profiles = creatorIds.length
+      ? await s.from("profiles").select("id,display_name,username,photo_url").in("id", creatorIds)
+      : ({ data: [] } as any);
+    const profileMap = new Map((profiles.data ?? []).map((p: any) => [String(p.id), p]));
+    return rows.map((row) => {
+      const p = profileMap.get(String(row.created_by ?? ""));
+      return mapVideo({
+        ...row,
+        posted_by_name: p?.display_name ?? null,
+        posted_by_username: p?.username ?? null,
+        posted_by_photo_url: p?.photo_url ?? null,
+      });
+    });
   });
 
 export const startWatchVideo = createServerFn({ method: "POST" })
@@ -377,6 +397,37 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
       .update({ views_count: Number(v.views_count ?? 0) + 1 })
       .eq("id", v.id);
     return { ok: true as const, already: false as const, rewardUsdt };
+  });
+
+export const getYoutubeVideoMetadata = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { url: string }) => data)
+  .handler(async ({ data }) => {
+    const normalized = normalizeYoutubeInput(data.url.trim());
+    const endpoint =
+      "https://www.youtube.com/oembed?url=" +
+      encodeURIComponent(normalized.url) +
+      "&format=json";
+    const response = await fetch(endpoint, { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      throw new Error(
+        "Could not read that YouTube video. Make sure the video is public and embeddable.",
+      );
+    }
+    const metadata = (await response.json()) as {
+      title?: string;
+      author_name?: string;
+      thumbnail_url?: string;
+    };
+    return {
+      videoId: normalized.id,
+      url: normalized.url,
+      title: String(metadata.title ?? ""),
+      authorName: String(metadata.author_name ?? ""),
+      thumbnailUrl:
+        String(metadata.thumbnail_url ?? "") ||
+        "https://img.youtube.com/vi/" + normalized.id + "/hqdefault.jpg",
+    };
   });
 
 export const registerOwnerVideo = createServerFn({ method: "POST" })
