@@ -381,8 +381,26 @@ function VideoFeedCard({
             {hourlyRateLabel(video)}
           </span>
         </div>
-        <div className="px-0.5 pt-1 text-[11px] font-medium text-slate-500">
-          {formatCompactViews(video.viewsCount)} views · {formatTime(video.durationSeconds)} watch time
+        <div className="flex items-center gap-2 px-0.5 pt-1.5">
+          {video.postedByPhotoUrl ? (
+            <img src={video.postedByPhotoUrl} alt="" className="size-5 rounded-full object-cover ring-1 ring-white/10" />
+          ) : (
+            <span className="flex size-5 items-center justify-center rounded-full bg-cyan-500/15 text-[8px] font-black text-cyan-200">
+              {(video.postedByName ?? "T").charAt(0)}
+            </span>
+          )}
+          <span className="min-w-0 truncate text-[10px] font-semibold text-slate-400">
+            {video.postedByName ?? "TASKORA advertiser"}
+            {video.postedByUsername ? " · @" + video.postedByUsername : ""}
+          </span>
+          <span className="shrink-0 text-[10px] text-slate-600">•</span>
+          <span className="shrink-0 text-[10px] font-medium text-slate-500">
+            {formatCompactViews(video.viewsCount)} views
+          </span>
+          <span className="shrink-0 text-[10px] font-medium text-slate-500">• {formatTime(video.durationSeconds)}</span>
+        </div>
+        <div className="px-0.5 pt-1 text-[10px] font-medium text-slate-500">
+          Required watch time · {formatTime(video.durationSeconds)} · reward {formatUsd(video.rewardUsdt)}
         </div>
       </button>
     </article>

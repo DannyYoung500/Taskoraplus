@@ -70,7 +70,7 @@ export const listWatchVideos = createServerFn({ method: "GET" })
       )
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(200);
     if (error) throw new Error(error.message);
     return ((data ?? []) as Record<string, unknown>[]).map(mapVideo);
   });
@@ -490,6 +490,7 @@ export const listOwnerVideos = createServerFn({ method: "GET" })
     const { data, error } = await (s as any)
       .from("watch_videos")
       .select("*")
+      .eq("created_by", context.userId)
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);

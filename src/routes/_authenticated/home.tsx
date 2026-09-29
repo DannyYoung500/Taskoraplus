@@ -11,6 +11,7 @@ import {
   ChevronRight,
   CalendarCheck,
   WalletCards,
+  ClipboardList,
   Flame,
   Trophy,
 } from "lucide-react";
@@ -246,6 +247,7 @@ function HomePage() {
           <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
           <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
           <Quick to="/ambassador" label="Invite" Icon={Users} />
+          <Quick to="/my-tasks" label="My Posted Tasks" Icon={ClipboardList} />
         </div>
       </section>
 
