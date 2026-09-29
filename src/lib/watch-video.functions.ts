@@ -392,7 +392,8 @@ export const registerOwnerVideo = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
-    if (!data.title.trim()) throw new Error("Video title is required.");\n    if (!Number.isFinite(Number(data.durationSeconds)) || Number(data.durationSeconds) < 1) throw new Error("Required watch time must be at least 1 second.");
+    if (!data.title.trim()) throw new Error("Video title is required.");
+    if (!Number.isFinite(Number(data.durationSeconds)) || Number(data.durationSeconds) < 1) throw new Error("Required watch time must be at least 1 second.");
     if (data.rewardUsdt < 0) throw new Error("USDT reward cannot be negative.");
     const platform = data.platform.trim() || "youtube";
 
@@ -433,7 +434,9 @@ export const registerOwnerVideo = createServerFn({ method: "POST" })
         provider_video_id: providerVideoId,
         reward_usdt: data.rewardUsdt,
         reward_points: 0,
-        duration_seconds: Math.max(1, Math.min(28800, Math.round(data.durationSeconds ?? 0))),\n        daily_limit: Math.max(1, Math.min(1000, Math.floor(data.dailyLimit ?? 1))),\n        max_views: Math.max(0, Math.min(1000000, Math.floor(data.maxViews ?? 0))),
+        duration_seconds: Math.max(1, Math.min(28800, Math.round(data.durationSeconds ?? 0))),
+        daily_limit: Math.max(1, Math.min(1000, Math.floor(data.dailyLimit ?? 1))),
+        max_views: Math.max(0, Math.min(1000000, Math.floor(data.maxViews ?? 0))),
         status: "active",
         created_by: context.userId,
       })
