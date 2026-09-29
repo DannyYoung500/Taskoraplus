@@ -37,17 +37,17 @@ function OwnerLedgerPage() {
         <Link to="/owner" className="rounded-full border border-white/10 p-2 text-white/60"><ChevronLeft className="size-4" /></Link>
         <div>
           <h1 className="text-xl font-bold">Ledger & Reconciliation</h1>
-          <p className="text-xs text-white/45">{\${source === "ledger" ? "Real append-only ledger" : "Transaction fallback"} · {filtered.length} entries}</p>
+          <p className="text-xs text-white/45">{${source === "ledger" ? "Real append-only ledger" : "Transaction fallback"} · {filtered.length} entries}</p>
         </div>
       </div>
       <div className="mb-3 grid grid-cols-2 gap-2">
         <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-3">
           <p className="text-[9px] uppercase tracking-wider text-white/35">Credits</p>
-          <p className="mt-1 text-sm font-bold text-emerald-300">{\${totals.credit.toFixed(2)}}</p>
+          <p className="mt-1 text-sm font-bold text-emerald-300">{${totals.credit.toFixed(2)}}</p>
         </div>
         <div className="rounded-2xl border border-red-400/15 bg-red-500/5 p-3">
           <p className="text-[9px] uppercase tracking-wider text-white/35">Debits</p>
-          <p className="mt-1 text-sm font-bold text-red-300">{\${totals.debit.toFixed(2)}}</p>
+          <p className="mt-1 text-sm font-bold text-red-300">{${totals.debit.toFixed(2)}}</p>
         </div>
       </div>
       <div className="mb-3 flex items-center gap-2 rounded-2xl border border-white/10 bg-[#12141c] px-3 py-2.5">
@@ -62,16 +62,16 @@ function OwnerLedgerPage() {
           const credit = Number(r.credit ?? 0); const debit = Number(r.debit ?? 0); const isCredit = credit > 0;
           return <div key={String(r.id)} className="rounded-2xl border border-white/8 bg-[#12141c] p-3 text-xs">
             <div className="flex items-start gap-2">
-              <span className={\`mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full \${isCredit ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}\`}>
+              <span className={\`mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full ${isCredit ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}\`}>
                 {isCredit ? <ArrowDownLeft className="size-3.5" /> : <ArrowUpRight className="size-3.5" />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-white">{\${String(r.entry_type ?? "transaction")}}</p>
-                <p className="mt-1 truncate text-white/55">{\${String(r.reference ?? "")}}</p>
-                <p className="mt-1 text-white/25">{\${String(r.user_id ?? "").slice(0, 8)}} · {\${new Date(String(r.created_at)).toLocaleString()}}</p>
+                <p className="font-semibold text-white">{${String(r.entry_type ?? "transaction")}}</p>
+                <p className="mt-1 truncate text-white/55">{${String(r.reference ?? "")}}</p>
+                <p className="mt-1 text-white/25">{${String(r.user_id ?? "").slice(0, 8)}} · {${new Date(String(r.created_at)).toLocaleString()}}</p>
               </div>
-              <p className={\`shrink-0 font-bold tabular-nums \${isCredit ? "text-emerald-300" : "text-red-300"}\`}>
-                {\${isCredit ? "+" : "−"}}{\${(isCredit ? credit : debit).toFixed(4)}}
+              <p className={\`shrink-0 font-bold tabular-nums ${isCredit ? "text-emerald-300" : "text-red-300"}\`}>
+                {${isCredit ? "+" : "−"}}{${(isCredit ? credit : debit).toFixed(4)}}
               </p>
             </div>
           </div>;
