@@ -132,7 +132,7 @@ function WatchEarnPage() {
       const earned = Number((result as { rewardUsdt?: number }).rewardUsdt ?? 0);
       setSessionEarned((v) => v + earned);
       setDoneIds((prev) => new Set(prev).add(active.id));
-      setMessage(earned > 0 ? `Earned ${formatUsd(earned)}` : "Watch completed.");
+      setMessage(earned > 0 ? `Reward credited: ${formatUsd(earned)}` : "Watch completed.");
       setActiveId(null);
       setSessionId(null);
     } catch (error) {
@@ -331,9 +331,8 @@ function getVideoThumbnail(video: WatchVideo): string | null {
   return null;
 }
 
-function rewardLabel(video: WatchVideo): string {
-  const reward = Number(video.rewardUsdt ?? 0);
-  return reward > 0 ? `+${formatUsd(reward)}` : "Reward";
+function rewardLabel(_video: WatchVideo): string {
+  return "Earn after completion";
 }
 
 function VideoFeedCard({
@@ -383,9 +382,9 @@ function VideoFeedCard({
           <h3 className="min-w-0 flex-1 line-clamp-2 text-[14px] font-extrabold leading-snug text-slate-100">
             {video.title || "Watch & Earn video"}
           </h3>
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-black text-cyan-300">
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-cyan-300">
             <Zap className="size-3.5 fill-cyan-300/40" />
-            {rewardLabel(video)}
+            Earn after completion
           </span>
         </div>
         <div className="flex items-center gap-2 px-0.5 pt-1.5">
@@ -406,7 +405,7 @@ function VideoFeedCard({
           <span className="shrink-0 text-[10px] font-medium text-slate-500">• {formatTime(video.durationSeconds)}</span>
         </div>
         <div className="px-0.5 pt-1 text-[10px] font-medium text-slate-500">
-          Required watch time · {formatTime(video.durationSeconds)} · reward {formatUsd(video.rewardUsdt)}
+          Required watch time · {formatTime(video.durationSeconds)}
         </div>
       </button>
     </article>
@@ -493,13 +492,13 @@ function WatchPlayer({
       <section className="px-3.5 pt-4">
         <div className="rounded-2xl border border-cyan-400/25 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,.14),transparent_55%),#0a1424] px-4 py-5 text-center shadow-[0_0_28px_rgba(34,211,238,0.08)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Reward for completing this watch
+            Watch & Earn
           </p>
-          <p className="mt-1.5 text-[32px] font-black tabular-nums leading-none text-cyan-200">
-            {formatUsd(completionReward)}
+          <p className="mt-1.5 text-[22px] font-black leading-none text-cyan-100">
+            Complete the watch to receive your reward
           </p>
           <p className="mt-2 text-[11px] font-medium text-slate-500">
-            Finish the required watch time to earn this exact amount.
+            Keep watching until the required time is reached.
           </p>
           <p className="mt-1 text-[10px] font-semibold text-cyan-300/80">
             {isPlaying ? "Playing · time is being verified" : "Press play to start verified watch time"}

@@ -1,28 +1,187 @@
-import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, CheckCircle2, PauseCircle, RefreshCw, WalletCards, XCircle } from "lucide-react";
+import { ArrowLeft, Eye, RefreshCw, Users, WalletCards, Clock3, CheckCircle2, PlayCircle, ExternalLink } from "lucide-react";
+import { useState } from "react";
 import { listMyPostedTasks } from "@/lib/taskora.functions";
+import { formatUsd } from "@/lib/taskora-display";
+import { TASKORA_LOGO } from "@/lib/brand";
 
-export const Route = createFileRoute("/_authenticated/my-tasks")({ component: MyPostedTasksPage });
-const money = (value: unknown) => "$" + Number(value ?? 0).toFixed(4);
-const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
+export const Route = createFileRoute("/_authenticated/my-tasks")({
+  loader: async () => ({ posted: await listMyPostedTasks().catch(() => []) }),
+  head: () => ({ meta: [{ title: "My Posted Tasks — TASKORA" }] }),
+  component: MyPostedTasks,
+});
 
-function MyPostedTasksPage() {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [busy, setBusy] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  async function refresh() { setBusy(true); try { setTasks(await listMyPostedTasks()); setError(null); } catch (e) { setError(e instanceof Error ? e.message : "Could not load your posted tasks."); } finally { setBusy(false); } }
-  useEffect(() => { void refresh(); }, []);
-  const stats = useMemo(() => ({ total: tasks.length, active: tasks.filter((t) => String(t.status ?? "") === "active" && Boolean(t.is_active)).length, submissions: tasks.reduce((n, t) => n + Number(t.submissions?.total ?? 0), 0), verified: tasks.reduce((n, t) => n + Number(t.submissions?.verified ?? 0), 0) }), [tasks]);
-  return <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
-    <header className="mb-5 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-300">Advertiser</p><h1 className="mt-1 text-xl font-black">My Posted Tasks</h1><p className="mt-1 text-[11px] text-white/40">Every task you have posted, with live delivery status.</p></div><button type="button" onClick={() => void refresh()} disabled={busy} aria-label="Refresh posted tasks" className="rounded-xl border border-white/10 p-2 text-white/60"><RefreshCw className={busy ? "size-4 animate-spin" : "size-4"} /></button></header>
-    <div className="grid grid-cols-2 gap-2"><Metric label="Posted" value={stats.total} /><Metric label="Active" value={stats.active} /><Metric label="Submissions" value={stats.submissions} /><Metric label="Verified" value={stats.verified} /></div>
-    {error ? <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/5 p-4 text-xs text-red-200">{error}</div> : null}
-    {busy && !tasks.length ? <div className="mt-5 rounded-2xl border border-white/8 bg-[#12151c] p-6 text-center text-xs text-white/40">Loading your posted tasks…</div> : null}
-    {!busy && !tasks.length && !error ? <div className="mt-5 rounded-2xl border border-white/8 bg-[#12151c] p-6 text-center"><div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-300"><WalletCards className="size-5" /></div><p className="mt-3 text-sm font-semibold">No posted tasks yet</p><p className="mt-1 text-[11px] text-white/40">Create a task from Advertise and it will appear here automatically.</p><Link to="/advertise" className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold">Create a task <ArrowUpRight className="size-3.5" /></Link></div> : null}
-    <div className="mt-4 space-y-3">{tasks.map((task) => { const s = task.submissions ?? { total: 0, pending: 0, verified: 0, rejected: 0 }; const status = String(task.status ?? "active"); const slots = task.slots_total == null ? null : Number(task.slots_total); const left = task.slots_left == null ? null : Number(task.slots_left); const progress = slots && slots > 0 ? Math.min(100, Math.max(0, ((slots - Number(left ?? slots)) / slots) * 100)) : 0; return <article key={String(task.id)} className="rounded-2xl border border-white/8 bg-[#12151c] p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-sm font-bold">{String(task.title ?? "Untitled task")}</h2><p className="mt-1 text-[10px] text-white/40">{String(task.platform ?? "Platform")} · {String(task.task_type ?? "Task")} · Posted {date(task.created_at)}</p></div><Status status={status} active={Boolean(task.is_active)} /></div><div className="mt-3 grid grid-cols-2 gap-2"><Stat label="Reward" value={money(task.reward)} /><Stat label="Budget" value={task.budget == null ? "—" : money(task.budget)} /><Stat label="Submissions" value={s.total} /><Stat label="Verified" value={s.verified} /></div>{slots !== null ? <><div className="mt-3 flex items-center justify-between text-[10px] text-white/40"><span>Delivery</span><span>{Math.max(0, slots - Number(left ?? 0))}/{slots} completed</span></div><div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/8"><div className="h-full rounded-full bg-sky-400" style={{ width: progress + "%" }} /></div></> : null}<div className="mt-3 flex flex-wrap gap-2 text-[10px] text-white/40"><span className="rounded-full border border-white/8 px-2 py-1">{s.pending} pending</span><span className="rounded-full border border-white/8 px-2 py-1">{s.rejected} rejected</span>{task.target_country_name ? <span className="rounded-full border border-white/8 px-2 py-1">{String(task.target_country_name)}</span> : null}</div></article>; })}</div>
-  </main>;
+function compact(n: number) {
+  const v = Math.max(0, Number(n) || 0);
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1) + "M";
+  if (v >= 1_000) return (v / 1_000).toFixed(v >= 10_000 ? 0 : 1) + "K";
+  return String(Math.floor(v));
 }
-function Metric({ label, value }: { label: string; value: number }) { return <div className="rounded-2xl border border-white/8 bg-[#12151c] p-3"><p className="text-[9px] uppercase tracking-wide text-white/35">{label}</p><p className="mt-1 text-base font-black">{value.toLocaleString()}</p></div>; }
-function Stat({ label, value }: { label: string; value: unknown }) { return <div className="rounded-xl border border-white/6 bg-black/15 p-2.5"><p className="text-[9px] text-white/35">{label}</p><p className="mt-0.5 text-xs font-bold text-white/80">{String(value)}</p></div>; }
-function Status({ status, active }: { status: string; active: boolean }) { const label = active && status === "active" ? "Live" : status; const Icon = label === "Live" ? CheckCircle2 : label === "paused" ? PauseCircle : label === "completed" ? CheckCircle2 : XCircle; return <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[9px] font-bold capitalize text-white/55"><Icon className="size-3" />{label}</span>; }
+
+function duration(seconds: number) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m ? `${m}m ${r}s` : `${r}s`;
+}
+
+function youtubeThumb(id: string | null) {
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
+}
+
+function MyPostedTasks() {
+  const { posted } = Route.useLoaderData();
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      const fresh = await listMyPostedTasks();
+      // TanStack loader data is intentionally left stable; a navigation refresh is safer than
+      // mutating loader internals. This button simply requests a route reload.
+      window.location.reload();
+      void fresh;
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const videos = (posted as any[]).filter((task) => Boolean(task.postedVideo));
+  const totalCompletions = (posted as any[]).reduce((n, task) => n + Number(task.submissions?.verified ?? 0), 0);
+  const totalSpent = (posted as any[]).reduce((n, task) => n + Number(task.watchRewardPaid ?? 0), 0);
+
+  return (
+    <main className="mx-auto min-h-screen w-full max-w-3xl bg-[#030814] px-4 pb-28 pt-4 text-white sm:px-6">
+      <header className="mb-5 flex items-center gap-3">
+        <Link to="/profile" aria-label="Back to profile" className="rounded-xl border border-white/8 bg-white/[.03] p-2.5">
+          <ArrowLeft className="size-4 text-slate-300" />
+        </Link>
+        <img src={TASKORA_LOGO} alt="" className="size-9 rounded-full ring-1 ring-cyan-400/40" />
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-black">My Posted Tasks</p>
+          <p className="text-[10px] text-slate-500">Track delivery, completions, views and campaign usage.</p>
+        </div>
+        <button type="button" onClick={() => void refresh()} disabled={refreshing} className="rounded-xl border border-white/8 bg-white/[.03] p-2.5 text-slate-300">
+          <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} />
+        </button>
+      </header>
+
+      <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Metric label="Posted" value={String((posted as any[]).length)} />
+        <Metric label="Verified completions" value={String(totalCompletions)} />
+        <Metric label="Posted videos" value={String(videos.length)} />
+        <Metric label="Rewards paid" value={formatUsd(totalSpent)} />
+      </section>
+
+      <section className="mt-5">
+        <div className="mb-3 flex items-end justify-between">
+          <div>
+            <p className="text-sm font-black">Posted Video</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Live YouTube views and TASKORA completion activity.</p>
+          </div>
+          <span className="text-[10px] font-bold text-cyan-300">{videos.length} video{videos.length === 1 ? "" : "s"}</span>
+        </div>
+
+        {videos.length === 0 ? (
+          <div className="rounded-3xl border border-white/8 bg-[#0b1628] p-8 text-center">
+            <PlayCircle className="mx-auto size-8 text-slate-600" />
+            <p className="mt-2 text-sm font-bold text-slate-300">No posted videos yet</p>
+            <p className="mt-1 text-[10px] text-slate-500">YouTube Watch campaigns you post will appear here with live delivery statistics.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {videos.map((task: any) => {
+              const thumb = youtubeThumb(task.youtubeVideoId);
+              const stats = task.submissions ?? {};
+              const completion = Number(task.watchCompletionCount ?? stats.verified ?? 0);
+              const total = Math.max(1, Number(task.slots_total ?? 0));
+              const progress = Math.min(100, Math.round((completion / total) * 100));
+              return (
+                <article key={String(task.id)} className="overflow-hidden rounded-3xl border border-cyan-400/15 bg-[#0b1628]">
+                  <div className="relative aspect-video bg-black">
+                    {thumb ? <img src={thumb} alt="" className="size-full object-cover" /> : <div className="flex size-full items-center justify-center"><PlayCircle className="size-12 text-slate-600" /></div>}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-4 pb-3 pt-10">
+                      <p className="truncate text-sm font-black">{String(task.title ?? "Posted video")}</p>
+                      <p className="mt-0.5 text-[9px] text-white/60">{String(task.status ?? "draft")} · {String(task.platform ?? "youtube")}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <Stat icon={Eye} label="YouTube views" value={compact(task.youtubeViewsCount)} />
+                      <Stat icon={Users} label="Users completed" value={String(completion)} />
+                      <Stat icon={CheckCircle2} label="Verified" value={String(stats.verified ?? completion)} />
+                      <Stat icon={Clock3} label="Watch time" value={duration(Number(task.seconds ?? 0))} />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <Stat icon={WalletCards} label="Reward / user" value={formatUsd(Number(task.reward ?? 0))} />
+                      <Stat icon={WalletCards} label="Rewards paid" value={formatUsd(Number(task.watchRewardPaid ?? 0))} />
+                      <Stat icon={Users} label="Remaining" value={String(task.remainingSlots ?? task.slots_left ?? 0)} />
+                      <Stat icon={PlayCircle} label="Campaign slots" value={String(task.slots_total ?? 0)} />
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="mb-1.5 flex items-center justify-between text-[9px] font-bold text-slate-500">
+                        <span>Completion</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+                        <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" style={{ width: progress + "%" }} />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-white/6 pt-3">
+                      <div className="text-[9px] text-slate-500">
+                        {stats.pending ?? 0} pending · {stats.rejected ?? 0} rejected
+                      </div>
+                      {task.targetUrl ? (
+                        <a href={String(task.targetUrl)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[10px] font-bold text-cyan-300">
+                          Open video <ExternalLink className="size-3" />
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6">
+        <div className="mb-3">
+          <p className="text-sm font-black">All posted tasks</p>
+          <p className="mt-0.5 text-[10px] text-slate-500">The same delivery stats are available for every campaign type.</p>
+        </div>
+        <div className="space-y-2">
+          {(posted as any[]).map((task) => {
+            const stats = task.submissions ?? {};
+            return (
+              <article key={String(task.id)} className="rounded-2xl border border-white/8 bg-[#0b1628] p-3.5">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-cyan-300">
+                    {task.postedVideo ? <PlayCircle className="size-4" /> : <CheckCircle2 className="size-4" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold">{String(task.title ?? "Untitled task")}</p>
+                    <p className="mt-0.5 text-[9px] text-slate-500">{String(task.platform ?? "")} · {String(task.status ?? "")}</p>
+                  </div>
+                  <p className="text-xs font-black text-cyan-300">{String(stats.verified ?? 0)} verified</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-2xl border border-white/8 bg-[#0b1628] p-3"><p className="text-[9px] text-slate-500">{label}</p><p className="mt-1 text-base font-black">{value}</p></div>;
+}
+
+function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return <div className="rounded-xl border border-white/6 bg-black/15 p-2.5"><div className="flex items-center gap-1.5 text-cyan-300"><Icon className="size-3.5" /><span className="text-[8px] text-slate-500">{label}</span></div><p className="mt-1 text-sm font-black tabular-nums">{value}</p></div>;
+}
