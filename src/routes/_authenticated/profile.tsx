@@ -1,33 +1,176 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, ChevronRight, Crown, LifeBuoy, Link2, Shield, Trophy, WalletCards, Users, PlayCircle, ClipboardList, CheckCircle2, Eye, Clock3 } from "lucide-react";
-import { getDashboard, listMyPostedTasks } from "@/lib/taskora.functions";
-import { getGrowthSummary } from "@/lib/growth.functions";
+import {
+  Bell,
+  ChevronRight,
+  Crown,
+  LifeBuoy,
+  Link2,
+  Shield,
+  Trophy,
+  WalletCards,
+  Users,
+  Star,
+  Zap,
+  CheckCircle2,
+} from "lucide-react";
+import { getDashboard } from "@/lib/taskora.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
-import { TASKORA_LOGO } from "@/lib/brand";
+import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
 import { AppLink } from "@/components/AppLink";
 
-export const Route = createFileRoute("/_authenticated/profile")({ loader: async () => { const [dash, accounts, growth, posted] = await Promise.all([getDashboard().catch(() => null), listConnectedAccounts().catch(() => []), getGrowthSummary().catch(() => null), listMyPostedTasks().catch(() => [])]); return { dash, accounts, growth, posted }; }, head: () => ({ meta: [{ title: "Profile — TASKORA" }] }), component: ProfileScreen });
+export const Route = createFileRoute("/_authenticated/profile")({
+  loader: async () => {
+    const [dash, accounts] = await Promise.all([
+      getDashboard().catch(() => null),
+      listConnectedAccounts().catch(() => []),
+    ]);
+    return { dash, accounts };
+  },
+  head: () => ({ meta: [{ title: "Profile — TASKORA" }] }),
+  component: ProfileScreen,
+});
 
 function ProfileScreen() {
- const { dash, accounts, growth, posted } = Route.useLoaderData();
- const profile = dash?.profile as any; const name = profile?.display_name ?? "Tasker"; const username = profile?.username ? "@" + profile.username : "Telegram user"; const photo = profile?.photo_url ?? null; const streak = Number(profile?.streak ?? 0); const level = Number(profile?.level_num ?? growth?.level?.number ?? 1);
- const txs = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label)); const balance = Math.max(0, txs.reduce((s, t) => s + Number(t.amount), 0)); const lifetime = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0); const verified = Number(dash?.verifiedCount ?? 0); const activePosted = posted.filter((t:any) => t.is_active && String(t.status ?? "") === "active").length; const submissions = posted.reduce((n:number, t:any) => n + Number(t.submissions?.total ?? 0), 0);
- return <main className="mx-auto min-h-screen w-full max-w-2xl bg-[#030814] px-4 pb-28 pt-4 text-white sm:px-6">
-  <header className="mb-4 flex items-center gap-3"><img src={TASKORA_LOGO} alt="" className="size-10 rounded-full ring-1 ring-cyan-400/40" /><div className="min-w-0 flex-1"><p className="text-lg font-black">Profile</p><p className="text-[10px] text-slate-500">Your TASKORA identity, earnings and activity</p></div><AppLink to="/notifications" className="rounded-xl border border-white/8 bg-white/[.03] p-2.5"><Bell className="size-4 text-slate-300" /></AppLink></header>
-  <section className="overflow-hidden rounded-[28px] border border-cyan-400/20 bg-[radial-gradient(circle_at_85%_0%,rgba(34,211,238,.18),transparent_34%),linear-gradient(145deg,#0b1d33,#07101c)]"><div className="p-5"><div className="flex items-center gap-4">{photo ? <img src={photo} alt="" className="size-[76px] rounded-full object-cover ring-2 ring-cyan-300/30" /> : <span className="flex size-[76px] items-center justify-center rounded-full bg-cyan-500/15 text-2xl font-black text-cyan-200 ring-2 ring-cyan-300/20">{name.charAt(0)}</span>}<div className="min-w-0 flex-1"><h1 className="truncate text-2xl font-black">{name}</h1><p className="mt-0.5 truncate text-sm text-slate-400">{username}</p><div className="mt-2 flex flex-wrap gap-2"><Badge text={"Level " + level} /><Badge text={streak + " day streak"} /><Badge text="Telegram verified" /></div></div>{dash?.isOwner ? <AppLink to="/owner" className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 p-2.5 text-cyan-200"><Crown className="size-5" /></AppLink> : null}</div></div><div className="grid grid-cols-2 border-t border-white/8 sm:grid-cols-4"><ProfileStat label="Balance" value={formatUsd(balance)} /><ProfileStat label="Lifetime" value={formatUsd(lifetime)} /><ProfileStat label="Verified tasks" value={String(verified)} /><ProfileStat label="Posted tasks" value={String(posted.length)} /></div></section>
-  <section className="mt-4 grid grid-cols-2 gap-2"><Action to="/wallet" icon={WalletCards} label="Wallet" sub="Balance & withdrawals" /><a href="#posted-tasks" className="rounded-2xl border border-white/8 bg-[#0b1628] p-3.5 active:bg-white/5"><span className="flex size-9 items-center justify-center rounded-xl bg-blue-500/10 text-cyan-300"><ClipboardList className="size-4" /></span><p className="mt-2 text-sm font-bold">My Posted Tasks</p><p className="mt-0.5 text-[10px] text-slate-500">{posted.length} campaigns · {activePosted} live</p></a><Action to="/watch-earn" icon={PlayCircle} label="Watch & Earn" sub="Watch videos & earn USDT" /><Action to="/ambassador" icon={Users} label="Invite & Earn" sub="Referral activity & rewards" /></section>
-  <section className="mt-4 rounded-2xl border border-white/8 bg-[#0b1628] p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-black">Posted-task activity</p><p className="mt-0.5 text-[10px] text-slate-500">Your campaigns and their delivery</p></div><p className="text-xs font-black text-cyan-300">{submissions} submissions</p></div><div className="mt-3 space-y-2">{posted.slice(0, 3).map((t:any) => <div key={t.id} className="flex items-center gap-3 rounded-xl border border-white/6 bg-black/15 p-2.5"><span className="flex size-9 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-300"><CheckCircle2 className="size-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{String(t.title ?? "Untitled task")}</p><p className="text-[9px] text-slate-500">{Number(t.submissions?.verified ?? 0)} verified · {Number(t.submissions?.pending ?? 0)} pending</p></div></div>)}{posted.length === 0 ? <p className="py-3 text-center text-[11px] text-slate-500">No posted campaigns yet.</p> : null}</div></section>
-  <section id="posted-tasks" className="mt-4 rounded-2xl border border-cyan-400/15 bg-[#0b1628] p-4"><div className="flex items-end justify-between"><div><p className="text-sm font-black">Posted Video</p><p className="mt-0.5 text-[10px] text-slate-500">Your YouTube Watch delivery, views and verified completions</p></div><p className="text-[10px] font-bold text-cyan-300">{posted.filter((t:any) => t.postedVideo).length} video{posted.filter((t:any) => t.postedVideo).length === 1 ? "" : "s"}</p></div><div className="mt-3 space-y-3">{posted.filter((t:any) => t.postedVideo).slice(0, 10).map((t:any) => { const completed=Number(t.watchCompletionCount ?? t.submissions?.verified ?? 0); const slots=Math.max(1,Number(t.slots_total ?? 0)); const pct=Math.min(100,Math.round((completed/slots)*100)); const watchSeconds=Math.max(0,Number(t.seconds ?? 0)); const mins=Math.floor(watchSeconds/60); const secs=watchSeconds%60; return <article key={t.id} className="overflow-hidden rounded-2xl border border-white/7 bg-black/15"><div className="flex gap-3 p-3">{t.youtubeVideoId ? <img src={"https://img.youtube.com/vi/"+String(t.youtubeVideoId)+"/hqdefault.jpg"} alt="" className="size-24 shrink-0 rounded-xl object-cover" /> : <span className="flex size-24 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-300"><PlayCircle className="size-7" /></span>}<div className="min-w-0 flex-1"><p className="line-clamp-2 text-xs font-black">{String(t.title ?? "Posted video")}</p><p className="mt-1 text-[9px] text-slate-500">{String(t.status ?? "active")} · {String(t.platform ?? "youtube")}</p><div className="mt-2 flex flex-wrap gap-1.5"><StatChip icon={Eye} label="YouTube views" value={formatCompact(Number(t.youtubeViewsCount ?? 0))} /><StatChip icon={Users} label="Completed" value={String(completed)} /></div></div></div><div className="grid grid-cols-2 gap-2 px-3 pb-3 sm:grid-cols-4"><MiniStat icon={CheckCircle2} label="Verified" value={String(t.submissions?.verified ?? completed)} /><MiniStat icon={Clock3} label="Watch time" value={(mins ? mins+"m " : "")+secs+"s"} /><MiniStat icon={WalletCards} label="Reward / user" value={formatUsd(Number(t.reward ?? 0))} /><MiniStat icon={Users} label="Remaining" value={String(t.remainingSlots ?? t.slots_left ?? 0)} /></div><div className="px-3 pb-3"><div className="mb-1 flex justify-between text-[8px] font-bold text-slate-500"><span>Completion</span><span>{pct}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/8"><div className="h-full rounded-full bg-cyan-400" style={{width:pct+"%"}} /></div></div></article>; })}{posted.filter((t:any) => t.postedVideo).length === 0 ? <p className="py-4 text-center text-[10px] text-slate-500">No YouTube Watch campaigns posted yet.</p> : null}</div></section>
-  <section className="mt-4 rounded-2xl border border-white/8 bg-[#0b1628]"><Row to="/connected" icon={Link2} label="Connected accounts" sub={accounts.length ? accounts.length + " linked account" + (accounts.length === 1 ? "" : "s") : "No accounts linked"} /><Row to="/leaderboard" icon={Trophy} label="Leaderboard" sub="Community position and activity" /><Row to="/notifications" icon={Bell} label="Notifications" sub="Account and earning alerts" /><Row to="/support" icon={LifeBuoy} label="Support" sub="Get help with your account" /><Row to="/terms" icon={Shield} label="Terms & Conditions" sub="TASKORA rules and policies" /></section>
-  <div className="mt-4 flex gap-2 rounded-2xl border border-emerald-400/15 bg-emerald-500/5 px-4 py-3 text-[10px] leading-5 text-emerald-200/80"><Shield className="mt-0.5 size-4 shrink-0" />Real account · real wallet ledger · real task activity</div>
- </main>;
-}
-function Badge({ text }: { text: string }) { return <span className="rounded-full border border-cyan-400/20 bg-cyan-400/8 px-2.5 py-1 text-[10px] font-bold text-cyan-200">{text}</span>; }
-function ProfileStat({ label, value }: { label: string; value: string }) { return <div className="border-r border-white/8 px-3 py-3 last:border-r-0"><p className="text-[9px] text-slate-500">{label}</p><p className="mt-1 text-sm font-black">{value}</p></div>; }
-function Action({ to, icon: Icon, label, sub }: { to: string; icon: any; label: string; sub: string }) { return <AppLink to={to} className="rounded-2xl border border-white/8 bg-[#0b1628] p-3.5 active:bg-white/5"><span className="flex size-9 items-center justify-center rounded-xl bg-blue-500/10 text-cyan-300"><Icon className="size-4" /></span><p className="mt-2 text-sm font-bold">{label}</p><p className="mt-0.5 text-[10px] text-slate-500">{sub}</p></AppLink>; }
-function Row({ to, icon: Icon, label, sub }: { to: string; icon: any; label: string; sub: string }) { return <AppLink to={to} className="flex items-center gap-3 border-b border-white/6 px-4 py-3.5 last:border-0"><span className="flex size-9 items-center justify-center rounded-xl bg-blue-500/10 text-cyan-300"><Icon className="size-4" /></span><div className="min-w-0 flex-1"><p className="text-sm font-bold">{label}</p><p className="text-[10px] text-slate-500">{sub}</p></div><ChevronRight className="size-4 text-slate-600" /></AppLink>; }
+  const { dash, accounts } = Route.useLoaderData();
+  const profile = dash?.profile as
+    | {
+        display_name?: string | null;
+        username?: string | null;
+        level?: string | null;
+        level_num?: number | null;
+        streak?: number | null;
+        photo_url?: string | null;
+        task_points?: number | null;
+      }
+    | null
+    | undefined;
 
-function formatCompact(n:number){const v=Math.max(0,Number(n)||0);if(v>=1000000)return (v/1000000).toFixed(v>=10000000?0:1)+"M";if(v>=1000)return (v/1000).toFixed(v>=10000?0:1)+"K";return String(Math.floor(v));}
-function StatChip({icon:Icon,label,value}:{icon:any;label:string;value:string}){return <span className="inline-flex items-center gap-1 rounded-full border border-white/7 bg-white/[.03] px-2 py-1 text-[8px] text-slate-400"><Icon className="size-3 text-cyan-300"/>{label}: <b className="text-slate-200">{value}</b></span>}
-function MiniStat({icon:Icon,label,value}:{icon:any;label:string;value:string}){return <div className="rounded-xl border border-white/6 bg-white/[.02] p-2"><div className="flex items-center gap-1 text-[8px] text-slate-500"><Icon className="size-3 text-cyan-300"/>{label}</div><p className="mt-1 text-[11px] font-black tabular-nums">{value}</p></div>}
+  const name = profile?.display_name ?? "Tasker";
+  const handle = profile?.username ? `@${profile.username}` : "Telegram user";
+  const levelNum = Math.max(1, Number(profile?.level_num ?? 1));
+  const level = profile?.level ?? `Level ${levelNum}`;
+  const photo = profile?.photo_url ?? null;
+  const streak = Number(profile?.streak ?? 0);
+  const taskPoints = Number(profile?.task_points ?? 0);
+  const isOwner = Boolean(dash?.isOwner);
+
+  const txs = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
+  const balance = Math.max(0, txs.reduce((s, t) => s + Number(t.amount), 0));
+  const lifetime = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
+  const verified = Number(dash?.verifiedCount ?? 0);
+  const connectedCount = Array.isArray(accounts) ? accounts.length : 0;
+  const band = 500;
+  const intoBand = taskPoints % band;
+  const progressPct = Math.min(100, Math.round((intoBand / band) * 100));
+
+  return (
+    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#05080f] pb-28 text-white">
+      <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-[#05080f]/95 px-3.5 py-3 backdrop-blur-xl">
+        <div className="flex items-center gap-2.5">
+          <img src={TASKORA_LOGO} alt="" className="size-9 rounded-full object-cover ring-1 ring-cyan-400/40" draggable={false} />
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-black tracking-wide" style={{ background: "linear-gradient(90deg,#e0f2fe,#38bdf8,#2563eb)", WebkitBackgroundClip: "text", color: "transparent" }}>Profile</p>
+            <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-cyan-300/70">Account · security · links</p>
+          </div>
+          <AppLink to="/notifications" aria-label="Notifications" className="rounded-full p-2 text-slate-300 hover:bg-white/5"><Bell className="size-5" /></AppLink>
+          {isOwner ? (<AppLink to="/owner" aria-label="Owner" className="rounded-full border border-cyan-400/30 bg-cyan-500/10 p-2 text-cyan-200"><Crown className="size-4" /></AppLink>) : null}
+        </div>
+      </header>
+
+      <div className="px-3.5 pt-4">
+        <section className="overflow-hidden rounded-[22px] border border-cyan-400/25 p-4" style={{ background: "radial-gradient(circle at 90% 0%,rgba(56,189,248,0.2),transparent 45%), linear-gradient(160deg,#0a1a33 0%,#060f1c 60%,#05080f 100%)" }}>
+          <div className="flex items-center gap-3.5">
+            <div className="relative shrink-0">
+              {photo ? (<img src={photo} alt="" className="size-[72px] rounded-full object-cover ring-2 ring-cyan-400/50" draggable={false} />) : (<span className="flex size-[72px] items-center justify-center rounded-full bg-cyan-500/20 text-2xl font-black ring-2 ring-cyan-400/40">{name.charAt(0).toUpperCase()}</span>)}
+              <span className="absolute -bottom-0.5 -right-0.5 flex size-6 items-center justify-center rounded-full bg-emerald-400 text-[9px] font-black text-slate-950 ring-2 ring-[#0a1a33]">{levelNum}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-lg font-black leading-tight">{name}</p>
+              <p className="mt-0.5 text-[12px] text-slate-400">{handle}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-200"><Star className="size-3" />{level}</span>
+                {streak > 0 ? (<span className="inline-flex items-center gap-1 rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-200"><Zap className="size-3" />{streak}d streak</span>) : null}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center justify-between text-[10px]">
+              <span className="font-semibold text-slate-400">Level progress</span>
+              <span className="font-bold tabular-nums text-cyan-300/90">{intoBand}/{band} TP</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full transition-[width]" style={{ width: `${progressPct}%`, background: BLUE_GRAD }} />
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <Stat label="Balance" value={formatUsd(balance)} accent />
+            <Stat label="Task Points" value={taskPoints.toLocaleString()} />
+            <Stat label="Verified" value={String(verified)} />
+          </div>
+        </section>
+
+        <section className="mt-3.5 grid grid-cols-2 gap-2.5">
+          <AppLink to="/wallet" className="flex items-center gap-2.5 rounded-2xl border border-cyan-400/15 bg-[#0b1628] p-3.5 active:scale-[0.98]">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-300"><WalletCards className="size-5" /></span>
+            <div className="min-w-0"><p className="text-xs font-black">Wallet</p><p className="text-[10px] text-slate-500">Deposit · withdraw</p></div>
+          </AppLink>
+          <AppLink to="/leaderboard" className="flex items-center gap-2.5 rounded-2xl border border-cyan-400/15 bg-[#0b1628] p-3.5 active:scale-[0.98]">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-300"><Trophy className="size-5" /></span>
+            <div className="min-w-0"><p className="text-xs font-black">Rank</p><p className="text-[10px] text-slate-500">Leaderboard</p></div>
+          </AppLink>
+        </section>
+
+        <section className="mt-3.5 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0b1628]">
+          <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="Task Points + commission" />
+          <Row to="/connected" icon={Link2} label="Connected accounts" sub={connectedCount > 0 ? `${connectedCount} linked · required for some platforms` : "Link TikTok, Instagram, YouTube…"} badge={connectedCount > 0 ? String(connectedCount) : undefined} />
+          <Row to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
+          <Row to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
+          <Row to="/notifications" icon={Bell} label="Notifications" sub="Alerts & updates" />
+        </section>
+
+        <section className="mt-3.5 rounded-2xl border border-white/[0.07] bg-[#0b1628] p-3.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Lifetime</p>
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-emerald-400/15 bg-emerald-500/5 px-3 py-2.5">
+              <p className="text-[10px] text-slate-500">Total earned</p>
+              <p className="mt-0.5 text-base font-black tabular-nums text-emerald-300">{formatUsd(lifetime)}</p>
+            </div>
+            <div className="rounded-xl border border-cyan-400/15 bg-cyan-500/5 px-3 py-2.5">
+              <p className="text-[10px] text-slate-500">Tasks verified</p>
+              <p className="mt-0.5 text-base font-black tabular-nums text-cyan-200">{verified}</p>
+            </div>
+          </div>
+        </section>
+
+        <div className="mt-3.5 flex items-start gap-2.5 rounded-2xl border border-emerald-400/20 bg-emerald-500/5 px-3.5 py-3 text-[11px] leading-relaxed text-emerald-200/90">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+          <span>Telegram-native session · real ledger balances · no demo money. Proofs are one-per-user and device-locked.</span>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-black/30 px-2 py-2.5 text-center">
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`mt-0.5 truncate text-sm font-black tabular-nums ${accent ? "text-cyan-200" : "text-white"}`}>{value}</p>
+    </div>
+  );
+}
+
+function Row({ to, icon: Icon, label, sub, badge }: { to: string; icon: typeof Trophy; label: string; sub: string; badge?: string }) {
+  return (
+    <AppLink to={to} className="flex items-center gap-3 border-b border-white/[0.05] px-3.5 py-3.5 last:border-0 active:bg-white/[0.04]">
+      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-300"><Icon className="size-4" /></span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-slate-100">{label}</p>
+        <p className="text-[10px] text-slate-500">{sub}</p>
+      </div>
+      {badge ? <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-black text-cyan-200">{badge}</span> : null}
+      <ChevronRight className="size-4 shrink-0 text-slate-600" />
+    </AppLink>
+  );
+}
