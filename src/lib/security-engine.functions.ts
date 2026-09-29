@@ -8,13 +8,6 @@ type SignalInput = {
   screen?: string;
 };
 
-function hash(value: string): string {
-  // Server-only SHA-256. The source value is never stored.
-  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)).then(
-    (buf) => Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join(""),
-  ) as unknown as string;
-}
-
 async function sha256(value: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
