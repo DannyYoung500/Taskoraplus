@@ -14,7 +14,7 @@ async function ctx(userId:string) {
   await assertOwner(userId); return {db:await admin(),audit};
 }
 const buttons=(v?:Button[])=> (v??[]).map(x=>({text:String(x.text||"").trim(),url:String(x.url||"").trim()}))
-  .filter(x=>x.text&&/^https?:\\/\\//i.test(x.url)).slice(0,6);
+  .filter(x=>x.text&&/^https?:\/\//i.test(x.url)).slice(0,6);
 const countries=(v?:string[])=>[...new Set((v??[]).map(x=>x.trim().toUpperCase()).filter(Boolean))].slice(0,50);
 const validDate=(v?:string)=>!v||Number.isFinite(Date.parse(v));
 
@@ -30,7 +30,7 @@ async function recipients(db:any,id:string,audience:string,cc:string[]) {
   const {error}=await db.from("telegram_broadcast_recipients").upsert(list.map(telegram_id=>({broadcast_id:id,telegram_id})),{onConflict:"broadcast_id,telegram_id",ignoreDuplicates:true});
   if(error)throw new Error(error.message); await db.from("telegram_broadcasts").update({total_recipients:list.length}).eq("id",id); return list.length;
 }
-function appUrl(){return String(process.env.PUBLIC_APP_URL||"").replace(/\\/$/,"")||(`${process.env.VERCEL_URL?"https://"+process.env.VERCEL_URL:""}`);}
+function appUrl(){return String(process.env.PUBLIC_APP_URL||"").replace(/\/$/,"")||(`${process.env.VERCEL_URL?"https://"+process.env.VERCEL_URL:""}`);}
 function track(url:string,b:string,r:string,i:number){const base=appUrl();return base?`${base}/api/telegram/broadcast/click?b=${encodeURIComponent(b)}&r=${encodeURIComponent(r)}&i=${i}&u=${encodeURIComponent(url)}`:url;}
 
 async function send(token:string,chatId:number,x:any) {
