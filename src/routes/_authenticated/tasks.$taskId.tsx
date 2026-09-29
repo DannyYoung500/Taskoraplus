@@ -27,8 +27,7 @@ function TaskDetail() {
   const platform = task.platform as Platform;
   const isTelegramJoin =
     String(task.platform).toLowerCase() === "telegram" ||
-    /t\.me\//i.test(String(task.link ?? "")) ||
-    String(task.proof) === "auto";
+    /t\.me\//i.test(String(task.link ?? ""));
   const isWatch =
     String(task.proof) === "auto" &&
     /watch/i.test(String(task.title ?? "")) &&
