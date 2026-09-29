@@ -23,7 +23,6 @@ import {
 import { getDashboard } from "@/lib/taskora.functions";
 import {
   completeWatchVideo,
-  heartbeatWatchVideo,
   listWatchVideos,
   startWatchVideo,
   type WatchVideo,
@@ -56,7 +55,6 @@ function WatchEarnPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
-  const [isPlaying, setIsPlaying] = useState(false);
 
   const active = videos.find((v) => v.id === activeId) ?? null;
   const profile = dashboard?.profile as {
@@ -86,7 +84,6 @@ function WatchEarnPage() {
     if (!activeId) return;
     setSessionId(null);
     setElapsed(0);
-    setIsPlaying(false);
     setMessage(null);
     let cancelled = false;
     setBusy(true);
@@ -109,35 +106,9 @@ function WatchEarnPage() {
 
   useEffect(() => {
     if (!sessionId || !active) return;
-    let cancelled = false;
-
-    const heartbeat = async () => {
-      if (!isPlaying || document.visibilityState !== "visible") return;
-      try {
-        const result = await heartbeatWatchVideo({
-          data: { sessionId, playing: true, visible: true },
-        });
-        if (!cancelled) {
-          const qualified = Number((result as { qualifiedSeconds?: number }).qualifiedSeconds ?? 0);
-          setElapsed((current) => Math.max(current, qualified));
-        }
-      } catch {
-        // Server remains authoritative; missed heartbeats never grant watch time.
-      }
-    };
-
-    const timer = window.setInterval(() => {
-      if (isPlaying && document.visibilityState === "visible") setElapsed((v) => v + 1);
-    }, 1000);
-    const beat = window.setInterval(() => void heartbeat(), 5000);
-    void heartbeat();
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      window.clearInterval(beat);
-    };
-  }, [sessionId, active?.id, isPlaying]);
+    const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [sessionId, active?.id]);
 
   async function onComplete() {
     if (!sessionId || !active) return;
@@ -162,7 +133,6 @@ function WatchEarnPage() {
     setActiveId(null);
     setSessionId(null);
     setElapsed(0);
-    setIsPlaying(false);
     setMessage(null);
   }
 
@@ -182,7 +152,6 @@ function WatchEarnPage() {
         onBack={closePlayer}
         onComplete={() => void onComplete()}
         onSelect={setActiveId}
-        onPlayingChange={setIsPlaying}
       />
     );
   }
@@ -422,7 +391,6 @@ function WatchPlayer({
   onBack: () => void;
   onComplete: () => void;
   onSelect: (id: string) => void;
-  onPlayingChange: (playing: boolean) => void;
 }) {
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#05080f] pb-24 text-white">
@@ -447,7 +415,7 @@ function WatchPlayer({
       </header>
       <section className="bg-black">
         <div className="relative aspect-video w-full">
-          <VideoPlayer video={active} onPlayingChange={onPlayingChange} />
+          <VideoPlayer video={active} />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/85 to-transparent" />
           <div className="absolute inset-x-3 bottom-3">
             <div className="mb-2 h-1 overflow-hidden rounded-full bg-white/20">
@@ -482,86 +450,61 @@ function WatchPlayer({
   );
 }
 
-function VideoPlayer({ video, onPlayingChange }: { video: WatchVideo; onPlayingChange: (playing: boolean) => void }) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const playerRef = useRef<any>(null);
-  const youtubeId = getYoutubeId(video.videoUrl ?? "");
-
-  useEffect(() => {
-    if (!youtubeId) return;
-    let cancelled = false;
-
-    const createPlayer = () => {
-      if (cancelled || !hostRef.current || !(window as any).YT?.Player) return;
-      playerRef.current?.destroy?.();
-      playerRef.current = new (window as any).YT.Player(hostRef.current, {
-        videoId: youtubeId,
-        playerVars: { autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1, enablejsapi: 1 },
-        events: {
-          onStateChange: (event: any) => onPlayingChange(Number(event?.data) === 1),
-        },
-      });
-    };
-
-    const w = window as any;
-    if (w.YT?.Player) {
-      createPlayer();
-    } else {
-      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-        const script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
-        script.async = true;
-        document.head.appendChild(script);
-      }
-      const previous = w.onYouTubeIframeAPIReady;
-      w.onYouTubeIframeAPIReady = () => {
-        previous?.();
-        createPlayer();
-      };
-      const wait = window.setInterval(() => {
-        if (w.YT?.Player) {
-          window.clearInterval(wait);
-          createPlayer();
-        }
-      }, 250);
-      window.setTimeout(() => window.clearInterval(wait), 10000);
-    }
-
-    return () => {
-      cancelled = true;
-      onPlayingChange(false);
-      playerRef.current?.destroy?.();
-      playerRef.current = null;
-    };
-  }, [youtubeId, onPlayingChange]);
-
-  if (youtubeId) return <div ref={hostRef} className="size-full" />;
-
-  if (video.videoUrl) {
+function VideoPlayer({ video }: { video: WatchVideo }) {
+  const embed = getEmbedUrl(video.videoUrl ?? "", video.providerName);
+  if (embed) {
     return (
-      <a href={video.videoUrl} target="_blank" rel="noreferrer" className="flex size-full flex-col items-center justify-center gap-3 bg-[#0b1420] text-cyan-200">
+      <iframe
+        title={video.title || "Watch"}
+        src={embed}
+        className="size-full"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    );
+  }
+  const link = video.videoUrl;
+  if (link) {
+    return (
+      <a
+        href={link}
+        target="_blank"
+        rel="noreferrer"
+        className="flex size-full flex-col items-center justify-center gap-3 bg-[#0b1420] text-cyan-200"
+      >
         <Play className="size-12" />
         <span className="text-xs font-bold">Open video on {video.providerName || "platform"}</span>
       </a>
     );
   }
-
-  return <div className="flex size-full items-center justify-center bg-[#0b1420] text-slate-400"><Play className="size-12" /></div>;
+  return (
+    <div className="flex size-full items-center justify-center bg-[#0b1420] text-slate-400">
+      <Play className="size-12" />
+    </div>
+  );
 }
 
-function getYoutubeId(videoUrl: string) {
+function getEmbedUrl(videoUrl: string | null, providerName: string | null) {
+  if (!videoUrl) return null;
   try {
     const url = new URL(videoUrl);
     const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] ?? "";
-    if (host === "youtube.com" || host === "m.youtube.com") {
-      if (url.pathname === "/watch") return url.searchParams.get("v") ?? "";
-      const parts = url.pathname.split("/").filter(Boolean);
-      const marker = parts.findIndex((part) => ["embed", "shorts", "live"].includes(part));
-      return marker >= 0 ? parts[marker + 1] ?? "" : "";
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be") {
+      let id = "";
+      if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? "";
+      else if (url.pathname.startsWith("/watch")) id = url.searchParams.get("v") ?? "";
+      else if (url.pathname.startsWith("/shorts/")) id = url.pathname.split("/")[2] ?? "";
+      else if (url.pathname.startsWith("/embed/")) id = url.pathname.split("/")[2] ?? "";
+      return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1` : null;
     }
-  } catch {}
-  return "";
+    if (host === "vimeo.com" || host === "player.vimeo.com") {
+      const id = url.pathname.split("/").filter(Boolean).pop();
+      return id && /^\d+$/.test(id) ? `https://player.vimeo.com/video/${id}?autoplay=1` : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function formatTime(totalSeconds: number) {
