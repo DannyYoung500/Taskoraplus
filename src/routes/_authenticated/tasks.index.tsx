@@ -168,6 +168,13 @@ function TasksScreen() {
               description?: string | null;
               difficulty?: string | null;
               featured?: boolean | null;
+              advertiserProfile?: {
+                displayName: string;
+                username: string | null;
+                verified: boolean;
+                level: string;
+                streak: number;
+              } | null;
             };
             const reward = formatUsd(Number(t.reward));
             const seconds = Number(t.seconds ?? 0);
