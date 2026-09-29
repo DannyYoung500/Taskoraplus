@@ -617,10 +617,12 @@ export const ownerUpdateDeposit = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     if (data.status === "completed") {
-      const amount=Math.abs(Number(prev.amount));
-      await db.from("transactions").insert({ user_id: prev.user_id, label: `Deposit verified — ${prev.method}`, amount, kind: "bonus" });
-      const { error:fundingError }=await db.rpc("credit_advertiser_deposit",{p_deposit_id:prev.id,p_advertiser_id:prev.user_id,p_amount:amount});
-      if(fundingError) throw new Error("Deposit was marked completed but advertiser funding could not be credited: "+fundingError.message);
+      const { data: settled, error: fundingError } = await db.rpc("complete_advertiser_deposit", {
+        p_deposit_id: prev.id,
+        p_admin_id: context.userId,
+      });
+      if (fundingError) throw new Error(fundingError.message);
+      return { status: data.status, balance: Number((settled as { balance?: number } | null)?.balance ?? 0) };
     }
     await log(context.userId, `deposit.${data.status}`, {
       targetType: "deposit",
