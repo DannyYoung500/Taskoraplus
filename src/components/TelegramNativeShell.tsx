@@ -8,8 +8,8 @@ type TelegramWebApp = {
   addToHomeScreen?: () => void;
   checkHomeScreenStatus?: (cb: (status: string) => void) => void;
   enableVerticalSwipes?: () => void;
-  onEvent?: (event: string, callback: () => void) => void;
-  offEvent?: (event: string, callback: () => void) => void;
+  onEvent?: (event: string, callback: (data?: Record<string, number>) => void) => void;
+  offEvent?: (event: string, callback: (data?: Record<string, number>) => void) => void;
   isActive?: boolean;
   viewportHeight?: number;
   viewportStableHeight?: number;
@@ -52,12 +52,18 @@ function syncTheme(tg: TelegramWebApp) {
   }
 }
 
-function syncSafeArea() {
+function syncSafeArea(data?: Record<string, number>) {
   const root = document.documentElement;
   root.style.setProperty("--tg-safe-top", "env(safe-area-inset-top, 0px)");
   root.style.setProperty("--tg-safe-right", "env(safe-area-inset-right, 0px)");
   root.style.setProperty("--tg-safe-bottom", "env(safe-area-inset-bottom, 0px)");
   root.style.setProperty("--tg-safe-left", "env(safe-area-inset-left, 0px)");
+  if (data) {
+    root.style.setProperty("--tg-content-safe-top", `${data.top ?? 0}px`);
+    root.style.setProperty("--tg-content-safe-right", `${data.right ?? 0}px`);
+    root.style.setProperty("--tg-content-safe-bottom", `${data.bottom ?? 0}px`);
+    root.style.setProperty("--tg-content-safe-left", `${data.left ?? 0}px`);
+  }
 }
 
 export function TelegramNativeShell() {
