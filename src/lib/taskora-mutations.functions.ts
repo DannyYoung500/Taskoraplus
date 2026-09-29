@@ -45,6 +45,9 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     }
     const { data: task } = await supabaseAdmin.from("tasks").select("*").eq("id", data.taskId).eq("is_active", true).maybeSingle();
     if (!task) throw new Error("This task is no longer available.");
+    if (task.created_by && String(task.created_by) === String(userId)) {
+      throw new Error("You cannot complete your own task.");
+    }
     if (task.slots_left <= 0) throw new Error("All slots for this task are taken.");
     const { data: existing } = await supabaseAdmin.from("submissions").select("id").eq("user_id", userId).eq("task_id", data.taskId).maybeSingle();
     if (existing) throw new Error("You already submitted this task.");

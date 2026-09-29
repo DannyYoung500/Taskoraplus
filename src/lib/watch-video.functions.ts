@@ -31,6 +31,7 @@ export type WatchVideo = {
   rewardPoints: number;
   durationSeconds: number;
   viewsCount: number;
+  youtubeViewsCount: number | null;
   status: string;
   postedByName: string | null;
   postedByUsername: string | null;
@@ -51,6 +52,7 @@ function mapVideo(row: Record<string, unknown>): WatchVideo {
     rewardPoints: Number(row.reward_points ?? 0),
     durationSeconds: Number(row.duration_seconds ?? 0),
     viewsCount: Number(row.views_count ?? 0),
+    youtubeViewsCount: row.youtube_view_count == null ? null : Number(row.youtube_view_count),
     status: String(row.status ?? "active"),
     postedByName: (row.posted_by_name as string | null) ?? null,
     postedByUsername: (row.posted_by_username as string | null) ?? null,
@@ -65,16 +67,46 @@ function normalizeYoutubeInput(raw: string): { id: string; url: string } {
   return { id, url: youtubeWatchUrl(id) };
 }
 
+async function fetchYoutubePublicViewCount(videoId: string): Promise<number | null> {
+  try {
+    const apiKey = process.env["YOUTUBE_API_KEY"]?.trim();
+    if (apiKey) {
+      const response = await fetch(
+        "https://www.googleapis.com/youtube/v3/videos?part=statistics&id=" +
+          encodeURIComponent(videoId) + "&key=" + encodeURIComponent(apiKey),
+        { headers: { accept: "application/json" } },
+      );
+      if (response.ok) {
+        const json = (await response.json()) as { items?: Array<{ statistics?: { viewCount?: string } }> };
+        const count = Number(json.items?.[0]?.statistics?.viewCount ?? "");
+        if (Number.isFinite(count) && count >= 0) return Math.floor(count);
+      }
+    }
+    const response = await fetch("https://www.youtube.com/watch?v=" + encodeURIComponent(videoId), {
+      headers: { accept: "text/html", "user-agent": "Mozilla/5.0 TASKORA/1.0" },
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+    const match = html.match(/"viewCount":"(\d+)"/) || html.match(/"viewCount":(\d+)/);
+    if (!match) return null;
+    const count = Number(match[1]);
+    return Number.isFinite(count) ? Math.floor(count) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const listWatchVideos = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
     const s = await adminClient();
     const { data, error } = await (s as any)
       .from("watch_videos")
       .select(
-        "id,title,description,thumbnail_url,video_url,source_type,provider_name,provider_video_id,reward_usdt,reward_points,duration_seconds,views_count,status,created_by",
+        "id,title,description,thumbnail_url,video_url,source_type,provider_name,provider_video_id,reward_usdt,reward_points,duration_seconds,views_count,youtube_view_count,youtube_view_count_updated_at,status,created_by",
       )
       .eq("status", "active")
+      .or(`created_by.is.null,created_by.neq.${context.userId}`)
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
@@ -84,15 +116,31 @@ export const listWatchVideos = createServerFn({ method: "GET" })
       ? await s.from("profiles").select("id,display_name,username,photo_url").in("id", creatorIds)
       : ({ data: [] } as any);
     const profileMap = new Map((profiles.data ?? []).map((p: any) => [String(p.id), p]));
-    return rows.map((row) => {
+    const mapped = rows.map((row) => {
       const p = profileMap.get(String(row.created_by ?? ""));
       return mapVideo({
         ...row,
         posted_by_name: p?.display_name ?? null,
-        posted_by_username: p?.username ?? null,
         posted_by_photo_url: p?.photo_url ?? null,
       });
     });
+
+    await Promise.all(mapped.slice(0, 25).map(async (video) => {
+      const providerId = String(video.providerVideoId ?? "");
+      if (!providerId || String(video.providerName ?? "").toLowerCase() !== "youtube") return;
+      const raw = rows.find((r) => String(r.id) === video.id);
+      const updatedAt = raw?.youtube_view_count_updated_at ? new Date(String(raw.youtube_view_count_updated_at)).getTime() : 0;
+      if (video.youtubeViewsCount != null && Date.now() - updatedAt < 10 * 60_000) return;
+      const count = await fetchYoutubePublicViewCount(providerId);
+      if (count == null) return;
+      video.youtubeViewsCount = count;
+      await (s as any).from("watch_videos").update({
+        youtube_view_count: count,
+        youtube_view_count_updated_at: new Date().toISOString(),
+      }).eq("id", video.id);
+    }));
+
+    return mapped;
   });
 
 export const startWatchVideo = createServerFn({ method: "POST" })
@@ -123,11 +171,14 @@ export const startWatchVideo = createServerFn({ method: "POST" })
     const s = await adminClient();
     const { data: v } = await (s as any)
       .from("watch_videos")
-      .select("id,status,source_type,duration_seconds,reward_usdt,reward_points,max_views,views_count")
+      .select("id,status,source_type,duration_seconds,reward_usdt,reward_points,max_views,views_count,created_by")
       .eq("id", data.videoId)
       .eq("status", "active")
       .maybeSingle();
     if (!v) throw new Error("This video is no longer available.");
+    if (v.created_by && String(v.created_by) === String(context.userId)) {
+      throw new Error("You cannot complete your own posted video.");
+    }
     if (v.max_views != null && Number(v.views_count) >= Number(v.max_views)) {
       throw new Error("This video has reached its view limit.");
     }

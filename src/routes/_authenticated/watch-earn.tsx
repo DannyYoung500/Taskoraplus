@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, Bell, Gift, Play, Zap } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import {
   completeWatchVideo,
+  heartbeatWatchVideo,
   listWatchVideos,
   startWatchVideo,
   type WatchVideo,
@@ -44,6 +45,7 @@ function WatchEarnPage() {
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [bonusLeft, setBonusLeft] = useState(BONUS_AD.dailyLimit);
   const [bonusBusy, setBonusBusy] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const active = videos.find((v) => v.id === activeId) ?? null;
   const profile = dashboard?.profile as {
@@ -55,24 +57,7 @@ function WatchEarnPage() {
   const progress = Math.min(100, Math.round((elapsed / required) * 100));
   const canComplete = Boolean(sessionId && elapsed >= required && !busy);
 
-  /** Live accrual while watching (display only; claim still requires full watch). */
-  const liveSessionDisplay = useMemo(() => {
-    if (!active) return sessionEarned;
-    const reward = Number(active.rewardUsdt ?? 0);
-    const secs = Math.max(30, Number(active.durationSeconds ?? 60));
-    if (reward <= 0) return sessionEarned;
-    const perSec = reward / secs;
-    const accrued = Math.min(reward, perSec * elapsed);
-    return sessionEarned + accrued;
-  }, [active, elapsed, sessionEarned]);
-
-  const hourlyRateForActive = useMemo(() => {
-    if (!active) return 0;
-    const reward = Number(active.rewardUsdt ?? 0);
-    const secs = Math.max(30, Number(active.durationSeconds ?? 60));
-    if (reward <= 0) return 0;
-    return reward * (3600 / secs);
-  }, [active]);
+  const completionReward = active ? Number(active.rewardUsdt ?? 0) : 0;
 
   const upNext = useMemo(() => {
     if (!activeId) return videos.slice(0, 10);
@@ -83,6 +68,7 @@ function WatchEarnPage() {
     if (!activeId) return;
     setSessionId(null);
     setElapsed(0);
+    setIsPlaying(false);
     setMessage(null);
     let cancelled = false;
     setBusy(true);
@@ -105,9 +91,37 @@ function WatchEarnPage() {
 
   useEffect(() => {
     if (!sessionId || !active) return;
-    const timer = window.setInterval(() => setElapsed((v) => v + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [sessionId, active?.id]);
+    let cancelled = false;
+
+    const heartbeat = async () => {
+      if (!isPlaying || document.visibilityState !== "visible") return;
+      try {
+        const result = await heartbeatWatchVideo({
+          data: { sessionId, playing: true, visible: true },
+        });
+        if (!cancelled) {
+          const qualified = Number((result as { qualifiedSeconds?: number }).qualifiedSeconds ?? 0);
+          setElapsed((current) => Math.max(current, qualified));
+        }
+      } catch {
+        // Server remains authoritative; missed heartbeats never grant watch time.
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      if (isPlaying && document.visibilityState === "visible") {
+        setElapsed((v) => v + 1);
+      }
+    }, 1000);
+    const beat = window.setInterval(() => void heartbeat(), 5000);
+    void heartbeat();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.clearInterval(beat);
+    };
+  }, [sessionId, active?.id, isPlaying]);
 
   async function onComplete() {
     if (!sessionId || !active) return;
@@ -167,8 +181,9 @@ function WatchEarnPage() {
         canComplete={canComplete}
         busy={busy}
         message={message}
-        sessionDisplay={liveSessionDisplay}
-        hourlyRate={hourlyRateForActive}
+        completionReward={completionReward}
+        isPlaying={isPlaying}
+        onPlayingChange={setIsPlaying}
         onBack={closePlayer}
         onComplete={() => void onComplete()}
         onSelect={setActiveId}
@@ -266,7 +281,7 @@ function WatchEarnPage() {
             <Play className="mx-auto size-10 text-slate-600" />
             <p className="mt-3 text-sm font-bold text-slate-300">No videos yet</p>
             <p className="mt-1 text-[10px] text-slate-500">
-              Owner adds YouTube URLs in the advertise / watch inventory.
+              New videos appear here as campaigns become active.
             </p>
           </div>
         ) : (
@@ -316,17 +331,9 @@ function getVideoThumbnail(video: WatchVideo): string | null {
   return null;
 }
 
-function hourlyRateLabel(video: WatchVideo): string {
+function rewardLabel(video: WatchVideo): string {
   const reward = Number(video.rewardUsdt ?? 0);
-  const secs = Math.max(30, Number(video.durationSeconds ?? 60));
-  if (reward <= 0) {
-    const pts = Number(video.rewardPoints ?? 0);
-    if (pts > 0) return `+${pts} TP`;
-    return "Earn";
-  }
-  const perHour = reward * (3600 / secs);
-  if (perHour >= 0.01) return `${formatUsd(perHour)}/h`;
-  return formatUsd(reward);
+  return reward > 0 ? `+${formatUsd(reward)}` : "Reward";
 }
 
 function VideoFeedCard({
@@ -378,7 +385,7 @@ function VideoFeedCard({
           </h3>
           <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-black text-cyan-300">
             <Zap className="size-3.5 fill-cyan-300/40" />
-            {hourlyRateLabel(video)}
+            {rewardLabel(video)}
           </span>
         </div>
         <div className="flex items-center gap-2 px-0.5 pt-1.5">
@@ -390,12 +397,11 @@ function VideoFeedCard({
             </span>
           )}
           <span className="min-w-0 truncate text-[10px] font-semibold text-slate-400">
-            {video.postedByName ?? "TASKORA advertiser"}
-            {video.postedByUsername ? " · @" + video.postedByUsername : ""}
+            {video.postedByName ?? "TASKORA"}
           </span>
           <span className="shrink-0 text-[10px] text-slate-600">•</span>
           <span className="shrink-0 text-[10px] font-medium text-slate-500">
-            {formatCompactViews(video.viewsCount)} views
+            {formatCompactViews(video.youtubeViewsCount ?? video.viewsCount)} views
           </span>
           <span className="shrink-0 text-[10px] font-medium text-slate-500">• {formatTime(video.durationSeconds)}</span>
         </div>
@@ -424,7 +430,9 @@ function WatchPlayer({
   busy,
   message,
   sessionDisplay,
-  hourlyRate,
+  completionReward,
+  isPlaying,
+  onPlayingChange,
   onBack,
   onComplete,
   onSelect,
@@ -438,7 +446,9 @@ function WatchPlayer({
   busy: boolean;
   message: string | null;
   sessionDisplay: number;
-  hourlyRate: number;
+  completionReward: number;
+  isPlaying: boolean;
+  onPlayingChange: (playing: boolean) => void;
   onBack: () => void;
   onComplete: () => void;
   onSelect: (id: string) => void;
@@ -460,7 +470,7 @@ function WatchPlayer({
       {/* YouTube embed — full width like NEWTUBE */}
       <section className="bg-black">
         <div className="relative aspect-video w-full">
-          <VideoPlayer video={active} />
+          <VideoPlayer video={active} onPlayingChange={onPlayingChange} />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/85 to-transparent" />
           <div className="absolute inset-x-3 bottom-2">
             <div className="mb-1 h-1 overflow-hidden rounded-full bg-white/20">
@@ -483,17 +493,16 @@ function WatchPlayer({
       <section className="px-3.5 pt-4">
         <div className="rounded-2xl border border-cyan-400/25 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,.14),transparent_55%),#0a1424] px-4 py-5 text-center shadow-[0_0_28px_rgba(34,211,238,0.08)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Earned this session
+            Reward for completing this watch
           </p>
           <p className="mt-1.5 text-[32px] font-black tabular-nums leading-none text-cyan-200">
-            {formatUsd(sessionDisplay)}
+            {formatUsd(completionReward)}
           </p>
           <p className="mt-2 text-[11px] font-medium text-slate-500">
-            {hourlyRate > 0
-              ? `${formatUsd(hourlyRate)} earned per hour watched`
-              : Number(active.rewardUsdt) > 0
-                ? `${formatUsd(active.rewardUsdt)} per completed watch`
-                : `+${Number(active.rewardPoints || 0)} TP per completed watch`}
+            Finish the required watch time to earn this exact amount.
+          </p>
+          <p className="mt-1 text-[10px] font-semibold text-cyan-300/80">
+            {isPlaying ? "Playing · time is being verified" : "Press play to start verified watch time"}
           </p>
         </div>
 
@@ -508,7 +517,9 @@ function WatchPlayer({
             ? "Claiming…"
             : canComplete
               ? "Claim reward"
-              : `Watch ${Math.max(0, required - elapsed)}s more`}
+              : isPlaying
+                ? `Watch ${Math.max(0, required - elapsed)}s more`
+                : "Play the video to start"}
         </button>
         {message ? (
           <p className="mt-2 text-center text-xs font-semibold text-cyan-200">{message}</p>
@@ -549,7 +560,7 @@ function WatchPlayer({
                   </p>
                   <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-300/90">
                     <Zap className="size-3 fill-cyan-300/30" />
-                    {hourlyRateLabel(v)}
+                    {rewardLabel(v)}
                   </p>
                 </div>
               </button>
@@ -564,62 +575,91 @@ function WatchPlayer({
   );
 }
 
-function VideoPlayer({ video }: { video: WatchVideo }) {
-  const embed = getEmbedUrl(video.videoUrl ?? "", video.providerName);
-  if (embed) {
-    return (
-      <iframe
-        title={video.title || "Watch"}
-        src={embed}
-        className="size-full border-0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-      />
-    );
-  }
+function VideoPlayer({ video, onPlayingChange }: { video: WatchVideo; onPlayingChange: (playing: boolean) => void }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const playerRef = useRef<any>(null);
+  const youtubeId = getYoutubeId(video.videoUrl ?? "");
+
+  useEffect(() => {
+    if (!youtubeId) return;
+    let cancelled = false;
+
+    const createPlayer = () => {
+      if (cancelled || !hostRef.current || !(window as any).YT?.Player) return;
+      playerRef.current?.destroy?.();
+      playerRef.current = new (window as any).YT.Player(hostRef.current, {
+        videoId: youtubeId,
+        playerVars: { autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1, enablejsapi: 1 },
+        events: {
+          onStateChange: (event: any) => {
+            onPlayingChange(Number(event?.data) === 1);
+          },
+        },
+      });
+    };
+
+    const w = window as any;
+    if (w.YT?.Player) {
+      createPlayer();
+    } else {
+      let wait: ReturnType<typeof setInterval> | undefined;
+      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        script.async = true;
+        document.head.appendChild(script);
+      }
+      const previous = w.onYouTubeIframeAPIReady;
+      w.onYouTubeIframeAPIReady = () => {
+        previous?.();
+        createPlayer();
+      };
+      wait = setInterval(() => {
+        if (w.YT?.Player) {
+          clearInterval(wait);
+          createPlayer();
+        }
+      }, 250);
+      setTimeout(() => wait && clearInterval(wait), 10000);
+    }
+
+    return () => {
+      cancelled = true;
+      onPlayingChange(false);
+      playerRef.current?.destroy?.();
+      playerRef.current = null;
+    };
+  }, [youtubeId, onPlayingChange]);
+
+  if (youtubeId) return <div ref={hostRef} className="size-full" />;
+
   if (video.videoUrl) {
     return (
-      <a
-        href={video.videoUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="flex size-full flex-col items-center justify-center gap-2 bg-[#0b1420] text-cyan-200"
-      >
+      <a href={video.videoUrl} target="_blank" rel="noreferrer" className="flex size-full flex-col items-center justify-center gap-2 bg-[#0b1420] text-cyan-200">
         <Play className="size-12" />
         <span className="text-xs font-bold">Open on {video.providerName || "platform"}</span>
       </a>
     );
   }
-  return (
-    <div className="flex size-full items-center justify-center bg-[#0b1420] text-slate-500">
-      <Play className="size-12" />
-    </div>
-  );
+
+  return <div className="flex size-full items-center justify-center bg-[#0b1420] text-slate-500"><Play className="size-12" /></div>;
 }
 
-function getEmbedUrl(videoUrl: string | null, _providerName: string | null) {
-  if (!videoUrl) return null;
+function getYoutubeId(videoUrl: string) {
   try {
     const url = new URL(videoUrl);
     const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be") {
-      let id = "";
-      if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? "";
-      else if (url.pathname.startsWith("/watch")) id = url.searchParams.get("v") ?? "";
-      else if (url.pathname.startsWith("/shorts/")) id = url.pathname.split("/")[2] ?? "";
-      else if (url.pathname.startsWith("/embed/")) id = url.pathname.split("/")[2] ?? "";
-      return id
-        ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
-        : null;
-    }
-    if (host === "vimeo.com" || host === "player.vimeo.com") {
-      const id = url.pathname.split("/").filter(Boolean).pop();
-      return id && /^\d+$/.test(id) ? `https://player.vimeo.com/video/${id}?autoplay=1` : null;
+    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] ?? "";
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (url.pathname === "/watch") return url.searchParams.get("v") ?? "";
+      const parts = url.pathname.split("/").filter(Boolean);
+      const marker = parts.findIndex((part) => ["embed", "shorts", "live"].includes(part));
+      return marker >= 0 ? parts[marker + 1] ?? "" : "";
     }
   } catch {
-    return null;
+    return "";
   }
-  return null;
+  return "";
 }
 
 function formatTime(totalSeconds: number) {

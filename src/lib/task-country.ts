@@ -15,6 +15,7 @@ export function isCountryCode(code: string | null | undefined): boolean {
   return COUNTRY_CODES.includes(c);
 }
 export async function isTaskEligibleForUser(opts: {supabaseAdmin:any; task:any; userId:string}): Promise<boolean> {
+  if (opts.task?.created_by && String(opts.task.created_by) === String(opts.userId)) return false;
   const target=String(opts.task?.target_country_code??"").trim().toUpperCase();
   if (!target) return true;
   const {data:profile}=await opts.supabaseAdmin.from("profiles").select("country_code,status").eq("id",opts.userId).maybeSingle();

@@ -64,6 +64,7 @@ export const listTasks = createServerFn({ method: "GET" })
     }
     const userCountry=String(profile?.country_code??"").trim().toUpperCase();
     return rows.filter((task:any)=>{
+      if (task.created_by && String(task.created_by) === String(context.userId)) return false;
       const target=String(task.target_country_code??"").trim().toUpperCase();
       if(!target || target===userCountry) return true;
       if(task.allow_other_countries_if_unavailable===false) return false;
