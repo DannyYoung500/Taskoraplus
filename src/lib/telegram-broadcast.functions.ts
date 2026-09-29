@@ -242,3 +242,52 @@ export const processTelegramBroadcast = createServerFn({ method: "POST" })
     }
     return updated;
   });
+
+export const listTelegramBroadcastTemplates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { db } = await ownerContext(context.userId);
+    const { data, error } = await db.from("telegram_broadcast_templates").select("*").eq("created_by", context.userId).order("updated_at", { ascending: false }).limit(50);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const saveTelegramBroadcastTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: any) => d)
+  .handler(async ({ data, context }) => {
+    const { db } = await ownerContext(context.userId);
+    const name = String(data.name || "").trim();
+    if (!name) throw new Error("Template name is required.");
+    const buttons = normalizeButtons(data.buttons, data.buttonText, data.buttonUrl);
+    const { data: template, error } = await db.from("telegram_broadcast_templates").upsert({
+      name, title: String(data.title || "").trim(), body: String(data.body || "").trim(),
+      media_url: data.mediaUrl || null, media_type: data.mediaType || "none", buttons,
+      disable_notification: Boolean(data.disableNotification), protect_content: Boolean(data.protectContent),
+      created_by: context.userId,
+    }, { onConflict: "created_by,name" }).select("*").single();
+    if (error) throw new Error(error.message);
+    return template;
+  });
+
+export const deleteTelegramBroadcastTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { db } = await ownerContext(context.userId);
+    const { error } = await db.from("telegram_broadcast_templates").delete().eq("id", data.id).eq("created_by", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const getTelegramBroadcastAnalytics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { broadcastId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { db } = await ownerContext(context.userId);
+    const { count } = await db.from("telegram_broadcast_clicks").select("id", { count: "exact", head: true }).eq("broadcast_id", data.broadcastId);
+    const { data: rows } = await db.from("telegram_broadcast_clicks").select("button_index").eq("broadcast_id", data.broadcastId);
+    const byButton = new Map<number, number>();
+    for (const row of rows ?? []) byButton.set(Number(row.button_index), (byButton.get(Number(row.button_index)) ?? 0) + 1);
+    return { clicks: count ?? 0, byButton: [...byButton.entries()].map(([buttonIndex, value]) => ({ buttonIndex, count: value })) };
+  });
