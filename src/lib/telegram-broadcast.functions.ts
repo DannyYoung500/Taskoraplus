@@ -39,7 +39,7 @@ async function telegramSend(token: string, chatId: number, input: {
   const type=input.mediaType||"none";
   const endpoint=type==="image"?"sendPhoto":type==="video"?"sendVideo":type==="document"?"sendDocument":type==="audio"?"sendAudio":type==="voice"?"sendVoice":"sendMessage";
   const key:any={image:"photo",video:"video",document:"document",audio:"audio",voice:"voice"}[type];
-  const payload:any={chat_id:chatId,parse_mode:"HTML",reply_markup:bs.length?{inline_keyboard:rows}:undefined,disable_notification:!!input.disableNotification,protect_content:!!input.protectContent};
+  const payload:any={chat_id:chatId,parse_mode:"HTML",link_preview_options:{is_disabled:true},reply_markup:bs.length?{inline_keyboard:rows}:undefined,disable_notification:!!input.disableNotification,protect_content:!!input.protectContent};
   if(key&&input.mediaUrl){payload[key]=input.mediaUrl;payload.caption=input.body;}else payload.text=input.body;
   const response=await fetch(`https://api.telegram.org/bot${token}/${endpoint}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
   const result=await response.json() as {ok?:boolean;description?:string;parameters?:{retry_after?:number}};
