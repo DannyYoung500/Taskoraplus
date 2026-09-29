@@ -1,4 +1,4 @@
-declare global { interface Window { Telegram?: { WebApp?: { openTelegramLink?: (url:string)=>void } } } }\n\nimport { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, CheckCircle2, Clock3, ShieldCheck, Users, Share2 } from "lucide-react";
 import { Screen } from "@/components/Screen";
@@ -6,6 +6,9 @@ import { PlatformBadge, platformLabel } from "@/components/PlatformIcon";
 import type { Platform } from "@/components/PlatformIcon";
 import { getTask } from "@/lib/taskora.functions";
 import { submitTaskGuarded } from "@/lib/taskora-mutations.functions";
+
+declare global { interface Window { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } } }
+
 
 export const Route = createFileRoute("/_authenticated/tasks/$taskId")({
   loader: async ({ params }) => {

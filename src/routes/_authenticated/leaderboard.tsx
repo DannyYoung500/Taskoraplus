@@ -36,14 +36,12 @@ function RankPage() {
     | {
         display_name?: string | null;
         photo_url?: string | null;
-        task_points?: number;
         level_num?: number | null;
       }
     | null;
 
   const name = profile?.display_name ?? "Tasker";
   const photo = profile?.photo_url ?? null;
-  const taskPoints = Number(profile?.task_points ?? 0);
   const levelNum = profile?.level_num ?? 1;
 
   const transactions = (dash?.transactions ?? []) as { amount: number | string }[];
@@ -58,13 +56,11 @@ function RankPage() {
       if (tab === "referrers") return r.referrals > 0;
       if (tab === "usdt") return Number(r.usdt_earned ?? 0) > 0;
       if (tab === "tasks") return Number(r.tasks_completed ?? 0) > 0;
-      return r.task_points > 0;
     })
     .sort((a, b) => {
       if (tab === "referrers") return b.referrals - a.referrals;
       if (tab === "usdt") return Number(b.usdt_earned ?? 0) - Number(a.usdt_earned ?? 0);
       if (tab === "tasks") return Number(b.tasks_completed ?? 0) - Number(a.tasks_completed ?? 0);
-      return b.task_points - a.task_points;
     });
 
   const myRank =
@@ -128,20 +124,6 @@ function RankPage() {
         </div>
       </section>
 
-      <section className="mb-3.5 flex items-center gap-3 rounded-2xl border border-amber-400/30 bg-gradient-to-r from-[#1a1408] to-[#0c1524] p-3.5">
-        <span className="inline-flex size-11 items-center justify-center rounded-full border border-amber-300/40 bg-amber-400/15 text-amber-200">
-          <Star className="size-5 fill-amber-300 text-amber-300" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <p className="text-sm font-black">Your Task Points</p>
-            <Info className="size-3 text-slate-500" />
-          </div>
-          <p className="text-[10px] text-slate-400">From check-ins, referrals, and owner daily quests.</p>
-        </div>
-        <p className="text-xl font-black text-amber-200">{taskPoints.toLocaleString()}</p>
-      </section>
-
       <section className="mb-3 overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
         <div className="flex items-center gap-3">
           <span className="inline-flex size-12 items-center justify-center rounded-full border border-amber-300/40 bg-amber-400/15 text-amber-200">
@@ -161,7 +143,6 @@ function RankPage() {
         {(
           [
             ["usdt", "USDT"],
-            ["points", "Points"],
             ["tasks", "Tasks"],
             ["referrers", "Invites"],
           ] as const
@@ -207,7 +188,7 @@ function RankPage() {
                   ? Number(row.usdt_earned ?? 0)
                   : tab === "tasks"
                     ? Number(row.tasks_completed ?? 0)
-                    : row.task_points;
+                    : Number(row.tasks_completed ?? 0);
             return (
               <div
                 key={row.user_id}
@@ -225,7 +206,7 @@ function RankPage() {
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-bold">{row.display_name}</p>
                     <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-slate-400">
-                      Lv. {Math.max(1, Math.floor(row.task_points / 250) + 1)}
+                      Lv. {Math.max(1, Math.floor(Number(row.tasks_completed ?? 0) / 10) + 1)}
                     </span>
                   </div>
                 </div>

@@ -10,7 +10,8 @@ import {
   WalletCards,
   Users,
 } from "lucide-react";
-import { getDashboard } from "@/lib/taskora.functions";\nimport { getGrowthSummary } from "@/lib/growth.functions";
+import { getDashboard } from "@/lib/taskora.functions";
+import { getGrowthSummary } from "@/lib/growth.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
 import { TASKORA_LOGO } from "@/lib/brand";
 import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
     const [dash, accounts, growth] = await Promise.all([
       getDashboard().catch(() => null),
       listConnectedAccounts().catch(() => []),
+      getGrowthSummary().catch(() => null),
     ]);
     return { dash, accounts };
   },
@@ -128,6 +130,15 @@ function ProfileScreen() {
           <Stat label="Available balance" value={formatUsd(balance)} />
           <Stat label="Lifetime earned" value={formatUsd(lifetime)} />
           <Stat label="Verified tasks" value={String(verified)} />
+        </div>
+      </section>
+
+      <section className="mb-4">
+        <SectionHeading title="Level & badges" sub="Calculated from verified activity and real earnings" />
+        <div className="rounded-2xl border border-white/8 bg-[#0b1628] p-4">
+          <div className="flex items-center justify-between"><div><p className="text-sm font-black">{growth?.level.name ?? level}</p><p className="text-[10px] text-slate-500">Level {growth?.level.number ?? levelNum} · {growth?.level.progress ?? 0}% to next</p></div><p className="text-xs font-bold text-cyan-300">{growth?.activity.tasks ?? verified} verified tasks</p></div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-cyan-400" style={{width:`${growth?.level.progress ?? 0}%`}} /></div>
+          <div className="mt-3 flex flex-wrap gap-2">{(growth?.badges ?? []).map((b)=><span key={b.id} title={b.detail} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${b.unlocked ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-300" : "border-white/8 bg-white/5 text-slate-500"}`}>{b.name}</span>)}</div>
         </div>
       </section>
 
