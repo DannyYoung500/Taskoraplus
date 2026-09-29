@@ -123,7 +123,12 @@ function AdvertisePage() {
     setDifficulty("easy");
     setScreenshotsRequired(1);
     setFeatured(false);
-    setVerificationMode(s.id === "yt_watch" ? "automatic" : "screenshot");
+    setVerificationMode(
+      s.id === "yt_watch" ||
+      ((platform === "telegram" || platform === "discord") && s.taskType === "join")
+        ? "automatic"
+        : "screenshot",
+    );
     setWatchMinutes(1);
     setWatchSeconds(0);
     setVideoDuration(null);
@@ -276,6 +281,9 @@ function AdvertisePage() {
   if (platform && service) {
     const meta = PLATFORM_META[platform];
     const isTgOrDiscord = platform === "telegram" || platform === "discord";
+    const automaticSupported =
+      isWatch ||
+      ((platform === "telegram" || platform === "discord") && service.taskType === "join");
     const typeLabel = taskTypeLabel(service.taskType);
     const formHeading = `${meta.label} ${typeLabel} Task`;
     return (
@@ -395,16 +403,22 @@ function AdvertisePage() {
             {!isWatch ? (
               <div className="rounded-xl border border-sky-400/15 bg-sky-400/[0.05] p-3">
                 <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sky-200/70">Verification method</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => { setVerificationMode("automatic"); setProofRequirements([]); setScreenshotsRequired(0); }} className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${verificationMode === "automatic" ? "border-sky-300/60 bg-sky-300/15 text-sky-100" : "border-white/10 bg-black/20 text-white/45"}`}>Automatic</button>
+                <div className={automaticSupported ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
+                  {automaticSupported ? (
+                    <button type="button" onClick={() => { setVerificationMode("automatic"); setProofRequirements([]); setScreenshotsRequired(0); }} className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${verificationMode === "automatic" ? "border-sky-300/60 bg-sky-300/15 text-sky-100" : "border-white/10 bg-black/20 text-white/45"}`}>Automatic</button>
+                  ) : null}
                   <button type="button" onClick={() => { setVerificationMode("screenshot"); setProofRequirements(["screenshot"]); setScreenshotsRequired(1); }} className={`rounded-xl border px-3 py-2.5 text-xs font-bold ${verificationMode === "screenshot" ? "border-sky-300/60 bg-sky-300/15 text-sky-100" : "border-white/10 bg-black/20 text-white/45"}`}>Screenshot</button>
                 </div>
                 <p className="mt-2 text-[10px] leading-relaxed text-white/40">
                   {verificationMode === "automatic"
-                    ? isTgOrDiscord
-                      ? "Membership is checked automatically. If it cannot run, the task stays unverified — no soft fallback to screenshot."
-                      : "System verifies when possible. If automatic check cannot run, the task stays unverified — no soft fallback to screenshot."
-                    : "Users submit proof; owner reviews. Automatic is not used for this campaign."}
+                    ? platform === "telegram"
+                      ? "TASKORA checks Telegram membership with the bot. If the check is unavailable or membership is not confirmed, the task stays unverified — there is no screenshot fallback."
+                      : platform === "discord"
+                        ? "TASKORA checks Discord server membership with the bot. If the check is unavailable or membership is not confirmed, the task stays unverified — there is no screenshot fallback."
+                        : "Watch completion is checked by the Watch & Earn playback system."
+                    : automaticSupported
+                      ? "Users submit proof; owner reviews. Automatic is not used for this campaign."
+                      : "Screenshot verification is required for this task type; automatic verification is not available."}
                 </p>
               </div>
             ) : (
