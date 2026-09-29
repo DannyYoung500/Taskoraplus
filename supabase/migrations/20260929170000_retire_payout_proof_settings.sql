@@ -1,1 +1,0 @@
-drop table if exists public.payout_proof_settings;

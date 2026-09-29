@@ -67,6 +67,68 @@ export const ownerSetPayoutPolicy = createServerFn({ method: "POST" })
   });
 
 
+/** Read / write public payout proof channel (Telegram channel id or @username). */
+export const ownerGetPayoutChannel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const { getPayoutChannelConfig } = await import("@/lib/notify-owner");
+    return getPayoutChannelConfig();
+  });
+
+export const ownerSetPayoutChannel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { channel_id: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const { setPayoutChannelConfig } = await import("@/lib/notify-owner");
+    const result = await setPayoutChannelConfig(data.channel_id);
+    await audit({
+      adminId: context.userId,
+      action: "payout_channel.update",
+      targetType: "settings",
+      targetId: "payout_channel",
+      previous: null,
+      next: result,
+    }).catch(() => undefined);
+    return { ok: true, ...result };
+  });
+
+
+export const ownerTestPayoutProof = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const { sendPayoutProofTest } = await import("@/lib/notify-owner");
+    const result = await sendPayoutProofTest();
+    await audit({ adminId: context.userId, action: "payout_channel.test", targetType: "settings", targetId: "payout_proof_settings", next: result }).catch(() => undefined);
+    return result;
+  });
+
+export const ownerRefreshPayoutChannel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const { refreshPayoutChannelPreview } = await import("@/lib/notify-owner");
+    const result = await refreshPayoutChannelPreview();
+    await audit({ adminId: context.userId, action: "payout_channel.preview_refresh", targetType: "settings", targetId: "payout_channel", next: result }).catch(() => undefined);
+    return result;
+  });
+
+export const ownerSetPayoutPresentation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { message_template: string; payout_image_data_url?: string; payout_image_file_name?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const { setPayoutPresentation } = await import("@/lib/notify-owner");
+    const presentation: { messageTemplate: string; imageDataUrl?: string; imageFileName?: string } = { messageTemplate: data.message_template };
+    if (data.payout_image_data_url) presentation.imageDataUrl = data.payout_image_data_url;
+    if (data.payout_image_file_name) presentation.imageFileName = data.payout_image_file_name;
+    const result = await setPayoutPresentation(presentation);
+    await audit({ adminId: context.userId, action: "payout_proof.presentation_update", targetType: "settings", targetId: "payout_proof_settings", next: { hasImage: Boolean(result.payout_image_url), messageTemplate: result.message_template } }).catch(() => undefined);
+    return result;
+  });
+
 /** Cron-friendly ops digest (owner session OR CRON_SECRET header). */
 export const cronOpsDigest = createServerFn({ method: "POST" })
   .handler(async () => {
