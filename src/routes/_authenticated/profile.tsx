@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
       listConnectedAccounts().catch(() => []),
       getGrowthSummary().catch(() => null),
     ]);
-    return { dash, accounts };
+    return { dash, accounts, growth };
   },
   head: () => ({ meta: [{ title: "Profile — TASKORA" }] }),
   component: ProfileScreen,
