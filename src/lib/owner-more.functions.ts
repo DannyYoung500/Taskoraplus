@@ -29,7 +29,7 @@ export const ownerListCampaigns = createServerFn({ method: "GET" })
       // table may be empty / missing columns
       return { campaigns: [], error: error.message };
     }
-    return { campaigns: data ?? [], error: null as string | null };
+    const campaigns=data??[]; const ids=campaigns.map((c:any)=>String(c.id)); const {data:tasks}=ids.length?await (db as any).from("tasks").select("id,campaign_id").in("campaign_id",ids):{data:[]}; const taskRows=tasks??[]; const taskIds=taskRows.map((t:any)=>String(t.id)); const {data:subs}=taskIds.length?await (db as any).from("submissions").select("id,task_id,status,fraud_flag").in("task_id",taskIds):{data:[]}; const stats=new Map<string,any>(); for(const c of campaigns) stats.set(String(c.id),{submissions:0,approved:0,rejected:0,pending:0,fraud:0}); const taskToCampaign=new Map(taskRows.map((t:any)=>[String(t.id),String(t.campaign_id)])); for(const s of subs??[]){const cid=taskToCampaign.get(String((s as any).task_id));const x=cid?stats.get(cid):null;if(!x)continue;x.submissions++;const st=String((s as any).status??"pending");if(st==="approved")x.approved++;else if(st==="rejected")x.rejected++;else x.pending++;if((s as any).fraud_flag)x.fraud++;} return { campaigns:campaigns.map((c:any)=>({...c,performance:stats.get(String(c.id))??{submissions:0,approved:0,rejected:0,pending:0,fraud:0}})), error:null as string|null };
   });
 
 export const ownerSetCampaignStatus = createServerFn({ method: "POST" })

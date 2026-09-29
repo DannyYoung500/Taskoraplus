@@ -21,3 +21,5 @@ function OwnerCampaignsPage(){
 }
 function Metric({label,value}:{label:string;value:any}){return <div className="rounded-2xl border border-white/8 bg-[#12141c] p-3"><p className="text-[9px] uppercase tracking-wide text-white/35">{label}</p><p className="mt-1 text-base font-bold">{value}</p></div>}
 function Stat({label,value}:{label:string;value:any}){return <div className="rounded-xl border border-white/6 bg-black/15 p-2"><p className="text-[9px] text-white/35">{label}</p><p className="mt-0.5 font-semibold text-white/80">{value}</p></div>}
+
+function Stat({label,value}:{label:string;value:number}){return <div className="rounded-lg border border-white/8 bg-black/15 p-1.5"><p className="text-xs font-bold text-white">{value}</p><p className="text-[8px] uppercase tracking-wide text-white/35">{label}</p></div>}
