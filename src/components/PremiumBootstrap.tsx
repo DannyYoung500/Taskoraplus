@@ -15,8 +15,6 @@ declare global {
           user?: { id?: number; first_name?: string; username?: string };
         };
         ready?: () => void;
-        expand?: () => void;
-        requestFullscreen?: () => void;
         setHeaderColor?: (color: string) => void;
         setBackgroundColor?: (color: string) => void;
         HapticFeedback?: {
@@ -30,7 +28,7 @@ declare global {
 
 /**
  * Enterprise premium boot screen — Telegram Mini App best practices:
- * 1. WebApp.ready() + expand() on first paint (kills Telegram system loader)
+ * 1. WebApp.ready() on first paint (kills Telegram system loader without resizing the Mini App)
  * 2. Theme header/bg match app (#030814)
  * 3. Short staged progress (no white flash, no long spinner)
  * 4. Dual-ring logo + ambient orbs + shimmer bar (premium feel)
@@ -78,11 +76,9 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
 
     async function runAuth() {
       const tg = await waitForTelegram();
-      // Critical: ready() first so Telegram drops its system loader immediately
+      // Critical: ready() first so Telegram drops its system loader immediately without expanding the Mini App
       try {
         tg?.ready?.();
-        tg?.expand?.();
-        try { tg?.requestFullscreen?.(); } catch {}
         tg?.setHeaderColor?.("#030814");
         tg?.setBackgroundColor?.("#030814");
       } catch {
