@@ -98,12 +98,20 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     } catch (e) {
       if (e instanceof Error && e.message.toLowerCase().includes("proof")) throw e;
     }
-    const row: Record<string, unknown> = { user_id: userId, task_id: task.id, status: "pending", proof_text: proofText || null, proof_url: proofUrl || null };
-    if (proofHash) row.proof_hash = proofHash;
-    const { error } = await supabaseAdmin.from("submissions").insert(row);
-    if (error) throw new Error(error.message);
-    await supabaseAdmin.from("tasks").update({ slots_left: Math.max(0, task.slots_left - 1) }).eq("id", task.id);
-    return { status: "pending" as const, autoVerified: false };
+    const { data: submissionId, error: claimError } = await supabaseAdmin.rpc(
+      "claim_task_submission",
+      {
+        p_user_id: userId,
+        p_task_id: task.id,
+        p_proof_text: proofText || null,
+        p_proof_url: proofUrl || null,
+        p_proof_hash: proofHash || null,
+      } as never,
+    );
+    if (claimError) {
+      throw new Error(claimError.message);
+    }
+    return { status: "pending" as const, autoVerified: false, submissionId: String(submissionId) };
   });
 
 export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
