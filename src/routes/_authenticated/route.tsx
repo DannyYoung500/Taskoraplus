@@ -2,7 +2,8 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
 import { getAccountAccess } from "@/lib/account-access.functions";
-import { touchPresence } from "@/lib/presence.functions";\nimport { TelegramNativeShell } from "@/components/TelegramNativeShell";
+import { touchPresence } from "@/lib/presence.functions";
+import { TelegramNativeShell } from "@/components/TelegramNativeShell";
 
 declare global {
   interface Window {
