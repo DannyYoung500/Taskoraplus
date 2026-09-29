@@ -126,6 +126,12 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     ? Number((Number(service.customer_unit_price)*watchSeconds).toFixed(8))
     : Number(service.customer_unit_price);
 
+  const automaticSupported =
+    service.pricing_model === "watch_second" ||
+    ((service.platform === "telegram" || service.platform === "discord") && service.task_type === "join");
+  if (data.verificationMode === "automatic" && !automaticSupported && service.pricing_model !== "watch_second") {
+    throw new Error("Automatic verification is only available for supported Watch, Telegram Join, and Discord Join tasks. Choose Screenshot verification for this campaign.");
+  }
   const verificationMode=service.pricing_model==="watch_second"
     ? "automatic"
     : data.verificationMode==="automatic"
