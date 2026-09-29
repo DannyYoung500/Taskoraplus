@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { loginWithTelegram } from "@/lib/taskora.functions";
 import { getAccountAccess, getMaintenanceMode } from "@/lib/account-access.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { TASKORA_LOGO, TASKORA_WELCOME_IMAGE, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO, TASKORA_WELCOME_IMAGE, BLUE_GRAD } from "@/lib/brand";\nimport { configureTelegramExperience } from "@/lib/telegram-native.functions";
 
 declare global {
   interface Window {
@@ -14,7 +14,7 @@ declare global {
           user?: { id?: number; first_name?: string; username?: string };
         };
         ready?: () => void;
-        expand?: () => void;
+        expand?: () => void;\n        requestFullscreen?: () => void;
         setHeaderColor?: (color: string) => void;
         setBackgroundColor?: (color: string) => void;
         HapticFeedback?: {
@@ -79,7 +79,7 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       // Critical: ready() first so Telegram drops its system loader immediately
       try {
         tg?.ready?.();
-        tg?.expand?.();
+        tg?.expand?.();\n        try { tg?.requestFullscreen?.(); } catch {}
         tg?.setHeaderColor?.("#030814");
         tg?.setBackgroundColor?.("#030814");
       } catch {
@@ -212,7 +212,7 @@ export function PremiumBootstrap({ redirectTo = "/home" }: { redirectTo?: string
       }
 
       if (authResult.current.firstName) setWelcomeName(authResult.current.firstName);
-      setGoOwner(Boolean(authResult.current.isOwner));
+      setGoOwner(Boolean(authResult.current.isOwner));\n      if (authResult.current.isOwner) void configureTelegramExperience().catch(() => undefined);
 
       try {
         const maint = await getMaintenanceMode();
