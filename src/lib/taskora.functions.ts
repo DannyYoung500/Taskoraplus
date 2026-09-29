@@ -58,11 +58,25 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
     const countryName = edgeCountry.name || langCountry.name || null;
 
     let userId: string | undefined;
-    const { data: listed } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const match =
-      listed?.users?.find((u) => Number(u.user_metadata?.telegram_id) === telegramId) ??
-      listed?.users?.find((u) => u.email === email);
-    userId = match?.id;
+
+    // Resolve existing Telegram users through the indexed profiles table first.
+    // Avoid scanning the entire Supabase Auth user list on every Mini App login.
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("telegram_id", telegramId)
+      .maybeSingle();
+    userId = existingProfile?.id;
+
+    // Recovery path for legacy accounts created before telegram_id was stored
+    // on profiles, or for a rare profile/auth consistency mismatch.
+    if (!userId) {
+      const { data: listed } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const match =
+        listed?.users?.find((u) => Number(u.user_metadata?.telegram_id) === telegramId) ??
+        listed?.users?.find((u) => u.email === email);
+      userId = match?.id;
+    }
 
     if (!userId) {
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -78,10 +92,20 @@ export const loginWithTelegram = createServerFn({ method: "POST" })
         },
       });
       if (createErr || !created.user) {
-        const { data: again } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        userId =
-          again?.users?.find((u) => Number(u.user_metadata?.telegram_id) === telegramId)?.id ??
-          again?.users?.find((u) => u.email === email)?.id;
+        // A concurrent first login can win the unique-email race. Re-read the
+        // profile/auth records before returning an error to the user.
+        const { data: racedProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("telegram_id", telegramId)
+          .maybeSingle();
+        userId = racedProfile?.id;
+        if (!userId) {
+          const { data: again } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+          userId =
+            again?.users?.find((u) => Number(u.user_metadata?.telegram_id) === telegramId)?.id ??
+            again?.users?.find((u) => u.email === email)?.id;
+        }
         if (!userId) throw new Error(createErr?.message ?? "Could not create Telegram user.");
       } else {
         userId = created.user.id;
