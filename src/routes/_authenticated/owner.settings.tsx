@@ -2,21 +2,14 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ChevronLeft,
-  Plus,
-  RefreshCw,
-  Trash2,
-  CheckCircle2,
-  AlertTriangle,
   Loader2,
   Link2,
   Coins,
   Shield,
+  Bell,
 } from "lucide-react";
 import {
   getTelegramGateSettings,
-  saveTelegramGateSettings,
-  previewTelegramGateChats,
-  testTelegramGateConnection,
   getTelegramGateAnalytics,
   type TelegramGateSettings,
   type TelegramGateChat,
@@ -29,29 +22,17 @@ import {
   ownerDeleteWebhook,
   type EconomySettings,
 } from "@/lib/owner-economy.functions";
+import {
+  ownerGetTaskNotifyChannel,
+  ownerSetTaskNotifyChannel,
+} from "@/lib/notify-owner";
 
 export const Route = createFileRoute("/_authenticated/owner/settings")({
   component: OwnerSettings,
 });
 
-function blankChat(type: "channel" | "group"): TelegramGateChat {
-  return {
-    id: "",
-    type,
-    url: "",
-    name: type === "channel" ? "Telegram Channel" : "Telegram Group",
-    verified: false,
-    photoUrl: null,
-    botIsAdmin: null,
-    username: null,
-    memberCount: null,
-    description: null,
-    error: null,
-  };
-}
-
 function OwnerSettings() {
-  const [tab, setTab] = useState<"economy" | "webhook" | "gate">("economy");
+  const [tab, setTab] = useState<"economy" | "webhook" | "gate" | "channels">("economy");
   const [gate, setGate] = useState<TelegramGateSettings | null>(null);
   const [economy, setEconomy] = useState<EconomySettings | null>(null);
   const [webhook, setWebhook] = useState<{
@@ -63,21 +44,19 @@ function OwnerSettings() {
     error: string | null;
   } | null>(null);
   const [webhookUrlInput, setWebhookUrlInput] = useState("");
+  const [taskChannelId, setTaskChannelId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
-  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [testResult, setTestResult] = useState<any>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [g, eco, wh] = await Promise.all([
+        const [g, eco, wh, tc] = await Promise.all([
           getTelegramGateSettings().catch(() => null),
           ownerGetEconomy().catch(() => null),
           ownerGetWebhookInfo().catch(() => null),
+          ownerGetTaskNotifyChannel().catch(() => null),
         ]);
         if (g) {
           setGate({
@@ -91,15 +70,11 @@ function OwnerSettings() {
           setWebhook(wh);
           setWebhookUrlInput(wh.url || (wh as any).suggestedUrl || "https://taskoraplusapp.vercel.app/api/telegram-webhook");
         }
+        if (tc?.channel_id) setTaskChannelId(tc.channel_id);
       } catch (e) {
         setMessage(e instanceof Error ? e.message : "Could not load settings.");
       } finally {
         setLoading(false);
-      }
-      try {
-        setAnalytics(await getTelegramGateAnalytics());
-      } catch {
-        /* ignore */
       }
     })();
   }, []);
@@ -114,6 +89,20 @@ function OwnerSettings() {
       setMessage("✓ Economy controls saved.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not save economy.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveTaskChannel() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const r = await ownerSetTaskNotifyChannel({ data: { channelId: taskChannelId.trim() } });
+      setTaskChannelId(r.channel_id);
+      setMessage("✓ Task notification channel saved. New active tasks will post here.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Could not save task channel.");
     } finally {
       setSaving(false);
     }
@@ -169,12 +158,12 @@ function OwnerSettings() {
         <div className="flex-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">Owner</p>
           <h1 className="text-xl font-bold">Command Center</h1>
-          <p className="text-[11px] text-white/45">Economy · Webhook · Gate</p>
+          <p className="text-[11px] text-white/45">Economy · Channels · Webhook · Gate</p>
         </div>
       </div>
 
       <div className="mb-4 flex gap-1 rounded-2xl border border-white/10 bg-[#0b1d36] p-1">
-        {([["economy", "Economy", Coins], ["webhook", "Webhook", Link2], ["gate", "Gate", Shield]] as const).map(([id, label, Icon]) => (
+        {([["economy", "Economy", Coins], ["channels", "Channels", Bell], ["webhook", "Webhook", Link2], ["gate", "Gate", Shield]] as const).map(([id, label, Icon]) => (
           <button
             key={id}
             type="button"
@@ -197,7 +186,7 @@ function OwnerSettings() {
         <section className="space-y-3">
           <div className="rounded-3xl border border-blue-400/20 bg-[#12141c] p-4">
             <h2 className="text-base font-bold text-blue-200">Command Center · Economy</h2>
-            <p className="mt-1 text-[11px] text-white/40">Live limits, fees, pauses. Changes apply to new deposits, withdrawals and tasks.</p>
+            <p className="mt-1 text-[11px] text-white/40">Live limits, fees, pauses. USDT only — Task Points removed.</p>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-3">
@@ -212,8 +201,6 @@ function OwnerSettings() {
             <NumField label="Watch & Earn daily cap (USDT)" value={economy.watch_earn_daily_cap_usdt} onChange={(v) => setEconomy({ ...economy, watch_earn_daily_cap_usdt: v })} />
             <NumField label="Bonus ad reward (USDT)" value={Number((economy as any).bonus_ad_reward_usdt ?? 0.003)} onChange={(v) => setEconomy({ ...economy, bonus_ad_reward_usdt: v } as any)} />
             <NumField label="Bonus ad daily limit" value={Number((economy as any).bonus_ad_daily_limit ?? 5)} onChange={(v) => setEconomy({ ...economy, bonus_ad_daily_limit: v } as any)} />
-            <NumField label="Daily check-in Task Points" value={economy.daily_checkin_points} onChange={(v) => setEconomy({ ...economy, daily_checkin_points: v })} />
-            <NumField label="Successful referral Task Points" value={economy.referral_points} onChange={(v) => setEconomy({ ...economy, referral_points: v })} />
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-2">
@@ -226,6 +213,40 @@ function OwnerSettings() {
           <button type="button" disabled={saving} onClick={() => void saveEconomy()} className="w-full rounded-2xl bg-sky-400 px-4 py-3.5 text-sm font-extrabold text-[#05070c] disabled:opacity-50">
             {saving ? "SAVING…" : "SAVE ECONOMY CONTROLS"}
           </button>
+        </section>
+      ) : null}
+
+      {tab === "channels" ? (
+        <section className="space-y-3">
+          <div className="rounded-3xl border border-blue-400/20 bg-[#12141c] p-4">
+            <h2 className="text-base font-bold text-blue-200">Task notification channel</h2>
+            <p className="mt-1 text-[11px] text-white/40">
+              When you activate a task, TASKORA posts a live announcement (reward, platform, slots).
+              Add the bot as admin, then paste channel @username or numeric chat ID.
+            </p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-3">
+            <label className="block text-xs text-white/55">
+              Channel @username or chat ID
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/40"
+                value={taskChannelId}
+                onChange={(e) => setTaskChannelId(e.target.value)}
+                placeholder="@your_task_channel or -1001234567890"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void saveTaskChannel()}
+              className="w-full rounded-2xl bg-sky-400 px-4 py-3 text-sm font-extrabold text-[#05070c] disabled:opacity-50"
+            >
+              {saving ? "SAVING…" : "SAVE TASK CHANNEL"}
+            </button>
+            <p className="text-[10px] text-white/40">
+              Env fallback: TASKORA_TASK_NOTIFY_CHANNEL_ID. Bot must be admin with post permission.
+            </p>
+          </div>
         </section>
       ) : null}
 
@@ -255,7 +276,7 @@ function OwnerSettings() {
             <h2 className="text-base font-bold text-blue-200">Telegram Gate</h2>
             <p className="mt-1 text-[11px] text-white/40">Require channel/group join before app access.</p>
           </div>
-          <p className="text-center text-xs text-white/50">Use full Owner Settings in a prior build for full gate chat management, or open Gate from Owner index.</p>
+          <p className="text-center text-xs text-white/50">Open Gate from Owner index for full chat management.</p>
         </section>
       ) : null}
     </main>
