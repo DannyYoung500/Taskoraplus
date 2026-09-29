@@ -10,7 +10,7 @@ import {
   WalletCards,
   Users,
 } from "lucide-react";
-import { getDashboard } from "@/lib/taskora.functions";
+import { getDashboard } from "@/lib/taskora.functions";\nimport { getGrowthSummary } from "@/lib/growth.functions";
 import { listConnectedAccounts } from "@/lib/connected-accounts.functions";
 import { TASKORA_LOGO } from "@/lib/brand";
 import { formatUsd, isDemoTransactionLabel } from "@/lib/taskora-display";
@@ -18,7 +18,7 @@ import { AppLink } from "@/components/AppLink";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   loader: async () => {
-    const [dash, accounts] = await Promise.all([
+    const [dash, accounts, growth] = await Promise.all([
       getDashboard().catch(() => null),
       listConnectedAccounts().catch(() => []),
     ]);
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
 });
 
 function ProfileScreen() {
-  const { dash, accounts } = Route.useLoaderData();
+  const { dash, accounts, growth } = Route.useLoaderData();
   const profile = dash?.profile as
     | {
         display_name?: string | null;
