@@ -154,11 +154,6 @@ function TaskDetail() {
               />
             ) : null}
             {error ? <p className="mt-2 text-xs text-warning">{error}</p> : null}
-            {useScreenshot ? (
-              <button type="button" className="mt-2 text-[11px] text-cyan-300" onClick={() => setUseScreenshot(false)}>
-                ← Back to automatic membership check
-              </button>
-            ) : null}
           </>
         )}
       </section>
