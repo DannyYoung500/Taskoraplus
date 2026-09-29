@@ -364,6 +364,7 @@ export interface FileRoutesByTo {
   '/support': typeof AuthenticatedSupportRoute
   '/wallet': typeof AuthenticatedWalletRoute
   '/watch-earn': typeof AuthenticatedWatchEarnRoute
+  '/my-tasks': typeof AuthenticatedMyTasksRoute
   '/owner/analytics': typeof AuthenticatedOwnerAnalyticsRoute
   '/owner/announce': typeof AuthenticatedOwnerAnnounceRoute
   '/owner/audit': typeof AuthenticatedOwnerAuditRoute
@@ -459,6 +460,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/wallet'
     | '/watch-earn'
+    | '/my-tasks'
     | '/owner/analytics'
     | '/owner/announce'
     | '/owner/audit'
@@ -504,6 +506,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/wallet'
     | '/watch-earn'
+    | '/my-tasks'
     | '/owner/analytics'
     | '/owner/announce'
     | '/owner/audit'
@@ -550,6 +553,7 @@ export interface FileRouteTypes {
     | '/_authenticated/support'
     | '/_authenticated/wallet'
     | '/_authenticated/watch-earn'
+    | '/_authenticated/my-tasks'
     | '/_authenticated/owner/analytics'
     | '/_authenticated/owner/announce'
     | '/_authenticated/owner/audit'
@@ -714,6 +718,13 @@ declare module '@tanstack/react-router' {
       path: '/watch-earn'
       fullPath: '/watch-earn'
       preLoaderRoute: typeof AuthenticatedWatchEarnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-tasks': {
+      id: '/_authenticated/my-tasks'
+      path: '/my-tasks'
+      fullPath: '/my-tasks'
+      preLoaderRoute: typeof AuthenticatedMyTasksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/owner/': {
@@ -913,6 +924,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
   AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
   AuthenticatedWatchEarnRoute: typeof AuthenticatedWatchEarnRoute
+  AuthenticatedMyTasksRoute: typeof AuthenticatedMyTasksRoute
   AuthenticatedOwnerAnalyticsRoute: typeof AuthenticatedOwnerAnalyticsRoute
   AuthenticatedOwnerAnnounceRoute: typeof AuthenticatedOwnerAnnounceRoute
   AuthenticatedOwnerAuditRoute: typeof AuthenticatedOwnerAuditRoute
@@ -953,6 +965,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
   AuthenticatedWalletRoute: AuthenticatedWalletRoute,
   AuthenticatedWatchEarnRoute: AuthenticatedWatchEarnRoute,
+  AuthenticatedMyTasksRoute: AuthenticatedMyTasksRoute,
   AuthenticatedOwnerAnalyticsRoute: AuthenticatedOwnerAnalyticsRoute,
   AuthenticatedOwnerAnnounceRoute: AuthenticatedOwnerAnnounceRoute,
   AuthenticatedOwnerAuditRoute: AuthenticatedOwnerAuditRoute,
