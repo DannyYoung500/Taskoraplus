@@ -10,7 +10,7 @@ export const listDailyMissions=createServerFn({method:"GET"}).middleware([requir
  const s=await db();const {data:p}=await s.from("profiles").select("timezone").eq("id",context.userId).maybeSingle();const date=localDate(String((p as any)?.timezone||"UTC"));const now=new Date().toISOString();
  const {data:missions,error}=await (s as any).from("daily_missions").select("id,title,description,mission_type,task_id,provider_key,reward_usdt,reward_points,daily_limit,starts_at,ends_at,is_active,task:tasks(id,title,description,platform,reward,link)").eq("is_active",true).or("starts_at.is.null,starts_at.lte."+now).or("ends_at.is.null,ends_at.gte."+now).order("created_at",{ascending:false}).limit(30);
  if(error)throw new Error(error.message);
- const ids=(missions??[]).map((m:any)=>m.id);const {data:claims}=ids.length?await (s as any).from("daily_mission_claims").select("mission_id,status").eq("user_id",context.userId).eq("mission_date",date).in("mission_id",ids):{data:[]};
+ const ids=(missions??[]).map((m:any)=>m.id);const {data:claims}=ids.length?await (s as any).from("daily_mission_claims").select("mission_id,status,claim_number").eq("user_id",context.userId).eq("mission_date",date).in("mission_id",ids):{data:[]};
  const claimMap=new Map((claims??[]).map((c:any)=>[c.mission_id,c]));const taskIds=(missions??[]).map((m:any)=>m.task_id).filter(Boolean);const {data:subs}=taskIds.length?await s.from("submissions").select("task_id,status").eq("user_id",context.userId).in("task_id",taskIds):{data:[]};const doneTasks=new Set((subs??[]).filter((x:any)=>x.status==="verified").map((x:any)=>x.task_id));
  const adKeys=[...new Set((missions??[]).filter((m:any)=>m.mission_type==="rewarded_ad"&&m.provider_key).map((m:any)=>String(m.provider_key)))];
  const providersByKey=new Map<string,any>();
@@ -22,7 +22,7 @@ export const listDailyMissions=createServerFn({method:"GET"}).middleware([requir
    const adapterReady=String(m.provider_key)==="adsgram";
    const adReady=m.mission_type==="rewarded_ad"&&Boolean(provider?.enabled&&provider?.placement_id&&adapterReady);
    const settings=(provider?.settings??{}) as Record<string,unknown>;
-   return {...m,completed:m.mission_type==="task"?doneTasks.has(m.task_id):c?.status==="completed",completedCount:completedCounts.get(m.id)??0,adReady:Boolean(adReady),adPlacementId:adReady?String(provider.placement_id):null,providerName:provider?.provider_name??m.provider_key,providerSettings:settings,adapterReady};
+   return {...m,completed:m.mission_type==="task"?doneTasks.has(m.task_id):(completedCounts.get(m.id)??0)>=Number(m.daily_limit??1),completedCount:completedCounts.get(m.id)??0,adReady:Boolean(adReady),adPlacementId:adReady?String(provider.placement_id):null,providerName:provider?.provider_name??m.provider_key,providerSettings:settings,adapterReady};
  });
 });
 
@@ -31,10 +31,20 @@ export const claimRewardedAd=createServerFn({method:"POST"}).middleware([require
  const date=localDate(String((p as any)?.timezone||"UTC"));const {data:m}=await (s as any).from("daily_missions").select("*").eq("id",data.missionId).eq("mission_type","rewarded_ad").eq("is_active",true).maybeSingle();if(!m)throw new Error("This ad mission is unavailable.");
  const now=new Date();if(m.starts_at&&new Date(m.starts_at)>now)throw new Error("This mission has not started yet.");if(m.ends_at&&new Date(m.ends_at)<now)throw new Error("This mission has ended.");
  const {data:provider}=await (s as any).from("monetization_providers").select("enabled,placement_id").eq("provider_key",m.provider_key).maybeSingle();if(String(m.provider_key)!=="adsgram")throw new Error("This ad network is not connected to TaskoraPlus yet.");if(!provider?.enabled||!provider?.placement_id)throw new Error("Rewarded ads are not configured yet.");
- const {count}=await (s as any).from("daily_mission_claims").select("id",{count:"exact",head:true}).eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).eq("status","completed");if((count??0)>=Number(m.daily_limit))throw new Error("Today's ad mission limit is reached.");
- const {data:existing}=await (s as any).from("daily_mission_claims").select("id,status").eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).maybeSingle();if(existing?.status==="completed")throw new Error("You already completed this ad mission today.");
- if(existing?.id)return {claimId:String(existing.id),placementId:String(provider.placement_id)};
- const {data:c,error}=await (s as any).from("daily_mission_claims").insert({mission_id:m.id,user_id:context.userId,mission_date:date,status:"pending"}).select("id").single();if(error||!c)throw new Error(error?.message??"Could not start ad reward.");
+ const {data:completedClaims}=await (s as any).from("daily_mission_claims").select("id").eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).eq("status","completed");
+ const completedCount=completedClaims?.length??0;
+ if(completedCount>=Number(m.daily_limit))throw new Error("Today's ad mission limit is reached.");
+ const {data:pendingClaim}=await (s as any).from("daily_mission_claims").select("id,status,claim_number").eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).eq("status","pending").maybeSingle();
+ if(pendingClaim?.id)return {claimId:String(pendingClaim.id),placementId:String(provider.placement_id)};
+ const claimNumber=completedCount+1;
+ const {data:c,error}=await (s as any).from("daily_mission_claims").insert({mission_id:m.id,user_id:context.userId,mission_date:date,claim_number:claimNumber,status:"pending"}).select("id").single();
+ if(error||!c) {
+   if(String(error?.code)==="23505") {
+     const {data:retry}=await (s as any).from("daily_mission_claims").select("id").eq("mission_id",m.id).eq("user_id",context.userId).eq("mission_date",date).eq("claim_number",claimNumber).maybeSingle();
+     if(retry?.id)return {claimId:String(retry.id),placementId:String(provider.placement_id)};
+   }
+   throw new Error(error?.message??"Could not start ad reward.");
+ }
  return {claimId:String(c.id),placementId:String(provider.placement_id)};
 });
 
