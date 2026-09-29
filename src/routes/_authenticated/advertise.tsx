@@ -22,6 +22,7 @@ import {
   type Platform,
 } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
+import { getYoutubeVideoMetadata } from "@/lib/watch-video.functions";
 import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
 import { SERVICES, FEATURE_FEE_USD, type ServiceDef } from "@/lib/advertise-services";
 import { extractYoutubeId, youtubeWatchUrl } from "@/lib/youtube-url";
@@ -81,6 +82,7 @@ function AdvertisePage() {
   const [watchMinutes, setWatchMinutes] = useState(1);
   const [watchSeconds, setWatchSeconds] = useState(0);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [ytMetadata, setYtMetadata] = useState<{ videoId: string; url: string; title: string; authorName: string; thumbnailUrl: string } | null>(null);
   const youtubePlayerRef = useRef<any>(null);
   const youtubeHostRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -132,6 +134,7 @@ function AdvertisePage() {
     setWatchMinutes(1);
     setWatchSeconds(0);
     setVideoDuration(null);
+    setYtMetadata(null);
     setMsg(null);
   }
 
@@ -200,6 +203,16 @@ function AdvertisePage() {
     };
   }, [ytId]);
 
+  useEffect(() => {
+    setYtMetadata(null);
+    if (!isWatch || !ytId) return;
+    let active = true;
+    void getYoutubeVideoMetadata({ data: { url: link } })
+      .then((metadata) => { if (active) setYtMetadata(metadata); })
+      .catch(() => { if (active) setYtMetadata(null); });
+    return () => { active = false; };
+  }, [isWatch, ytId]);
+
   function setWatchDurationParts(minutes: number, seconds: number) {
     const totalSec = Math.max(1, Math.min(detectedMaxSeconds, Math.floor(minutes) * 60 + Math.floor(seconds)));
     setWatchMinutes(Math.floor(totalSec / 60));
@@ -241,7 +254,7 @@ function AdvertisePage() {
       setMsg("Watch time cannot be longer than the detected YouTube video duration.");
       return;
     }
-    if (!title.trim()) { setMsg("Task title is required."); return; }
+    if (!isWatch && !title.trim()) { setMsg("Task title is required."); return; }
     if (insufficient) {
       setMsg(`Insufficient balance. You need ${formatUsd(total)} and have ${formatUsd(balance)}.`);
       return;
@@ -308,7 +321,7 @@ function AdvertisePage() {
             {formHeading}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-sky-100/80">
-            Set your link, quantity, title, steps, and proof. Pricing is catalog-locked (earner reward + TASKORA margin).
+            {isWatch ? "Paste the YouTube URL, preview the video, set watch time and quantity. Video information is gathered automatically." : "Set your link, quantity, title, steps, and proof. Pricing is catalog-locked (earner reward + TASKORA margin)."}
           </p>
         </div>
         <div className="space-y-3">
@@ -325,6 +338,15 @@ function AdvertisePage() {
                 <span className="text-[10px] text-emerald-300">Valid video URL</span>
               </div>
               <div className="aspect-video w-full bg-black"><div ref={youtubeHostRef} className="h-full w-full" /></div>
+              {ytMetadata ? (
+                <div className="flex items-center gap-3 border-t border-white/8 bg-[#0b0f15] px-3 py-3">
+                  <img src={ytMetadata.thumbnailUrl} alt="" className="size-16 shrink-0 rounded-xl object-cover ring-1 ring-white/10" />
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 text-[12px] font-bold text-white">{ytMetadata.title || "YouTube video"}</p>
+                    <p className="mt-1 truncate text-[10px] text-white/45">{ytMetadata.authorName ? "by " + ytMetadata.authorName : "YouTube"}</p>
+                  </div>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between border-t border-white/8 px-3 py-2 text-[10px]">
                 <span className="text-white/40">Detected duration</span>
                 <span className="font-bold text-emerald-300">{videoDuration ? `${String(Math.floor(videoDuration / 60)).padStart(2, "0")}:${String(videoDuration % 60).padStart(2, "0")}` : "Reading…"}</span>
@@ -356,10 +378,7 @@ function AdvertisePage() {
               ))}
             </div>
           </div>
-          <div>
-            <label className="mb-1.5 block text-[11px] font-semibold text-white/55">Notes <span className="font-normal text-white/30">(optional)</span></label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="" className="w-full resize-none rounded-xl border border-white/10 bg-[#141820] px-3.5 py-3 text-sm outline-none transition focus:border-sky-400/50" />
-          </div>
+          {!isWatch ? <>
           <div className="space-y-3 rounded-2xl border border-white/10 bg-[#12151c] p-4">
             <p className="text-[11px] font-bold text-white/70"><span className="mr-1">✎</span> {formHeading} details</p>
             <div>
@@ -461,6 +480,7 @@ function AdvertisePage() {
               </>
             ) : null}
           </div>
+          </> : null}
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-400/25 bg-amber-500/[0.06] p-3.5">
             <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} className="mt-0.5 size-4 rounded border-white/20" />
             <div>
