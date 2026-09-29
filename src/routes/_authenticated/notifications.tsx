@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Bell, ChevronRight, Megaphone } from "lucide-react";
-import { listActiveAnnouncements } from "@/lib/announcements.functions";
+import { listMyNotifications, markNotificationRead } from "@/lib/growth.functions";
 import { BLUE_GRAD } from "@/lib/brand";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
   head: () => ({ meta: [{ title: "Notifications — TASKORA" }] }),
   loader: async () => {
-    const items = await listActiveAnnouncements().catch(() => []);
+    const items = await listMyNotifications().catch(() => []);
     return { items };
   },
   component: NotificationsPage,
@@ -23,7 +23,7 @@ function NotificationsPage() {
         </Link>
         <div className="min-w-0 flex-1">
           <p className="text-lg font-black tracking-tight">Notifications</p>
-          <p className="text-[10px] text-slate-500">Announcements · system updates</p>
+          <p className="text-[10px] text-slate-500">Account alerts · announcements · earning activity</p>
         </div>
       </header>
 
