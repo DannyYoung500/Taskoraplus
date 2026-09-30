@@ -1,15 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-async function adminClient() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
-
-/** Server-side bonus rewarded-ad credit. Enforces daily limit from economy settings. */
+/**
+ * 8 · Bonus ad credit.
+ * Wire Monetag / Adsgram / PropellerAds client SDK in watch-earn UI:
+ *   1) Open ad unit (show)
+ *   2) On reward callback, call creditBonusAd({ data: { sdkToken } })
+ * Server validates rate limits + daily cap; sdkToken reserved for future signature check.
+ */
 export const creditBonusAd = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d?: { sdkToken?: string }) => d ?? {})
+  .handler(async ({ data, context }) => {
+    void data;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const s = supabaseAdmin;
+
     try {
       const { assertActionRateLimit } = await import("@/lib/strong-ops");
       await assertActionRateLimit({ userId: context.userId, kind: "bonus_ad" });
@@ -17,12 +23,7 @@ export const creditBonusAd = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
 
-    const s = await adminClient();
-    const { data: ecoRow } = await s
-      .from("app_settings")
-      .select("value")
-      .eq("key", "economy")
-      .maybeSingle();
+    const { data: ecoRow } = await s.from("app_settings").select("value").eq("key", "economy").maybeSingle();
     const eco = (ecoRow?.value ?? {}) as Record<string, unknown>;
     const reward = Math.max(0, Number(eco.bonus_ad_reward_usdt ?? 0.003));
     const dailyLimit = Math.max(0, Math.min(50, Math.floor(Number(eco.bonus_ad_daily_limit ?? 5))));
