@@ -10,9 +10,7 @@ import {
 } from "lucide-react";
 import {
   getTelegramGateSettings,
-  getTelegramGateAnalytics,
   type TelegramGateSettings,
-  type TelegramGateChat,
 } from "@/lib/telegram-gate.functions";
 import {
   ownerGetEconomy,
@@ -25,6 +23,8 @@ import {
 import {
   ownerGetTaskNotifyChannel,
   ownerSetTaskNotifyChannel,
+  ownerGetOpsChannel,
+  ownerSetOpsChannel,
 } from "@/lib/notify-owner";
 
 export const Route = createFileRoute("/_authenticated/owner/settings")({
@@ -45,6 +45,7 @@ function OwnerSettings() {
   } | null>(null);
   const [webhookUrlInput, setWebhookUrlInput] = useState("");
   const [taskChannelId, setTaskChannelId] = useState("");
+  const [opsChannelId, setOpsChannelId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -52,11 +53,12 @@ function OwnerSettings() {
   useEffect(() => {
     void (async () => {
       try {
-        const [g, eco, wh, tc] = await Promise.all([
+        const [g, eco, wh, tc, oc] = await Promise.all([
           getTelegramGateSettings().catch(() => null),
           ownerGetEconomy().catch(() => null),
           ownerGetWebhookInfo().catch(() => null),
           ownerGetTaskNotifyChannel().catch(() => null),
+          ownerGetOpsChannel().catch(() => null),
         ]);
         if (g) {
           setGate({
@@ -71,6 +73,7 @@ function OwnerSettings() {
           setWebhookUrlInput(wh.url || (wh as any).suggestedUrl || "https://taskoraplusapp.vercel.app/api/telegram-webhook");
         }
         if (tc?.channel_id) setTaskChannelId(tc.channel_id);
+        if (oc?.channel_id) setOpsChannelId(oc.channel_id);
       } catch (e) {
         setMessage(e instanceof Error ? e.message : "Could not load settings.");
       } finally {
@@ -100,9 +103,23 @@ function OwnerSettings() {
     try {
       const r = await ownerSetTaskNotifyChannel({ data: { channelId: taskChannelId.trim() } });
       setTaskChannelId(r.channel_id);
-      setMessage("✓ Task notification channel saved. New active tasks will post here.");
+      setMessage("✓ Task notification channel saved.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not save task channel.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveOpsChannel() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const r = await ownerSetOpsChannel({ data: { channelId: opsChannelId.trim() } });
+      setOpsChannelId(r.channel_id);
+      setMessage("✓ Ops channel saved. Withdrawals & alerts post here.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Could not save ops channel.");
     } finally {
       setSaving(false);
     }
@@ -185,33 +202,29 @@ function OwnerSettings() {
       {tab === "economy" && economy ? (
         <section className="space-y-3">
           <div className="rounded-3xl border border-blue-400/20 bg-[#12141c] p-4">
-            <h2 className="text-base font-bold text-blue-200">Command Center · Economy</h2>
-            <p className="mt-1 text-[11px] text-white/40">Live limits, fees, pauses. USDT only — Task Points removed.</p>
+            <h2 className="text-base font-bold text-blue-200">Economy</h2>
+            <p className="mt-1 text-[11px] text-white/40">USDT limits & pauses. Task Points removed.</p>
           </div>
-
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-3">
             <NumField label="Min deposit (USDT)" value={economy.min_deposit_usd} onChange={(v) => setEconomy({ ...economy, min_deposit_usd: v })} />
             <NumField label="Min withdrawal (USDT)" value={economy.min_withdrawal_usd} onChange={(v) => setEconomy({ ...economy, min_withdrawal_usd: v })} />
             <NumField label="First withdrawal max (USDT)" value={economy.first_withdrawal_max_usd} onChange={(v) => setEconomy({ ...economy, first_withdrawal_max_usd: v })} />
             <NumField label="Platform fee %" value={economy.platform_fee_pct} onChange={(v) => setEconomy({ ...economy, platform_fee_pct: v })} />
             <NumField label="Referral %" value={economy.referral_pct} onChange={(v) => setEconomy({ ...economy, referral_pct: v })} />
-            <NumField label="Feature boost fee (USDT)" value={economy.feature_boost_fee_usd} onChange={(v) => setEconomy({ ...economy, feature_boost_fee_usd: v })} />
             <NumField label="Dual-approval threshold (USDT)" value={economy.dual_approval_threshold_usd} onChange={(v) => setEconomy({ ...economy, dual_approval_threshold_usd: v })} />
-            <NumField label="Watch & Earn rate / hour (USDT)" value={economy.watch_earn_rate_per_hour_usdt} onChange={(v) => setEconomy({ ...economy, watch_earn_rate_per_hour_usdt: v })} />
-            <NumField label="Watch & Earn daily cap (USDT)" value={economy.watch_earn_daily_cap_usdt} onChange={(v) => setEconomy({ ...economy, watch_earn_daily_cap_usdt: v })} />
+            <NumField label="Watch rate / hour (USDT)" value={economy.watch_earn_rate_per_hour_usdt} onChange={(v) => setEconomy({ ...economy, watch_earn_rate_per_hour_usdt: v })} />
+            <NumField label="Watch daily cap (USDT)" value={economy.watch_earn_daily_cap_usdt} onChange={(v) => setEconomy({ ...economy, watch_earn_daily_cap_usdt: v })} />
             <NumField label="Bonus ad reward (USDT)" value={Number((economy as any).bonus_ad_reward_usdt ?? 0.003)} onChange={(v) => setEconomy({ ...economy, bonus_ad_reward_usdt: v } as any)} />
             <NumField label="Bonus ad daily limit" value={Number((economy as any).bonus_ad_daily_limit ?? 5)} onChange={(v) => setEconomy({ ...economy, bonus_ad_daily_limit: v } as any)} />
           </div>
-
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-2">
             <Toggle label="Dual approval for large withdrawals" on={economy.dual_approval_enabled} onChange={(v) => setEconomy({ ...economy, dual_approval_enabled: v })} />
             <Toggle label="Pause all payouts" on={economy.payouts_paused} onChange={(v) => setEconomy({ ...economy, payouts_paused: v })} danger />
             <Toggle label="Pause new tasks" on={economy.tasks_paused} onChange={(v) => setEconomy({ ...economy, tasks_paused: v })} danger />
             <Toggle label="Watch & Earn enabled" on={economy.watch_earn_enabled} onChange={(v) => setEconomy({ ...economy, watch_earn_enabled: v })} />
           </div>
-
           <button type="button" disabled={saving} onClick={() => void saveEconomy()} className="w-full rounded-2xl bg-sky-400 px-4 py-3.5 text-sm font-extrabold text-[#05070c] disabled:opacity-50">
-            {saving ? "SAVING…" : "SAVE ECONOMY CONTROLS"}
+            {saving ? "SAVING…" : "SAVE ECONOMY"}
           </button>
         </section>
       ) : null}
@@ -220,32 +233,30 @@ function OwnerSettings() {
         <section className="space-y-3">
           <div className="rounded-3xl border border-blue-400/20 bg-[#12141c] p-4">
             <h2 className="text-base font-bold text-blue-200">Task notification channel</h2>
-            <p className="mt-1 text-[11px] text-white/40">
-              When you activate a task, TASKORA posts a live announcement (reward, platform, slots).
-              Add the bot as admin, then paste channel @username or numeric chat ID.
-            </p>
+            <p className="mt-1 text-[11px] text-white/40">Posts when you activate a task. Bot must be channel admin.</p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-3">
             <label className="block text-xs text-white/55">
               Channel @username or chat ID
-              <input
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/40"
-                value={taskChannelId}
-                onChange={(e) => setTaskChannelId(e.target.value)}
-                placeholder="@your_task_channel or -1001234567890"
-              />
+              <input className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/40" value={taskChannelId} onChange={(e) => setTaskChannelId(e.target.value)} placeholder="@your_task_channel or -100…" />
             </label>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void saveTaskChannel()}
-              className="w-full rounded-2xl bg-sky-400 px-4 py-3 text-sm font-extrabold text-[#05070c] disabled:opacity-50"
-            >
+            <button type="button" disabled={saving} onClick={() => void saveTaskChannel()} className="w-full rounded-2xl bg-sky-400 px-4 py-3 text-sm font-extrabold text-[#05070c] disabled:opacity-50">
               {saving ? "SAVING…" : "SAVE TASK CHANNEL"}
             </button>
-            <p className="text-[10px] text-white/40">
-              Env fallback: TASKORA_TASK_NOTIFY_CHANNEL_ID. Bot must be admin with post permission.
-            </p>
+          </div>
+          <div className="rounded-3xl border border-amber-400/20 bg-[#12141c] p-4">
+            <h2 className="text-base font-bold text-amber-200">Private ops channel</h2>
+            <p className="mt-1 text-[11px] text-white/40">Withdrawals, paid/failed, velocity alerts. Private channel recommended. Also mirrors to owner DMs.</p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-3">
+            <label className="block text-xs text-white/55">
+              Ops channel @username or chat ID
+              <input className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/40" value={opsChannelId} onChange={(e) => setOpsChannelId(e.target.value)} placeholder="@taskora_ops or -100…" />
+            </label>
+            <button type="button" disabled={saving} onClick={() => void saveOpsChannel()} className="w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-extrabold text-[#05070c] disabled:opacity-50">
+              {saving ? "SAVING…" : "SAVE OPS CHANNEL"}
+            </button>
+            <p className="text-[10px] text-white/40">Env: TASKORA_OPS_CHANNEL_ID</p>
           </div>
         </section>
       ) : null}
@@ -254,7 +265,6 @@ function OwnerSettings() {
         <section className="space-y-3">
           <div className="rounded-3xl border border-blue-400/20 bg-[#12141c] p-4">
             <h2 className="text-base font-bold text-blue-200">Telegram webhook</h2>
-            <p className="mt-1 text-[11px] text-white/40">Register the bot webhook so /start welcome and updates work.</p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-[#12141c] p-4 space-y-3">
             <label className="block text-xs text-white/55">
@@ -265,18 +275,17 @@ function OwnerSettings() {
               <button type="button" disabled={saving} onClick={() => void registerWebhook()} className="flex-1 rounded-xl bg-sky-400 py-2.5 text-xs font-bold text-[#05070c] disabled:opacity-50">Register</button>
               <button type="button" disabled={saving} onClick={() => void deleteWebhook()} className="rounded-xl border border-red-400/30 px-4 py-2.5 text-xs font-bold text-red-300 disabled:opacity-50">Delete</button>
             </div>
-            <p className="text-[10px] text-white/40">Bot: {webhook?.botUsername ? `@${webhook.botUsername}` : "—"} · Pending: {webhook?.pending ?? 0}</p>
+            <p className="text-[10px] text-white/40">Bot: {webhook?.botUsername ? `@${webhook.botUsername}` : "—"}</p>
           </div>
         </section>
       ) : null}
 
-      {tab === "gate" && gate ? (
+      {tab === "gate" ? (
         <section className="space-y-3">
           <div className="rounded-3xl border border-blue-400/20 bg-[#12141c] p-4">
             <h2 className="text-base font-bold text-blue-200">Telegram Gate</h2>
-            <p className="mt-1 text-[11px] text-white/40">Require channel/group join before app access.</p>
+            <p className="mt-1 text-[11px] text-white/40">Open Gate from Owner index for full management.</p>
           </div>
-          <p className="text-center text-xs text-white/50">Open Gate from Owner index for full chat management.</p>
         </section>
       ) : null}
     </main>
