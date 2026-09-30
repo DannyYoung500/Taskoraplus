@@ -45,7 +45,6 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
 
   const normalizedTarget = normalizeTargetUrl(target);
 
-  // Same-link campaign cap (active + draft)
   try {
     const { data: sameLinkRows } = await supabaseAdmin
       .from("campaigns")
@@ -65,7 +64,6 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     if (e instanceof Error && e.message.includes("already has")) throw e;
   }
 
-  // Advertiser velocity + trust hold
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count: campaigns24h } = await supabaseAdmin
     .from("campaigns")
@@ -86,9 +84,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
       .eq("id", context.userId)
       .maybeSingle();
     advertiserAgeHours = hoursSince(profile?.created_at);
-  } catch {
-    /* soft */
-  }
+  } catch {}
   const underTrustHold = advertiserAgeHours < RULES.advertiserTrustHoldHours;
 
   const unitService={
@@ -108,14 +104,10 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
 
   if (underTrustHold) {
     if (quantity > RULES.advertiserTrustMaxQty) {
-      throw new Error(
-        `New advertisers (first ${RULES.advertiserTrustHoldHours}h) are limited to ${RULES.advertiserTrustMaxQty.toLocaleString()} units per campaign.`,
-      );
+      throw new Error(`New advertisers (first ${RULES.advertiserTrustHoldHours}h) are limited to ${RULES.advertiserTrustMaxQty.toLocaleString()} units per campaign.`);
     }
     if (customerTotalWithFeature > RULES.advertiserTrustMaxCampaignUsd) {
-      throw new Error(
-        `New advertisers are limited to $${RULES.advertiserTrustMaxCampaignUsd} per campaign until trust unlocks.`,
-      );
+      throw new Error(`New advertisers are limited to $${RULES.advertiserTrustMaxCampaignUsd} per campaign until trust unlocks.`);
     }
   }
 
@@ -151,18 +143,10 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   let proofRequirements=Array.isArray(data.proofRequirements)
     ? data.proofRequirements.filter((v)=>["screenshot","text","link","watch_completion"].includes(String(v)))
     : service.pricing_model==="watch_second" ? ["watch_completion"] : verificationMode==="automatic" ? ["automatic"] : ["screenshot"];
-  if (
-    verificationMode === "screenshot" &&
-    followLikeTypes.has(taskType) &&
-    !proofRequirements.includes("text")
-  ) {
+  if (verificationMode === "screenshot" && followLikeTypes.has(taskType) && !proofRequirements.includes("text")) {
     proofRequirements = [...proofRequirements, "text"];
   }
-  if (
-    verificationMode === "screenshot" &&
-    !proofRequirements.includes("screenshot") &&
-    !proofRequirements.includes("automatic")
-  ) {
+  if (verificationMode === "screenshot" && !proofRequirements.includes("screenshot") && !proofRequirements.includes("automatic")) {
     proofRequirements = ["screenshot", ...proofRequirements];
   }
   const difficulty=data.difficulty==="hard"?"hard":data.difficulty==="medium"?"medium":"easy";
@@ -274,3 +258,60 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
 
   return {campaign,task,pricing:{...pricing,customerTotal:customerTotalWithFeature,featureFee,watchSeconds,perTaskReward,perTaskCustomer,verificationMethods},status:"draft" as const};
 });
+
+/** Advertiser: my posted tasks + watch videos (clean inventory). */
+export const listMyPosted = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tasks, error } = await supabaseAdmin
+      .from("tasks")
+      .select("id, title, platform, task_type, status, is_active, reward, slots_left, slots_total, link, created_at, proof, campaign_id")
+      .eq("created_by", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(80);
+    if (error) throw new Error(error.message);
+
+    const rows = tasks ?? [];
+    const taskIds = rows.map((t) => t.id);
+    const subCount = new Map<string, number>();
+    if (taskIds.length) {
+      const { data: subs } = await supabaseAdmin
+        .from("submissions")
+        .select("task_id, status")
+        .in("task_id", taskIds);
+      for (const s of subs ?? []) {
+        const tid = String((s as { task_id: string }).task_id);
+        const st = String((s as { status?: string }).status ?? "");
+        if (st === "verified" || st === "approved" || st === "auto_approved" || st === "pending") {
+          subCount.set(tid, (subCount.get(tid) ?? 0) + 1);
+        }
+      }
+    }
+
+    const mapped = rows.map((t) => {
+      const type = String((t as { task_type?: string }).task_type ?? "").toLowerCase();
+      const isVideo = type.includes("watch") || type.includes("video") || type === "view";
+      return {
+        id: t.id,
+        title: String((t as { title?: string }).title ?? "Untitled"),
+        platform: String((t as { platform?: string }).platform ?? ""),
+        taskType: type,
+        isVideo,
+        status: String((t as { status?: string }).status ?? "draft"),
+        isActive: Boolean((t as { is_active?: boolean }).is_active),
+        reward: Number((t as { reward?: number }).reward ?? 0),
+        slotsLeft: Number((t as { slots_left?: number }).slots_left ?? 0),
+        slotsTotal: Number((t as { slots_total?: number }).slots_total ?? 0),
+        link: String((t as { link?: string }).link ?? ""),
+        createdAt: String((t as { created_at?: string }).created_at ?? ""),
+        submissions: subCount.get(t.id) ?? 0,
+      };
+    });
+
+    return {
+      videos: mapped.filter((m) => m.isVideo),
+      tasks: mapped.filter((m) => !m.isVideo),
+      all: mapped,
+    };
+  });
