@@ -2,7 +2,11 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Globe, Users, Activity, Wallet, ClipboardCheck, ChevronRight } from "lucide-react";
 import { ownerGetAnalytics } from "@/lib/owner-analytics.functions";
-import { ownerGetCompletionsHeatMap, ownerRunStuckTaskSla } from "@/lib/strong-plus.functions";
+import {
+  ownerGetCompletionsHeatMap,
+  ownerRunStuckTaskSla,
+  ownerRunAdvertiserReputation,
+} from "@/lib/strong-plus.functions";
 import { AppLink } from "@/components/AppLink";
 
 export const Route = createFileRoute("/_authenticated/owner/analytics")({
@@ -28,6 +32,8 @@ function OwnerAnalytics() {
   const { data, heat, error } = Route.useLoaderData();
   const [slaMsg, setSlaMsg] = useState("");
   const [slaBusy, setSlaBusy] = useState(false);
+  const [repMsg, setRepMsg] = useState("");
+  const [repBusy, setRepBusy] = useState(false);
 
   async function runSla() {
     setSlaBusy(true);
@@ -39,6 +45,20 @@ function OwnerAnalytics() {
       setSlaMsg(e instanceof Error ? e.message : "SLA failed");
     } finally {
       setSlaBusy(false);
+    }
+  }
+
+  async function runRep() {
+    setRepBusy(true);
+    setRepMsg("");
+    try {
+      const r = await ownerRunAdvertiserReputation({ data: { autoPause: true } });
+      const paused = (r.results ?? []).reduce((s: number, x: { paused?: number }) => s + (x.paused ?? 0), 0);
+      setRepMsg(`Rep: scanned ${r.scanned}, flagged ${r.results?.length ?? 0}, paused ${paused}`);
+    } catch (e) {
+      setRepMsg(e instanceof Error ? e.message : "Reputation scan failed");
+    } finally {
+      setRepBusy(false);
     }
   }
 
@@ -74,29 +94,40 @@ function OwnerAnalytics() {
             <Mini label="New 30d" value={String(data.new30d)} />
           </section>
 
+          <section className="mt-3 grid grid-cols-2 gap-2">
+            <Kpi label="Pending reviews" value={String(data.pendingReviews)} icon={ClipboardCheck} tone="gold" />
+            <Kpi label="Pending payouts" value={String(data.pendingWithdrawals)} icon={Wallet} tone="purple" />
+            <Kpi label="Rewards paid" value={`$${Number(data.rewardsPaid).toFixed(2)}`} icon={Wallet} tone="green" />
+            <Kpi label="Active accounts" value={String(data.byStatus.active)} icon={Users} tone="cyan" />
+          </section>
+
           <section className="mt-5">
-            <div className="mb-2 flex items-center gap-2">
-              <Globe className="size-3.5 text-cyan-300" />
-              <p className="text-xs font-bold uppercase tracking-wide text-white/50">Users by country</p>
-            </div>
-            {(data.countries?.length ?? 0) === 0 ? (
-              <p className="rounded-xl border border-white/8 bg-[#12141c] px-3 py-4 text-center text-[11px] text-white/40">No geo data yet.</p>
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-black">
+              <Globe className="size-4 text-cyan-300" /> Country heat map
+            </h2>
+            <p className="mb-2 text-[10px] text-white/40">Users · online now · share of base</p>
+            {data.countries.length === 0 ? (
+              <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-sm text-white/40">
+                No country data yet. Run PRESENCE_COUNTRY_RUN_ONCE.sql and have users open the app.
+              </p>
             ) : (
               <div className="space-y-1.5">
-                {data.countries.map((c: { name: string; count: number; online?: number }) => {
+                {data.countries.map((c) => {
                   const pct = data.totalUsers > 0 ? Math.round((c.count / data.totalUsers) * 100) : 0;
-                  const onlineN = Number(c.online ?? 0);
+                  const onlineN = Number((c as { online?: number }).online ?? 0);
                   return (
-                    <div key={c.name} className="flex items-center gap-2 rounded-xl border border-white/8 bg-[#12141c] px-3 py-2.5">
-                      <span className="w-16 truncate text-[11px] font-bold text-white/80">{c.name}</span>
-                      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/10">
-                        <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.min(100, pct)}%` }} />
-                      </div>
+                    <div
+                      key={c.name}
+                      className="flex items-center gap-2 rounded-xl border border-white/8 bg-[#12141c] px-3 py-2.5"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-white/90">
+                        {c.name}
+                      </span>
+                      <span className="text-[10px] tabular-nums text-white/40">{pct}%</span>
                       <span className="w-8 text-right text-[11px] font-bold tabular-nums text-cyan-200">{c.count}</span>
                       <span className={`w-10 text-right text-[10px] font-semibold tabular-nums ${onlineN > 0 ? "text-emerald-300" : "text-white/25"}`}>
                         {onlineN > 0 ? `${onlineN} on` : "—"}
                       </span>
-                      <span className="w-7 text-right text-[10px] text-white/35">{pct}%</span>
                     </div>
                   );
                 })}
@@ -110,6 +141,7 @@ function OwnerAnalytics() {
             <Mini label="Banned" value={String(data.byStatus.banned)} />
           </section>
 
+          {/* 10 · Completions heat map */}
           <section className="mt-5">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-bold uppercase tracking-wide text-white/50">Completions by country</p>
@@ -136,34 +168,62 @@ function OwnerAnalytics() {
             )}
           </section>
 
+          {/* 3 · Stuck SLA */}
           <section className="mt-5 rounded-2xl border border-amber-400/20 bg-[#12141c] p-3.5">
             <p className="text-xs font-bold text-amber-100">Stuck task SLA</p>
             <p className="mt-1 text-[10px] text-white/40">Active tasks with 0 completions for 48h → auto-pause + ops alert.</p>
-            <button type="button" disabled={slaBusy} onClick={() => void runSla()} className="mt-2.5 w-full rounded-xl bg-amber-400 py-2.5 text-xs font-extrabold text-[#05070c] disabled:opacity-50">
+            <button
+              type="button"
+              disabled={slaBusy}
+              onClick={() => void runSla()}
+              className="mt-2.5 w-full rounded-xl bg-amber-400 py-2.5 text-xs font-extrabold text-[#05070c] disabled:opacity-50"
+            >
               {slaBusy ? "Scanning…" : "Run 48h SLA scan"}
             </button>
             {slaMsg ? <p className="mt-2 text-[10px] text-white/60">{slaMsg}</p> : null}
           </section>
 
-          <section className="mt-5 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border border-white/8 bg-[#12141c] p-3">
-              <div className="flex items-center gap-1.5"><ClipboardCheck className="size-3.5 text-amber-300" /><p className="text-[11px] text-white/45">Pending reviews</p></div>
-              <p className="mt-1 text-lg font-bold tabular-nums text-amber-200">{data.pendingReviews}</p>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-[#12141c] p-3">
-              <div className="flex items-center gap-1.5"><Wallet className="size-3.5 text-violet-300" /><p className="text-[11px] text-white/45">Pending WDs</p></div>
-              <p className="mt-1 text-lg font-bold tabular-nums text-violet-200">{data.pendingWithdrawals}</p>
-            </div>
+          {/* 4 · Advertiser reputation */}
+          <section className="mt-3 rounded-2xl border border-rose-400/20 bg-[#12141c] p-3.5">
+            <p className="text-xs font-bold text-rose-100">Advertiser reputation</p>
+            <p className="mt-1 text-[10px] text-white/40">
+              Rejection rate ≥45% (min 8 reviews) → auto-pause campaigns + ops alert.
+            </p>
+            <button
+              type="button"
+              disabled={repBusy}
+              onClick={() => void runRep()}
+              className="mt-2.5 w-full rounded-xl bg-rose-400 py-2.5 text-xs font-extrabold text-[#05070c] disabled:opacity-50"
+            >
+              {repBusy ? "Scanning…" : "Run reputation sweep"}
+            </button>
+            {repMsg ? <p className="mt-2 text-[10px] text-white/60">{repMsg}</p> : null}
           </section>
+
         </>
       ) : null}
     </main>
   );
 }
 
-function Kpi({ label, value, icon: Icon, tone }: { label: string; value: string; icon: typeof Users; tone: string }) {
+function Kpi({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: typeof Users;
+  tone: string;
+}) {
   const toneMap: Record<string, string> = {
-    cyan: "text-cyan-300", green: "text-emerald-300", amber: "text-amber-300", gold: "text-amber-200", purple: "text-violet-300", slate: "text-slate-300",
+    cyan: "text-cyan-300",
+    green: "text-emerald-300",
+    amber: "text-amber-300",
+    gold: "text-amber-200",
+    purple: "text-violet-300",
+    slate: "text-slate-300",
   };
   return (
     <div className="rounded-2xl border border-white/8 bg-[#12141c] p-3">
