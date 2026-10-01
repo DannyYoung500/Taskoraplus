@@ -37,10 +37,17 @@ export const createSupportTicket = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
+    try {
+      const { sendOwnerHtml } = await import("@/lib/notify-owner");
+      await sendOwnerHtml(
+        `🎫 <b>New support ticket</b>\n<code>${String((row as { id?: string }).id || "").slice(0, 8)}</code>\n${subject.slice(0, 80)}\n${body.slice(0, 120)}`,
+      );
+    } catch {
+      /* soft */
+    }
     return row;
   });
 
-/** G: Dispute / appeal a rejected submission */
 export const createSubmissionAppeal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { submissionId: string; reason: string }) => d)
@@ -150,3 +157,5 @@ export const ownerCloseTicket = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export { ownerReplyTicket } from "@/lib/premium-product.functions";
