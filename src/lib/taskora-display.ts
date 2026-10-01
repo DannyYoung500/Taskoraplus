@@ -35,3 +35,5 @@ export function formatUsd(value: number | string | null | undefined) {
   const amount = Number(value ?? 0);
   return `$${(Number.isFinite(amount) ? amount : 0).toFixed(4)}`;
 }
+
+export { formatUsdWithLocal, DISPLAY_RATES } from "@/lib/premium-product.functions";
