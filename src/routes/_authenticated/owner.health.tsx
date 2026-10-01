@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
 import { getSystemHealth } from "@/lib/owner-ops.functions";
+import { AppLink } from "@/components/AppLink";
 import {
   getOwnerKillSwitches,
   setOwnerKillSwitch,
@@ -9,6 +10,7 @@ import {
   ownerAlertStuckWithdrawals,
   ownerAlertStuckCampaigns,
 } from "@/lib/strong-wave.functions";
+import { ownerRunStuckWithdrawalSla } from "@/lib/strong-premium.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/health")({
   component: OwnerHealthPage,
@@ -69,13 +71,16 @@ function OwnerHealthPage() {
     }
   }
 
-  async function runCron(kind: "wd" | "campaigns") {
+  async function runCron(kind: "wd" | "campaigns" | "wd_sla") {
     setBusy(kind);
     setMsg(null);
     try {
       if (kind === "wd") {
         const r = await ownerAlertStuckWithdrawals();
         setMsg(`Stuck withdrawals: ${r.count} · ~$${Number(r.totalUsd).toFixed(2)}`);
+      } else if (kind === "wd_sla") {
+        const r = await ownerRunStuckWithdrawalSla({ data: { hours: 12 } });
+        setMsg(`WD SLA: ${r.count} stuck · ~$${Number(r.totalUsd).toFixed(2)} · flagged ${r.flagged}`);
       } else {
         const r = await ownerAlertStuckCampaigns();
         setMsg(`Stuck campaigns: ${r.count}`);
@@ -97,11 +102,11 @@ function OwnerHealthPage() {
   ];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[1440px] bg-[#05070c] px-4 pb-16 pt-6 sm:px-6 lg:px-8 text-white">
+    <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
       <div className="mb-4 flex items-center gap-2">
-        <Link to="/owner" className="rounded-full border border-white/10 p-2 text-white/60">
+        <AppLink to="/owner" className="rounded-full border border-white/10 p-2 text-white/60">
           <ChevronLeft className="size-4" />
-        </Link>
+        </AppLink>
         <div>
           <h1 className="text-xl font-bold">System Health</h1>
           <p className="text-xs text-white/45">Probes · kill switches · cron</p>
@@ -110,7 +115,7 @@ function OwnerHealthPage() {
       {msg ? <p className="mb-3 text-xs text-cyan-300">{msg}</p> : null}
 
       {webhook ? (
-        <div className="mb-3 rounded-2xl border border-white/8 bg-[#0b1422] px-4 py-3">
+        <div className="mb-3 rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">Telegram webhook</p>
             <span
@@ -157,20 +162,28 @@ function OwnerHealthPage() {
 
       <section className="mb-4 space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/80">Manual cron</p>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2">
           <button
             type="button"
             disabled={busy === "wd"}
             onClick={() => void runCron("wd")}
-            className="flex-1 rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50"
+            className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50"
           >
             Alert stuck WDs
           </button>
           <button
             type="button"
+            disabled={busy === "wd_sla"}
+            onClick={() => void runCron("wd_sla")}
+            className="rounded-xl border border-amber-400/25 bg-amber-400/10 py-2.5 text-xs font-bold text-amber-200 disabled:opacity-50"
+          >
+            Run 12h WD SLA (flag + notify)
+          </button>
+          <button
+            type="button"
             disabled={busy === "campaigns"}
             onClick={() => void runCron("campaigns")}
-            className="flex-1 rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50"
+            className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50"
           >
             Alert stuck campaigns
           </button>
