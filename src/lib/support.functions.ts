@@ -20,27 +20,39 @@ export const listMyTickets = createServerFn({ method: "GET" })
 
 export const createSupportTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { subject: string; body: string }) => d)
+  .inputValidator((d: { subject: string; body: string; attachmentUrl?: string }) => d)
   .handler(async ({ data, context }) => {
     const subject = data.subject.trim();
     const body = data.body.trim();
     if (!subject || !body) throw new Error("Subject and message are required.");
+    let attachmentUrl: string | null = null;
+    const rawAtt = String(data.attachmentUrl || "").trim();
+    if (rawAtt) {
+      if (!/^https?:\/\//i.test(rawAtt)) {
+        throw new Error("Attachment must be a public https image/link URL.");
+      }
+      if (rawAtt.length > 500) throw new Error("Attachment URL is too long.");
+      attachmentUrl = rawAtt.slice(0, 500);
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const insertRow: Record<string, unknown> = {
+      user_id: context.userId,
+      subject,
+      body,
+      status: "open",
+    };
+    if (attachmentUrl) insertRow.attachment_url = attachmentUrl;
     const { data: row, error } = await supabaseAdmin
       .from("support_tickets")
-      .insert({
-        user_id: context.userId,
-        subject,
-        body,
-        status: "open",
-      } as never)
+      .insert(insertRow as never)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
     try {
       const { sendOwnerHtml } = await import("@/lib/notify-owner");
       await sendOwnerHtml(
-        `🎫 <b>New support ticket</b>\n<code>${String((row as { id?: string }).id || "").slice(0, 8)}</code>\n${subject.slice(0, 80)}\n${body.slice(0, 120)}`,
+        `🎫 <b>New support ticket</b>\n<code>${String((row as { id?: string }).id || "").slice(0, 8)}</code>\n${subject.slice(0, 80)}\n${body.slice(0, 120)}` +
+          (attachmentUrl ? `\n📎 ${attachmentUrl.slice(0, 80)}` : ""),
       );
     } catch {
       /* soft */
