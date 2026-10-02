@@ -18,6 +18,42 @@ export const listMyTickets = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+/** Upload screenshot for support (JPEG/PNG, max ~2.5MB data URL). */
+export const uploadSupportImage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { dataUrl: string }) => d)
+  .handler(async ({ data, context }) => {
+    const raw = String(data.dataUrl || "").trim();
+    const m = raw.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (!m) throw new Error("Upload a JPEG, PNG, or WebP image.");
+    const contentType = m[1]!.toLowerCase().replace("jpg", "jpeg");
+    const base64 = m[2]!.replace(/\s/g, "");
+    if (base64.length > 3_500_000) throw new Error("Image too large (max ~2.5 MB).");
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+    const path = `tickets/${context.userId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: bucket } = await supabaseAdmin.storage.getBucket("support-attachments");
+    if (!bucket) {
+      const { error: createError } = await supabaseAdmin.storage.createBucket("support-attachments", {
+        public: true,
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+        fileSizeLimit: "3MB",
+      });
+      if (createError && !/already exists/i.test(createError.message)) {
+        throw new Error(`Could not create storage: ${createError.message}`);
+      }
+    }
+    const { error: uploadError } = await supabaseAdmin.storage.from("support-attachments").upload(path, bytes, {
+      contentType,
+      cacheControl: "86400",
+      upsert: false,
+    });
+    if (uploadError) throw new Error(uploadError.message);
+    const { data: pub } = supabaseAdmin.storage.from("support-attachments").getPublicUrl(path);
+    return { url: pub.publicUrl };
+  });
+
 export const createSupportTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { subject: string; body: string; attachmentUrl?: string }) => d)
@@ -25,6 +61,7 @@ export const createSupportTicket = createServerFn({ method: "POST" })
     const subject = data.subject.trim();
     const body = data.body.trim();
     if (!subject || !body) throw new Error("Subject and message are required.");
+    // 10 · Ticket attachment: screenshot URL only (no file upload)
     let attachmentUrl: string | null = null;
     const rawAtt = String(data.attachmentUrl || "").trim();
     if (rawAtt) {
@@ -54,12 +91,11 @@ export const createSupportTicket = createServerFn({ method: "POST" })
         `🎫 <b>New support ticket</b>\n<code>${String((row as { id?: string }).id || "").slice(0, 8)}</code>\n${subject.slice(0, 80)}\n${body.slice(0, 120)}` +
           (attachmentUrl ? `\n📎 ${attachmentUrl.slice(0, 80)}` : ""),
       );
-    } catch {
-      /* soft */
-    }
+    } catch { /* soft */ }
     return row;
   });
 
+/** G: Dispute / appeal a rejected submission */
 export const createSubmissionAppeal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { submissionId: string; reason: string }) => d)
@@ -78,6 +114,7 @@ export const createSubmissionAppeal = createServerFn({ method: "POST" })
     if (String((sub as { status?: string }).status) !== "rejected") {
       throw new Error("Only rejected submissions can be appealed.");
     }
+    // One open appeal per submission
     const { data: existing } = await supabaseAdmin
       .from("support_tickets")
       .select("id")
