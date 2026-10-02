@@ -174,50 +174,44 @@ export const getBonusAdSession = createServerFn({ method: "POST" })
     return mintBonusAdSession({ userId: context.userId });
   });
 
+/** Validate sdk session token before crediting. Required — no soft skip. */
 export async function assertBonusAdSessionToken(opts: {
   userId: string;
   sdkToken?: string | null;
 }): Promise<void> {
   const token = String(opts.sdkToken || "").trim();
-  if (!token) return;
-
-  try {
-    const s = await admin();
-    const { data } = await s
-      .from("app_settings")
-      .select("value")
-      .eq("key", `bonus_ad_session:${opts.userId}`)
-      .maybeSingle();
-    const v = (data?.value ?? {}) as {
-      token?: string;
-      expiresAt?: string;
-      used?: boolean;
-    };
-    if (!v.token || v.token !== token) {
-      throw new Error("Invalid bonus-ad session. Open the ad again.");
-    }
-    if (v.used) {
-      throw new Error("This bonus-ad session was already claimed.");
-    }
-    if (v.expiresAt && new Date(v.expiresAt).getTime() < Date.now()) {
-      throw new Error("Bonus-ad session expired. Open the ad again.");
-    }
-    await s.from("app_settings").upsert(
-      {
-        key: `bonus_ad_session:${opts.userId}`,
-        value: { ...v, used: true },
-        updated_at: new Date().toISOString(),
-      } as never,
-      { onConflict: "key" },
-    );
-  } catch (e) {
-    if (
-      e instanceof Error &&
-      (e.message.includes("bonus-ad") || e.message.includes("session") || e.message.includes("Invalid"))
-    ) {
-      throw e;
-    }
+  if (!token || token.length < 16) {
+    throw new Error("Bonus-ad session required. Tap Watch a bonus ad again.");
   }
+
+  const s = await admin();
+  const { data } = await s
+    .from("app_settings")
+    .select("value")
+    .eq("key", `bonus_ad_session:${opts.userId}`)
+    .maybeSingle();
+  const v = (data?.value ?? {}) as {
+    token?: string;
+    expiresAt?: string;
+    used?: boolean;
+  };
+  if (!v.token || v.token !== token) {
+    throw new Error("Invalid bonus-ad session. Open the ad again.");
+  }
+  if (v.used) {
+    throw new Error("This bonus-ad session was already claimed.");
+  }
+  if (v.expiresAt && new Date(v.expiresAt).getTime() < Date.now()) {
+    throw new Error("Bonus-ad session expired. Open the ad again.");
+  }
+  await s.from("app_settings").upsert(
+    {
+      key: `bonus_ad_session:${opts.userId}`,
+      value: { ...v, used: true },
+      updated_at: new Date().toISOString(),
+    } as never,
+    { onConflict: "key" },
+  );
 }
 
 /* ───────── 10 · Kill-switch helpers ───────── */
