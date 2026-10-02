@@ -7,12 +7,12 @@ async function adminClient() {
 }
 
 /**
- * 9 · Bonus ad credit with optional SDK session token.
- * Wire Monetag / Adsgram / PropellerAds in watch-earn UI:
- *   1) Call getBonusAdSession() → token
- *   2) Show ad unit
- *   3) On reward callback: creditBonusAd({ data: { sdkToken: token } })
- * Server validates rate limits + daily cap + one-time session token.
+ * 9 · Bonus ad credit — requires one-time SDK session token.
+ * Flow:
+ *   1) getBonusAdSession() → token
+ *   2) (optional) show Adsgram/Monetag unit
+ *   3) creditBonusAd({ data: { sdkToken: token } })
+ * Server: rate limit + daily cap + single-use token.
  */
 export const creditBonusAd = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -28,25 +28,12 @@ export const creditBonusAd = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
 
-    // 9 · SDK session token (soft if client not yet passing token)
-    try {
-      const { assertBonusAdSessionToken } = await import("@/lib/strong-premium.functions");
-      await assertBonusAdSessionToken({
-        userId: context.userId,
-        sdkToken: (data as { sdkToken?: string } | undefined)?.sdkToken,
-      });
-    } catch (e) {
-      if (
-        e instanceof Error &&
-        (e.message.includes("bonus-ad") ||
-          e.message.includes("session") ||
-          e.message.includes("Invalid") ||
-          e.message.includes("claimed") ||
-          e.message.includes("expired"))
-      ) {
-        throw e;
-      }
-    }
+    // 9 · SDK session token REQUIRED (mint via getBonusAdSession first)
+    const { assertBonusAdSessionToken } = await import("@/lib/strong-premium.functions");
+    await assertBonusAdSessionToken({
+      userId: context.userId,
+      sdkToken: (data as { sdkToken?: string } | undefined)?.sdkToken,
+    });
 
     const s = await adminClient();
     const { data: ecoRow } = await s
