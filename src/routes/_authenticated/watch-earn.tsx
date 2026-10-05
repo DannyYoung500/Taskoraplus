@@ -247,13 +247,9 @@ function getVideoThumbnail(video: WatchVideo): string | null {
 
 function hourlyRateLabel(video: WatchVideo): string {
   const reward = Number(video.rewardUsdt ?? 0);
-  const secs = Math.max(30, Number(video.durationSeconds ?? 60));
-  if (reward <= 0) {
-    const pts = Number(video.rewardPoints ?? 0);
-    return pts > 0 ? `+${pts} TP` : "Earn";
-  }
-  const perHour = reward * (3600 / secs);
-  return perHour >= 0.01 ? `${formatUsd(perHour)}/h` : formatUsd(reward);
+  if (reward > 0) return `+${formatUsd(reward)}`;
+  const pts = Number(video.rewardPoints ?? 0);
+  return pts > 0 ? `+${pts} TP` : "Earn";
 }
 
 function VideoFeedCard({ video, rank, done, onSelect }: { video: WatchVideo; rank: number; done: boolean; onSelect: () => void }) {
@@ -316,7 +312,7 @@ function WatchPlayer({
         <div className="rounded-2xl border border-cyan-400/20 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,.12),transparent_55%),#0a1424] px-4 py-4 text-center">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Earned this session</p>
           <p className="mt-1 text-3xl font-black tabular-nums text-cyan-200">{formatUsd(sessionDisplay)}</p>
-          <p className="mt-1 text-[10px] text-slate-500">{hourlyRate > 0 ? `${formatUsd(hourlyRate)} earned per hour watched` : Number(active.rewardUsdt) > 0 ? `${formatUsd(active.rewardUsdt)} per completed watch` : `+${Number(active.rewardPoints || 0)} TP per completed watch`}</p>
+          <p className="mt-1 text-[10px] text-slate-500">{Number(active.rewardUsdt) > 0 ? `${formatUsd(active.rewardUsdt)} per completed watch` : `+${Number(active.rewardPoints || 0)} TP per completed watch`}</p>
         </div>
         <button type="button" disabled={!canComplete || busy} onClick={onComplete} className="mt-3 w-full rounded-2xl py-3.5 text-sm font-black text-white disabled:opacity-45" style={{ background: BLUE_GRAD }}>
           {busy ? "Claiming…" : canComplete ? "Claim reward" : `Watch ${Math.max(0, required - elapsed)}s more`}
