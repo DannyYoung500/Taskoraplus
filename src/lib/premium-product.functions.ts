@@ -1,4 +1,4 @@
-/** Premium product barrel (5, 6, 10, 11–16, 18). */
+/** Premium product barrel. */
 export {
   imageStructuralHash,
   assertProofImageStructuralUnique,
@@ -6,14 +6,3 @@ export {
   computeFraudScore,
   ownerGetUserFraudScore,
 } from "./premium-product-core.functions";
-export {
-  levelFromVerified,
-  getMyLevelProgress,
-  getMyAdvertiserStats,
-  advertiserPauseTask,
-  DISPLAY_RATES,
-  formatUsdWithLocal,
-  claimWeeklyQuestPack,
-  getWeeklyQuestPackProgress,
-  ownerReplyTicket,
-} from "./premium-product-ux.functions";
