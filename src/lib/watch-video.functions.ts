@@ -457,3 +457,120 @@ export const getYoutubeVideoMetadata = createServerFn({ method: "GET" })
       authorName: json.author_name ?? null,
     };
   });
+export const registerOwnerVideo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: {
+      title: string;
+      description?: string;
+      videoUrl: string;
+      platform: string;
+      rewardUsdt: number;
+      durationSeconds?: number;
+      thumbnailUrl?: string;
+      dailyLimit?: number;
+      maxViews?: number;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    if (!data.title.trim()) throw new Error("Video title is required.");
+    if (!Number.isFinite(Number(data.durationSeconds)) || Number(data.durationSeconds) < 1) throw new Error("Required watch time must be at least 1 second.");
+    if (data.rewardUsdt < 0) throw new Error("USDT reward cannot be negative.");
+    const platform = data.platform.trim() || "youtube";
+
+    // YouTube only path for advertise/watch: normalize URL, no upload
+    let videoUrl = data.videoUrl.trim();
+    let providerVideoId = videoUrl;
+    if (/youtube|youtu\.be/i.test(videoUrl) || platform.toLowerCase() === "youtube") {
+      const norm = normalizeYoutubeInput(videoUrl);
+      videoUrl = norm.url;
+      providerVideoId = norm.id;
+
+      // Velocity: same YouTube id already used heavily
+      const s0 = await adminClient();
+      const { count } = await (s0 as any)
+        .from("watch_videos")
+        .select("id", { count: "exact", head: true })
+        .eq("provider_video_id", norm.id)
+        .eq("status", "active");
+      if ((count ?? 0) >= 8) {
+        throw new Error(
+          "This YouTube video is already used on too many active campaigns. Pick another video.",
+        );
+      }
+    } else if (!/^https?:\/\//i.test(videoUrl)) {
+      throw new Error("Enter a valid video link.");
+    }
+
+    const s = await adminClient();
+    const { data: row, error } = await (s as any)
+      .from("watch_videos")
+      .insert({
+        title: data.title.trim(),
+        description: data.description?.trim() || null,
+        video_url: videoUrl,
+        thumbnail_url: data.thumbnailUrl?.trim() || null,
+        source_type: "owner_uploaded",
+        provider_name: platform,
+        provider_video_id: providerVideoId,
+        reward_usdt: data.rewardUsdt,
+        reward_points: 0,
+        duration_seconds: Math.max(1, Math.min(28800, Math.round(data.durationSeconds ?? 0))),
+        daily_limit: Math.max(1, Math.min(1000, Math.floor(data.dailyLimit ?? 1))),
+        max_views: Math.max(0, Math.min(1000000, Math.floor(data.maxViews ?? 0))),
+        status: "active",
+        created_by: context.userId,
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return mapVideo(row as Record<string, unknown>);
+  });
+
+export const setOwnerVideoStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { videoId: string; status: "active" | "paused" }) => data)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const s = await adminClient();
+    const { error } = await (s as any)
+      .from("watch_videos")
+      .update({ status: data.status })
+      .eq("id", data.videoId)
+      .eq("created_by", context.userId)
+      .neq("status", "completed");
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const deleteOwnerVideo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { videoId: string }) => data)
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+    const s = await adminClient();
+    const { error } = await (s as any)
+      .from("watch_videos")
+      .update({ status: "completed" })
+      .eq("id", data.videoId)
+      .eq("created_by", context.userId)
+      .neq("status", "completed");
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const listOwnerVideos = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertOwner(context.userId);
+    const s = await adminClient();
+    const { data, error } = await (s as any)
+      .from("watch_videos")
+      .select("*")
+      .eq("created_by", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Record<string, unknown>[]).map(mapVideo);
+  });
