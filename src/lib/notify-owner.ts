@@ -13,7 +13,7 @@ async function ownerChatIds(): Promise<{ botToken: string; ownerIds: string[] }>
 }
 
 function esc(v: unknown) {
-  return String(v ?? "").replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """);
+  return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 async function resolveOpsId(): Promise<string> {
@@ -117,7 +117,7 @@ export async function notifyOwnersWithdrawalFailed(opts: {
 }
 
 function escapeHtml(value: unknown) {
-  return String(value ?? "").replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """);
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const DEFAULT_PAYOUT_TEMPLATE =
   "✅ <b>PAYOUT COMPLETE</b>\\n\\nAmount: <b>#amount</b> USDT\\nNetwork: #method\\nUser: #name\\nUsername: #username\\nTo: <code>#address</code>\\nTx: <code>#tx_hash</code>\\nRef: <code>#reference</code>\\nTime: #time";
