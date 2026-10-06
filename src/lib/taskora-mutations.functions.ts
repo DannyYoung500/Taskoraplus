@@ -21,7 +21,7 @@ async function getMaintenanceSwitches() {
 
 export const submitTaskGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; proofText?: string | undefined; proofUrl?: string | undefined }) => d)
+  .inputValidator((d: { taskId: string; proofText?: string | undefined; proofUrl?: string | undefined; startedAtIso?: string | undefined }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
     try {
@@ -66,6 +66,16 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       await assertPlatformSubmitCooldown({ userId, platform });
     } catch (e) {
       if (e instanceof Error && (e.message.includes("Connect your") || e.message.includes("Daily limit") || e.message.includes("Quality hold") || e.message.includes("Wait "))) throw e;
+    }
+
+    try {
+      const { assertTaskDwellTime } = await import("@/lib/strong-score.functions");
+      await assertTaskDwellTime({
+        startedAtIso: data.startedAtIso,
+        platform: String((task as { platform?: string }).platform ?? ""),
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("seconds on this task")) throw e;
     }
 
     const proofText = (data.proofText ?? "").trim();
@@ -221,6 +231,14 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       requiresDual = strong.requiresDual;
     } catch (e) {
       if (e instanceof Error && (e.message.includes("frozen") || e.message.includes("Max ") || e.message.includes("region") || e.message.includes("limited"))) throw e;
+    }
+
+    try {
+      const { assertFraudScoreForWithdrawal } = await import("@/lib/strong-score.functions");
+      const fs = await assertFraudScoreForWithdrawal({ userId, amount: data.amount, requiresDual });
+      requiresDual = fs.requiresDual;
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("risk score")) throw e;
     }
 
     const ageH = hoursSince((profile as { created_at?: string } | null)?.created_at);
