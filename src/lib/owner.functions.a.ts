@@ -1,1 +1,2 @@
-LOAD_FROM:/tmp/owner_mod_a.ts
+/** Stub — core owner functions live in owner.functions.ts */
+export {};
