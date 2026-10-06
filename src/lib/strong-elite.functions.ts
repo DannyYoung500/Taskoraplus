@@ -1,9 +1,9 @@
 /**
  * Strong Elite: Telegram profile quality, trust score, behavioral velocity,
  * AdsGram/Monetag server postback, short session tokens, cluster alerts.
+ * Web Crypto only — safe if ever pulled near client boundary.
  * Soft-fail when optional columns are missing.
  */
-import { createHash, randomBytes } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -15,6 +15,35 @@ async function adminClient() {
 async function assertAdmin(userId: string) {
   const { assertOwner } = await import("@/lib/owner-guard.server");
   await assertOwner(userId);
+}
+
+function toBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  const b64 = btoa(binary);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(s: string): string {
+  const padded = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
+  return atob(padded + pad);
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function randomHex(bytesLen: number): string {
+  const arr = new Uint8Array(bytesLen);
+  crypto.getRandomValues(arr);
+  return Array.from(arr)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /** Score Telegram profile quality (0-100). Low score = extra friction. */
@@ -205,29 +234,28 @@ export async function assertTrustScoreForAction(opts: {
   }
 }
 
-export function mintAppSessionToken(userId: string): {
+export async function mintAppSessionToken(userId: string): Promise<{
   token: string;
   expiresAt: number;
-} {
+}> {
   const expiresAt = Date.now() + 30 * 60 * 1000;
-  const nonce = randomBytes(16).toString("hex");
+  const nonce = randomHex(16);
   const payload = `${userId}|${expiresAt}|${nonce}`;
-  const sig = createHash("sha256")
-    .update(payload + (process.env.SESSION_SECRET ?? process.env.BOT_TOKEN ?? "taskora"))
-    .digest("hex")
-    .slice(0, 24);
+  const secret = process.env.SESSION_SECRET ?? process.env.BOT_TOKEN ?? "taskora";
+  const sig = (await sha256Hex(payload + secret)).slice(0, 24);
+  const raw = `${payload}|${sig}`;
   return {
-    token: Buffer.from(`${payload}|${sig}`).toString("base64url"),
+    token: toBase64Url(new TextEncoder().encode(raw)),
     expiresAt,
   };
 }
 
-export function verifyAppSessionToken(
+export async function verifyAppSessionToken(
   token: string,
   expectedUserId: string,
-): boolean {
+): Promise<boolean> {
   try {
-    const raw = Buffer.from(token, "base64url").toString("utf8");
+    const raw = fromBase64Url(token);
     const parts = raw.split("|");
     if (parts.length !== 4) return false;
     const [userId, expStr, nonce, sig] = parts;
@@ -235,10 +263,8 @@ export function verifyAppSessionToken(
     const expiresAt = Number(expStr);
     if (!expiresAt || Date.now() > expiresAt) return false;
     const payload = `${userId}|${expStr}|${nonce}`;
-    const expected = createHash("sha256")
-      .update(payload + (process.env.SESSION_SECRET ?? process.env.BOT_TOKEN ?? "taskora"))
-      .digest("hex")
-      .slice(0, 24);
+    const secret = process.env.SESSION_SECRET ?? process.env.BOT_TOKEN ?? "taskora";
+    const expected = (await sha256Hex(payload + secret)).slice(0, 24);
     return sig === expected;
   } catch {
     return false;
@@ -257,10 +283,10 @@ export const adsNetworkRewardPostback = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const secret = process.env.ADSGRAM_POSTBACK_SECRET ?? process.env.MONETAG_POSTBACK_SECRET;
     if (secret && data.signature) {
-      const expected = createHash("sha256")
-        .update(`${data.telegramUserId}|${data.blockId ?? ""}|${secret}`)
-        .digest("hex")
-        .slice(0, 32);
+      const expected = (await sha256Hex(`${data.telegramUserId}|${data.blockId ?? ""}|${secret}`)).slice(
+        0,
+        32,
+      );
       if (data.signature !== expected && data.signature !== secret) {
         throw new Error("Invalid postback signature.");
       }
@@ -406,17 +432,28 @@ export const ownerGetEarnerRiskSnapshot = createServerFn({ method: "POST" })
 
     const quality = await scoreTelegramProfileQuality({
       userId: data.userId,
-      username: (profile as any).username,
-      firstName: (profile as any).first_name,
-      photoUrl: (profile as any).photo_url,
+      username: (profile as { username?: string }).username,
+      firstName: (profile as { first_name?: string }).first_name,
+      photoUrl: (profile as { photo_url?: string }).photo_url,
     });
+
+    let fraudScore = { score: 0, signals: [] as string[], action: "allow" as const };
+    try {
+      const { computeCompositeFraudScore } = await import("@/lib/strong-score.functions");
+      fraudScore = await computeCompositeFraudScore(data.userId);
+    } catch {
+      /* soft */
+    }
 
     return {
       profile,
       qualityScore: quality.score,
       qualityFlags: quality.flags,
-      trustScore: Number((profile as any).trust_score ?? 70),
-      approved: Number((profile as any).approved_count ?? 0),
-      rejected: Number((profile as any).rejected_count ?? 0),
+      trustScore: Number((profile as { trust_score?: number }).trust_score ?? 70),
+      approved: Number((profile as { approved_count?: number }).approved_count ?? 0),
+      rejected: Number((profile as { rejected_count?: number }).rejected_count ?? 0),
+      fraudScore: fraudScore.score,
+      fraudSignals: fraudScore.signals,
+      fraudAction: fraudScore.action,
     };
   });
