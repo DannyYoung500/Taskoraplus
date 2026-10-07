@@ -2,7 +2,7 @@
  * Remaining strong options (server-only):
  * - Device FP v2 report + cluster auto-hold
  * - Money-path initData freshness (≤5 min)
- * - Soft KYC: username + photo required before first large WD
+ * - Soft KYC: username + photo + connected account before first WD
  * - Short app session after initData
  * Soft-fail when optional columns missing.
  */
@@ -103,7 +103,7 @@ export async function applyClusterAutoHold(opts: {
   }
 }
 
-/** Soft KYC+: username + photo required before first withdrawal (or when trust low). */
+/** Soft KYC+: username + photo + connected account before first withdrawal. */
 export async function assertSoftKycPlus(opts: {
   userId: string;
 }): Promise<{ ok: boolean; reason?: string }> {
@@ -134,13 +134,21 @@ export async function assertSoftKycPlus(opts: {
       };
     }
 
-    // Also enforce legacy soft KYC after lifetime paid threshold
     try {
       const { assertSoftKycForWithdrawal } = await import("@/lib/strong-ops");
       const legacy = await assertSoftKycForWithdrawal({ userId: opts.userId });
       if (!legacy.ok && legacy.reason) return { ok: false, reason: legacy.reason };
     } catch {
       /* soft */
+    }
+
+    try {
+      const { assertConnectedBeforeFirstWithdrawal } = await import("@/lib/strong-next.functions");
+      await assertConnectedBeforeFirstWithdrawal({ userId: opts.userId });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Connect at least")) {
+        return { ok: false, reason: e.message };
+      }
     }
 
     if (trust < 35) {
@@ -162,8 +170,7 @@ export async function assertFreshInitDataForMoney(opts: {
 }): Promise<{ ok: boolean; userId?: number }> {
   const raw = String(opts.initData ?? "").trim();
   if (!raw) {
-    // Soft: if client doesn't send initData yet, allow (backward compatible).
-    // Tighten later once all clients send it.
+    // Soft allow until all clients send initData (wallet now does).
     return { ok: true };
   }
   const token = process.env.TELEGRAM_BOT_TOKEN ?? process.env.BOT_TOKEN ?? "";
@@ -182,7 +189,6 @@ export const mintSessionFromInitData = createServerFn({ method: "POST" })
     const token = process.env.TELEGRAM_BOT_TOKEN ?? process.env.BOT_TOKEN ?? "";
     if (!token) throw new Error("Bot token not configured.");
     const { validateTelegramInitData } = await import("@/lib/telegram-initdata");
-    // Login window can be longer; money paths use 5 min separately
     await validateTelegramInitData(data.initData, token, 3600);
     const { mintAppSessionToken } = await import("@/lib/strong-elite.functions");
     return mintAppSessionToken(context.userId);
