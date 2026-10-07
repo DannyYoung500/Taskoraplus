@@ -30,6 +30,12 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     } catch (e) {
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
+    try {
+      const { assertNotImpossibleProgression } = await import("@/lib/strong-tier-b.functions");
+      await assertNotImpossibleProgression({ userId });
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("Too many") || e.message.includes("New accounts"))) throw e;
+    }
     const maint = await getMaintenanceSwitches();
     if (maint.read_only) throw new Error("Platform is in read-only mode. Try again later.");
     if (maint.task_creation_paused) throw new Error("New task submissions are temporarily paused by the owner.");
