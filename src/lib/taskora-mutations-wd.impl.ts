@@ -21,7 +21,7 @@ async function getMaintenanceSwitches() {
 
 export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { method: string; address: string; amount: number; initData?: string | undefined }) => d)
+  .inputValidator((d: { method: string; address: string; amount: number; initData?: string | undefined; sessionToken?: string | undefined }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const address = normalizeWalletAddress(data.address);
@@ -40,13 +40,19 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     try {
-      const { assertHardInitDataForMoney } = await import("@/lib/strong-more.functions");
-      await assertHardInitDataForMoney({ initData: data.initData, maxAgeSeconds: 300 });
+      const { assertMoneySessionOrInitData } = await import("@/lib/strong-tier-a.functions");
+      await assertMoneySessionOrInitData({
+        userId,
+        sessionToken: data.sessionToken,
+        initData: data.initData,
+        maxAgeSeconds: 300,
+      });
     } catch (e) {
       if (e instanceof Error && (
         e.message.includes("initData") || e.message.includes("expired") ||
         e.message.includes("Invalid Telegram") || e.message.includes("Open TASKORA from Telegram") ||
-        e.message.includes("Fresh session")
+        e.message.includes("Fresh session") || e.message.includes("Money session") ||
+        e.message.includes("session")
       )) throw e;
     }
 
