@@ -58,7 +58,7 @@ function ProfileScreen() {
   const lifetime = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
   const verified = Number(dash?.verifiedCount ?? 0);
   const connectedCount = Array.isArray(accounts) ? accounts.length : 0;
-  const band = 10;
+  const band = 20;
   const intoBand = verified % band;
   const progressPct = Math.min(100, Math.round((intoBand / band) * 100));
   const nextLevelAt = band - intoBand;
