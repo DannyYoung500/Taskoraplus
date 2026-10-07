@@ -1,6 +1,6 @@
 /**
  * Remaining strong options (server-only):
- * - Device FP v2 report + cluster auto-hold
+ * - Device FP v2 report + cluster auto-hold + device change stamp
  * - Money-path initData freshness (≤5 min)
  * - Soft KYC: username + photo + connected account before first WD
  * - Short app session after initData
@@ -50,6 +50,13 @@ export const reportDeviceFpV2 = createServerFn({ method: "POST" })
         .eq("id", context.userId);
     } catch {
       /* column may not exist */
+    }
+
+    try {
+      const { markDeviceFpChangedIfNeeded } = await import("@/lib/strong-more.functions");
+      await markDeviceFpChangedIfNeeded({ userId: context.userId, newFp: fp });
+    } catch {
+      /* soft */
     }
 
     const multi = await countDeviceCluster(fp);
@@ -170,7 +177,6 @@ export async function assertFreshInitDataForMoney(opts: {
 }): Promise<{ ok: boolean; userId?: number }> {
   const raw = String(opts.initData ?? "").trim();
   if (!raw) {
-    // Soft allow until all clients send initData (wallet now does).
     return { ok: true };
   }
   const token = process.env.TELEGRAM_BOT_TOKEN ?? process.env.BOT_TOKEN ?? "";
