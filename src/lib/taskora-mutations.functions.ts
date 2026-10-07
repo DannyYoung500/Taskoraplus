@@ -1,6 +1,3 @@
-/** Re-export — full implementation in taskora-mutations.impl.ts */
-export {
-  submitTaskGuarded,
-  requestWithdrawalGuarded,
-  requestDepositGuarded,
-} from "./taskora-mutations.impl";
+/** Re-export — split impl for deploy safety */
+export { submitTaskGuarded } from "./taskora-mutations-submit.impl";
+export { requestWithdrawalGuarded, requestDepositGuarded } from "./taskora-mutations-wd.impl";
