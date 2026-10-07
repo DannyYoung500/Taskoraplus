@@ -132,7 +132,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
 
 export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { method: string; address: string; amount: number }) => d)
+  .inputValidator((d: { method: string; address: string; amount: number; initData?: string | undefined }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const address = normalizeWalletAddress(data.address);
@@ -151,12 +151,26 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     try {
-      const { assertAddressAllowlisted, assertSoftKycForWithdrawal } = await import("@/lib/strong-ops");
-      await assertAddressAllowlisted({ userId, address });
-      const kyc = await assertSoftKycForWithdrawal({ userId });
-      if (!kyc.ok && kyc.reason) throw new Error(kyc.reason);
+      const { assertFreshInitDataForMoney } = await import("@/lib/strong-remaining.functions");
+      await assertFreshInitDataForMoney({ initData: data.initData, maxAgeSeconds: 300 });
     } catch (e) {
-      if (e instanceof Error && (e.message.includes("24") || e.message.includes("cool") || e.message.includes("wait") || e.message.includes("Address saved") || e.message.includes("soft KYC") || e.message.includes("Complete soft"))) throw e;
+      if (e instanceof Error && (e.message.includes("initData") || e.message.includes("expired") || e.message.includes("Invalid Telegram"))) throw e;
+    }
+
+    try {
+      const { assertAddressAllowlisted } = await import("@/lib/strong-ops");
+      await assertAddressAllowlisted({ userId, address });
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("24") || e.message.includes("cool") || e.message.includes("wait") || e.message.includes("Address saved"))) throw e;
+    }
+
+    try {
+      const { assertSoftKycPlus, assertClusterNotBlocked } = await import("@/lib/strong-remaining.functions");
+      const kyc = await assertSoftKycPlus({ userId });
+      if (!kyc.ok && kyc.reason) throw new Error(kyc.reason);
+      await assertClusterNotBlocked({ userId });
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("Soft KYC") || e.message.includes("Trust score") || e.message.includes("frozen") || e.message.includes("multiple accounts") || e.message.includes("profile photo") || e.message.includes("username"))) throw e;
     }
 
     try {
