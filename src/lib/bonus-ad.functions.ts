@@ -12,7 +12,7 @@ async function adminClient() {
  *   1) getBonusAdSession() → token
  *   2) (optional) show Adsgram/Monetag unit
  *   3) creditBonusAd({ data: { sdkToken: token } })
- * Server: rate limit + daily cap + single-use token.
+ * Server: rate limit + daily cap + single-use token + trust earn cap.
  */
 export const creditBonusAd = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -28,7 +28,6 @@ export const creditBonusAd = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
 
-    // 9 · SDK session token REQUIRED (mint via getBonusAdSession first)
     const { assertBonusAdSessionToken } = await import("@/lib/strong-premium.functions");
     await assertBonusAdSessionToken({
       userId: context.userId,
@@ -49,6 +48,13 @@ export const creditBonusAd = createServerFn({ method: "POST" })
     );
     if (reward <= 0 || dailyLimit <= 0) {
       throw new Error("Bonus ads are disabled by the owner.");
+    }
+
+    try {
+      const { runEarnGuards } = await import("@/lib/strong-next.functions");
+      await runEarnGuards({ userId: context.userId, amount: reward });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Daily earn")) throw e;
     }
 
     const today = new Date().toISOString().slice(0, 10);
