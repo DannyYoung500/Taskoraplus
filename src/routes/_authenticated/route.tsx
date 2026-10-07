@@ -4,6 +4,7 @@ import { getTelegramGateStatus } from "@/lib/telegram-gate.functions";
 import { getAccountAccess } from "@/lib/account-access.functions";
 import { touchPresence } from "@/lib/presence.functions";
 import { TelegramNativeShell } from "@/components/TelegramNativeShell";
+import { DeviceFpBootstrap } from "@/components/DeviceFpBootstrap";
 
 declare global {
   interface Window {
@@ -37,30 +38,20 @@ export const Route = createFileRoute("/_authenticated")({
         throw redirect({ to: "/maintenance" });
       }
     } catch (e) {
-      if (e && typeof e === "object" && "to" in (e as object)) throw e;
+      if (e && typeof e === "object" && "to" in e) throw e;
     }
 
-    // Owner console and gate screen themselves are exempt from membership gate
-    if (path.startsWith("/owner") || path === "/telegram-gate") {
-      return { user: { id: data.user.id } };
-    }
-
-    const initData =
-      typeof window !== "undefined" ? (window.Telegram?.WebApp?.initData ?? "") : "";
-
-    if (!initData) {
-      return { user: { id: data.user.id } };
-    }
-
-    try {
-      const status = await getTelegramGateStatus({ data: { initData, force: false } });
-      if (status.allowed) {
-        return { user: { id: data.user.id } };
+    // Telegram gate (skip for owner paths)
+    if (!path.startsWith("/owner")) {
+      try {
+        const initData = typeof window !== "undefined" ? String(window.Telegram?.WebApp?.initData ?? "") : "";
+        const gate = await getTelegramGateStatus({ data: { initData } });
+        if (gate && gate.allowed === false && gate.configured !== false) {
+          throw redirect({ to: "/telegram-gate" });
+        }
+      } catch (e) {
+        if (e && typeof e === "object" && "to" in e) throw e;
       }
-      throw redirect({ to: "/telegram-gate" });
-    } catch (e) {
-      if (e && typeof e === "object" && "to" in (e as object)) throw e;
-      throw redirect({ to: "/telegram-gate" });
     }
   },
   pendingComponent: AuthenticatedPending,
@@ -68,7 +59,7 @@ export const Route = createFileRoute("/_authenticated")({
   component: () => (
     <>
       <style>{".taskora-advertise-theme,.taskora-advertise-theme :where(main,section,header,nav,article,aside){--taskora-page:#05070c;--taskora-surface:#12141c;--taskora-surface-2:#0b0d14;--taskora-border:rgba(255,255,255,.10);--taskora-accent:#38bdf8;--taskora-accent-strong:#0ea5e9}.taskora-advertise-theme{min-height:100dvh;background:radial-gradient(circle at 88% 0%,rgba(14,165,233,.13),transparent 32%),radial-gradient(circle at 0% 24%,rgba(56,189,248,.07),transparent 28%),#05070c;color:#fff}.taskora-advertise-theme [class*=\"bg-[#030814]\"],.taskora-advertise-theme [class*=\"bg-[#06152d]\"],.taskora-advertise-theme [class*=\"bg-[#071a36]\"],.taskora-advertise-theme [class*=\"bg-[#0b1424]\"],.taskora-advertise-theme [class*=\"bg-[#0a1423]\"],.taskora-advertise-theme [class*=\"bg-[#0b1628\"]{background-color:#05070c!important;background-image:none!important}.taskora-advertise-theme [class*=\"bg-[#121f33]\"],.taskora-advertise-theme [class*=\"bg-[#0b2040]\"],.taskora-advertise-theme [class*=\"bg-[#0a1423]\"],.taskora-advertise-theme [class*=\"bg-[#0b1628]\"],.taskora-advertise-theme [class*=\"bg-[#0b1c31]\"]{background-color:#12141c!important}.taskora-advertise-theme [class*=\"bg-[#07111f]\"]{background-color:#0b0d14!important}.taskora-advertise-theme [class*=\"border-cyan-\"],.taskora-advertise-theme [class*=\"border-blue-\"]{border-color:rgba(56,189,248,.18)!important}.taskora-advertise-theme [class*=\"text-cyan-\"],.taskora-advertise-theme [class*=\"text-blue-\"]{color:#38bdf8!important}.taskora-advertise-theme [class*=\"bg-cyan-\"],.taskora-advertise-theme [class*=\"bg-blue-\"]{background-color:rgba(56,189,248,.07)!important}.taskora-advertise-theme [class*=\"text-slate-\"]{color:#94a3b8!important}.taskora-advertise-theme [class*=\"border-white/\"]{border-color:rgba(255,255,255,.10)!important}.taskora-advertise-theme input,.taskora-advertise-theme textarea,.taskora-advertise-theme select{border-color:rgba(255,255,255,.10)!important;background-color:rgba(0,0,0,.30)!important}.taskora-advertise-theme a,.taskora-advertise-theme button{-webkit-tap-highlight-color:transparent}"}</style>
-      <div className="taskora-advertise-theme taskora-owner-aware-shell"><TelegramNativeShell /><Outlet /></div>
+      <div className="taskora-advertise-theme taskora-owner-aware-shell"><DeviceFpBootstrap /><TelegramNativeShell /><Outlet /></div>
     </>
   ),
 });
