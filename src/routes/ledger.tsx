@@ -1,21 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getPublicPlatformStats } from "@/lib/strong-wave.functions";
+import { getPublicPayoutLedger } from "@/lib/strong-next.functions";
 import { TASKORA_LOGO } from "@/lib/brand";
 
 export const Route = createFileRoute("/ledger")({
   head: () => ({ meta: [{ title: "Public ledger — TASKORA" }] }),
   loader: async () => {
-    const stats = await getPublicPlatformStats().catch(() => ({
-      verifiedToday: 0,
-      paidWeekUsd: 0,
-    }));
-    return { stats };
+    const [stats, payouts] = await Promise.all([
+      getPublicPlatformStats().catch(() => ({
+        verifiedToday: 0,
+        paidWeekUsd: 0,
+      })),
+      getPublicPayoutLedger().catch(() => []),
+    ]);
+    return { stats, payouts: payouts ?? [] };
   },
   component: PublicLedgerPage,
 });
 
 function PublicLedgerPage() {
-  const { stats } = Route.useLoaderData();
+  const { stats, payouts } = Route.useLoaderData();
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05080f] px-4 pb-16 pt-8 text-white">
       <div className="flex items-center gap-3">
@@ -23,7 +27,7 @@ function PublicLedgerPage() {
         <div>
           <h1 className="text-xl font-black tracking-tight">Public ledger</h1>
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300/70">
-            Real counts · no user data
+            Real counts · masked payouts
           </p>
         </div>
       </div>
@@ -49,8 +53,54 @@ function PublicLedgerPage() {
         </div>
       </section>
 
+      <section className="mt-6 space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-white/50">Recent paid withdrawals</p>
+        {(payouts as Array<{
+          id: string;
+          amount: number;
+          method: string;
+          addressMasked: string;
+          txMasked: string | null;
+          name: string;
+          at: string;
+        }>).length === 0 ? (
+          <p className="rounded-2xl border border-white/8 bg-[#0c1018] p-4 text-[12px] text-white/40">
+            No public payouts yet.
+          </p>
+        ) : (
+          (payouts as Array<{
+            id: string;
+            amount: number;
+            method: string;
+            addressMasked: string;
+            txMasked: string | null;
+            name: string;
+            at: string;
+          }>).map((p) => (
+            <div
+              key={p.id}
+              className="rounded-2xl border border-white/8 bg-[#0c1018] px-4 py-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-white">{p.name}</p>
+                <p className="text-sm font-black tabular-nums text-emerald-300">
+                  ${Number(p.amount).toFixed(2)}
+                </p>
+              </div>
+              <p className="mt-1 text-[11px] text-white/45">
+                {p.method} · {p.addressMasked}
+                {p.txMasked ? ` · tx ${p.txMasked}` : ""}
+              </p>
+              <p className="mt-0.5 text-[10px] text-white/30">
+                {p.at ? new Date(p.at).toLocaleString() : ""} · ref {p.id}
+              </p>
+            </div>
+          ))
+        )}
+      </section>
+
       <p className="mt-8 text-center text-[11px] leading-5 text-white/40">
-        TASKORA never requires a deposit to unlock earnings. Figures update from the live ledger.
+        TASKORA never requires a deposit to unlock earnings. Names and addresses are masked for privacy.
       </p>
     </main>
   );

@@ -7,6 +7,8 @@ import {
   scanFraudSignals,
   type FraudFlagRow,
 } from "@/lib/owner-ops.functions";
+import { ownerUnfreezeWallet } from "@/lib/strong-next.functions";
+import { ownerForceClusterScanHold } from "@/lib/strong-remaining.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/fraud")({
   component: OwnerFraud,
@@ -17,6 +19,8 @@ function OwnerFraud() {
   const [filter, setFilter] = useState<"open" | "resolved" | "dismissed" | "all">("open");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [unfreezeId, setUnfreezeId] = useState("");
+  const [unfreezeNote, setUnfreezeNote] = useState("reviewed — ok");
 
   const load = useCallback(async () => {
     setMsg(null);
@@ -58,6 +62,38 @@ function OwnerFraud() {
     }
   }
 
+  async function onUnfreeze() {
+    const uid = unfreezeId.trim();
+    if (!uid) {
+      setMsg("Enter user id to unfreeze");
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await ownerUnfreezeWallet({ data: { userId: uid, note: unfreezeNote.trim() || "manual unfreeze" } });
+      setMsg(`Wallet unfrozen for ${uid.slice(0, 8)}…`);
+      setUnfreezeId("");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Unfreeze failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onClusterHold() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await ownerForceClusterScanHold();
+      setMsg(`Cluster scan · ${r.clusters} clusters · ${r.held} held`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Cluster scan failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
       <div className="mb-4 flex items-center gap-2">
@@ -79,9 +115,7 @@ function OwnerFraud() {
             type="button"
             onClick={() => setFilter(f)}
             className={`rounded-full px-3 py-1.5 text-[11px] font-bold capitalize ${
-              filter === f
-                ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
-                : "border border-white/10 text-white/50"
+              filter === f ? "bg-cyan-400 text-[#05080f]" : "border border-white/10 text-white/50"
             }`}
           >
             {f}
@@ -91,40 +125,27 @@ function OwnerFraud() {
           type="button"
           disabled={busy}
           onClick={() => void onScan()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-bold text-cyan-200 disabled:opacity-50"
+          className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-100 disabled:opacity-50"
         >
           <RefreshCw className={`size-3.5 ${busy ? "animate-spin" : ""}`} />
           Scan now
         </button>
       </div>
 
-      {msg ? <p className="mb-3 text-xs text-cyan-200/80">{msg}</p> : null}
+      {msg ? <p className="mb-3 text-[12px] text-cyan-200">{msg}</p> : null}
 
       <div className="space-y-2">
         {rows.length === 0 ? (
-          <p className="rounded-2xl border border-white/8 bg-[#12141c] p-4 text-center text-sm text-white/40">
-            No {filter === "all" ? "" : filter} flags. Run scan to detect shared wallets & high rejects.
+          <p className="rounded-2xl border border-white/8 bg-[#12151c] p-4 text-[12px] text-white/40">
+            No flags in this filter.
           </p>
         ) : (
           rows.map((r) => (
-            <div key={r.id} className="rounded-2xl border border-white/8 bg-[#12141c] p-3.5">
+            <div key={r.id} className="rounded-2xl border border-white/8 bg-[#12151c] p-3.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-amber-200">
-                    {r.kind.replace(/_/g, " ")}
-                    <span
-                      className={`ml-2 text-[10px] font-bold uppercase ${
-                        r.severity === "high"
-                          ? "text-red-400"
-                          : r.severity === "medium"
-                            ? "text-amber-300"
-                            : "text-slate-400"
-                      }`}
-                    >
-                      {r.severity}
-                    </span>
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-white/60">
+                  <p className="text-sm font-bold text-white">{r.kind || "Flag"}</p>
+                  <p className="truncate text-[11px] text-white/45">
                     {r.display_name || "User"}
                     {r.username ? ` · @${r.username}` : ""}
                     {r.telegram_id ? ` · ${r.telegram_id}` : ""}
@@ -169,14 +190,48 @@ function OwnerFraud() {
         )}
       </div>
 
+      <div className="mt-5 space-y-3 rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4">
+        <p className="text-xs font-bold text-amber-200">Wallet unfreeze (cluster recovery)</p>
+        <input
+          value={unfreezeId}
+          onChange={(e) => setUnfreezeId(e.target.value)}
+          placeholder="User UUID"
+          className="w-full rounded-xl border border-white/10 bg-[#0a0c12] px-3 py-2 text-[13px] outline-none"
+        />
+        <input
+          value={unfreezeNote}
+          onChange={(e) => setUnfreezeNote(e.target.value)}
+          placeholder="Note"
+          className="w-full rounded-xl border border-white/10 bg-[#0a0c12] px-3 py-2 text-[13px] outline-none"
+        />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onUnfreeze()}
+            className="flex-1 rounded-xl bg-emerald-400 py-2.5 text-xs font-extrabold text-[#05080f] disabled:opacity-50"
+          >
+            Unfreeze wallet
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onClusterHold()}
+            className="flex-1 rounded-xl border border-amber-400/30 bg-amber-500/10 py-2.5 text-xs font-bold text-amber-100 disabled:opacity-50"
+          >
+            Cluster scan hold
+          </button>
+        </div>
+      </div>
+
       <div className="mt-5 space-y-2 rounded-2xl border border-white/8 bg-[#0b1628] p-4">
         <p className="text-xs font-bold text-cyan-200">Active controls</p>
         <ul className="space-y-1.5 text-[11px] text-white/50">
           <li>· Shared payout address blocked at withdrawal</li>
           <li>· Max 12 submissions / hour · 24h new-account hold</li>
           <li>· Min withdrawal $3 · max 2 pending WDs</li>
-          <li>· Invite Task Points after first verified task</li>
-          <li>· Telegram join tasks: bot getChatMember auto-verify</li>
+          <li>· Soft KYC + connected account before first WD</li>
+          <li>· Cluster auto-hold when 3+ accounts share device</li>
         </ul>
       </div>
     </main>
