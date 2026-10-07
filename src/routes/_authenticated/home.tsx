@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
 import { AppLink } from "@/components/AppLink";
+import { HomeStrongStrip } from "@/components/HomeStrongStrip";
 import { listDailyMissions } from "@/lib/daily-missions.functions";
 import { recordSecuritySignal } from "@/lib/security-engine.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
@@ -109,7 +110,6 @@ function HomePage() {
   const photo = profile?.photo_url ?? null;
   const streak = profile?.streak ?? 0;
 
-
   const levelNum = Number(levelStats?.level ?? profile?.level_num ?? 1);
   const progressPct = Number(levelStats?.progress ?? 0);
   const isOwner = Boolean(dash?.isOwner);
@@ -157,10 +157,6 @@ function HomePage() {
       cancelled = true;
     };
   }, []);
-
-  const submissions = dash?.submissions ?? [];
-  const doneTasks = submissions.filter((s) => s.status === "approved" || s.status === "pending").length;
-  const taskProgress = Math.min(3, doneTasks);
 
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [checkBusy, setCheckBusy] = useState(false);
@@ -242,6 +238,8 @@ function HomePage() {
           <ChevronRight className="size-4" />
         </AppLink>
       ) : null}
+
+      <HomeStrongStrip />
 
       <section
         className="relative mb-3.5 overflow-hidden rounded-[18px] border border-blue-400/20 p-3.5 shadow-[0_12px_32px_rgba(2,8,23,0.28)]"
@@ -426,36 +424,6 @@ function Quick({
         </span>
       )}
       <p className="mt-1 w-full truncate text-[9px] font-medium leading-tight text-slate-300">{label}</p>
-    </AppLink>
-  );
-}
-
-function DailyCard({
-  to,
-  title,
-  reward,
-  progress,
-  pct,
-  Icon,
-}: {
-  to: string;
-  title: string;
-  reward: string;
-  progress: string;
-  pct: number;
-  Icon: ComponentType<{ className?: string }>;
-}) {
-  return (
-    <AppLink to={to} className="rounded-2xl border border-blue-400/15 bg-[#0b1628] p-2.5 active:scale-[0.98]">
-      <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/15 text-cyan-300">
-        <Icon className="size-4" />
-      </span>
-      <p className="mt-2 text-[11px] font-bold leading-tight">{title}</p>
-      <p className="mt-0.5 text-[10px] font-black text-cyan-300">{reward}</p>
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-      <p className="mt-1 text-[9px] text-slate-500">{progress}</p>
     </AppLink>
   );
 }

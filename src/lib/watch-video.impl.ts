@@ -85,9 +85,10 @@ export const startWatchVideo = createServerFn({ method: "POST" })
     return { sessionId: String(session.id), durationSeconds: Number(v.duration_seconds ?? 0), rewardUsdt: Number(v.reward_usdt ?? 0) };
   });
 
+/** Heartbeat: only accumulate qualified time when tab is visible + optional attention ack. */
 export const heartbeatWatchVideo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { sessionId: string; attentionAck?: boolean }) => data)
+  .inputValidator((data: { sessionId: string; attentionAck?: boolean; visible?: boolean }) => data)
   .handler(async ({ data, context }) => {
     const s = await adminClient();
     const { data: session } = await (s as any)
@@ -102,7 +103,10 @@ export const heartbeatWatchVideo = createServerFn({ method: "POST" })
     const now = Date.now();
     const last = session.last_heartbeat_at ? new Date(String(session.last_heartbeat_at)).getTime() : now;
     const delta = Math.min(15, Math.max(0, (now - last) / 1000));
-    const qualified = Number(session.qualified_seconds ?? 0) + delta;
+    // Visibility gate: if client reports tab hidden, do not credit watch time
+    const isVisible = data.visible !== false;
+    const add = isVisible ? delta : 0;
+    const qualified = Number(session.qualified_seconds ?? 0) + add;
     const patch: Record<string, unknown> = {
       qualified_seconds: qualified,
       last_heartbeat_at: new Date(now).toISOString(),
@@ -112,7 +116,7 @@ export const heartbeatWatchVideo = createServerFn({ method: "POST" })
       patch.attention_acked = true;
     }
     await (s as any).from("watch_video_sessions").update(patch).eq("id", data.sessionId);
-    return { ok: true as const, qualifiedSeconds: qualified };
+    return { ok: true as const, qualifiedSeconds: qualified, credited: add };
   });
 
 export const completeWatchVideo = createServerFn({ method: "POST" })
