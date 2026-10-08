@@ -20,7 +20,7 @@ import {
   requestDepositGuarded,
 } from "@/lib/taskora-mutations.functions";
 import { CryptoLogo, resolveCryptoId } from "@/components/CryptoIcon";
-import { BLUE_GRAD } from "@/lib/brand";
+import { ACCENT_GRAD } from "@/lib/brand";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
   loader: async () => {
@@ -174,41 +174,31 @@ function WalletScreen() {
   }
 
   return (
-    <Screen className="!bg-[#030814]">
-      <section
-        className="relative mb-4 overflow-hidden rounded-[22px] border border-cyan-400/25 p-5 shadow-lg"
-        style={{
-          background:
-            "radial-gradient(circle at 88% 12%,rgba(56,189,248,0.2),transparent 42%), linear-gradient(145deg,#0a1a33,#060f1c)",
-        }}
-      >
+    <Screen className="!bg-[#080808]">
+      <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#121212] p-5">
         <div className="relative flex items-start justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300/70">
-              Available balance
-            </p>
-            <p className="mt-1 text-4xl font-extrabold tracking-tight text-white tabular-nums">
+            <p className="text-[11px] font-normal text-neutral-500">Available balance</p>
+            <p className="mt-1 text-4xl font-semibold tracking-tight text-neutral-50 tabular-nums">
               {formatUsd(balance)}
             </p>
-            <p className="mt-1.5 text-xs text-slate-400">
-              Pending rewards · {formatUsd(pending)}
+            <p className="mt-1.5 text-[12px] font-normal text-neutral-500">
+              Pending · {formatUsd(pending)}
             </p>
           </div>
-          <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/15 text-cyan-200">
-            <WalletIcon className="size-5" />
-          </span>
+          <WalletIcon className="size-6 text-orange-400" strokeWidth={1.75} />
         </div>
         <div className="relative mt-4 flex gap-2">
-          <div className="flex flex-1 items-center gap-1.5 rounded-xl border border-white/8 bg-black/25 px-3 py-2 text-[10px] text-slate-400">
-            <Shield className="size-3.5 text-emerald-300" /> Secure ledger
+          <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-[#0a0a0a] px-3 py-2 text-[10px] font-normal text-neutral-500">
+            <Shield className="size-3.5 text-emerald-400" strokeWidth={1.75} /> Secure ledger
           </div>
-          <div className="flex flex-1 items-center gap-1.5 rounded-xl border border-white/8 bg-black/25 px-3 py-2 text-[10px] text-slate-400">
-            <Clock className="size-3.5 text-amber-300" /> 24h new-account hold
+          <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-[#0a0a0a] px-3 py-2 text-[10px] font-normal text-neutral-500">
+            <Clock className="size-3.5 text-amber-400" strokeWidth={1.75} /> Review holds apply
           </div>
         </div>
       </section>
 
-      <div className="mb-4 flex gap-1 rounded-2xl border border-cyan-400/15 bg-[#0b1628] p-1">
+      <div className="mb-4 flex gap-1 rounded-2xl bg-[#121212] p-1">
         {(
           [
             { id: "deposit", label: "Deposit" },
@@ -220,10 +210,10 @@ function WalletScreen() {
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition ${
-              tab === t.id ? "text-white shadow-md" : "text-slate-400 hover:text-slate-200"
+            className={`flex-1 rounded-xl py-2.5 text-[12px] font-medium transition ${
+              tab === t.id ? "text-white" : "text-neutral-500"
             }`}
-            style={tab === t.id ? { background: BLUE_GRAD } : undefined}
+            style={tab === t.id ? { background: ACCENT_GRAD } : undefined}
           >
             {t.label}
           </button>
@@ -232,29 +222,18 @@ function WalletScreen() {
 
       {tab === "deposit" ? (
         <section className="space-y-3">
-          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-3.5">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300/80">
-              How to deposit
-            </p>
-            <ol className="space-y-1.5 text-[11px] leading-snug text-slate-300">
-              <li className="flex gap-2">
-                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-cyan-400/20 text-[10px] font-bold text-cyan-200">1</span>
-                Choose network & copy the address below
-              </li>
-              <li className="flex gap-2">
-                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-cyan-400/20 text-[10px] font-bold text-cyan-200">2</span>
-                {"Send crypto from your wallet (min " + formatUsd(minDep) + ")"}
-              </li>
-              <li className="flex gap-2">
-                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-cyan-400/20 text-[10px] font-bold text-cyan-200">3</span>
-                Submit amount + TX hash for faster review
-              </li>
+          <div className="rounded-2xl bg-[#141210] p-3.5">
+            <p className="mb-2 text-[11px] font-medium text-orange-300/90">How to deposit</p>
+            <ol className="space-y-1.5 text-[11px] font-normal leading-snug text-neutral-400">
+              <li>1. Choose network & copy the address</li>
+              <li>2. Send crypto (min {formatUsd(minDep)})</li>
+              <li>3. Submit amount + TX hash for faster review</li>
             </ol>
           </div>
 
           {depositMethods.length === 0 ? (
-            <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-4 text-center text-[12px] text-amber-100">
-              Deposit addresses are not configured yet. Owner sets them in Settings → Economy.
+            <div className="rounded-2xl bg-amber-500/10 p-4 text-center text-[12px] font-normal text-amber-200">
+              Deposit addresses not configured yet.
             </div>
           ) : null}
 
@@ -266,130 +245,200 @@ function WalletScreen() {
                   key={m.id}
                   type="button"
                   onClick={() => setDIdx(i)}
-                  className={`flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-left transition ${
-                    active
-                      ? "border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(56,189,248,0.12)]"
-                      : "border-white/8 bg-[#0b1628]"
+                  className={`flex items-center gap-2.5 rounded-2xl px-3 py-3 text-left transition ${
+                    active ? "bg-orange-500/15" : "bg-[#121212]"
                   }`}
                 >
-                  <CryptoLogo method={m.label || m.id} size={36} />
+                  <CryptoLogo method={m.label || m.id} size={32} />
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-white">{m.label}</p>
-                    <p className="text-[10px] text-slate-400">{m.network}</p>
+                    <p className="truncate text-[12px] font-medium text-neutral-100">{m.label}</p>
+                    <p className="text-[10px] font-normal text-neutral-500">{m.network}</p>
                   </div>
                 </button>
               );
             })}
           </div>
 
-          <div className="rounded-2xl border border-cyan-400/15 bg-[#0b1628] p-4">
+          <div className="rounded-2xl bg-[#121212] p-4">
             <div className="mb-2 flex items-center gap-2">
-              <CryptoLogo method={dMethod?.label || dMethod?.id || "USDT"} size={28} />
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Deposit address · {dMethod?.network}
+              <CryptoLogo method={dMethod?.label || dMethod?.id || "USDT"} size={24} />
+              <p className="text-[10px] font-normal text-neutral-500">
+                Address · {dMethod?.network}
               </p>
             </div>
             {dMethod?.address ? (
               <>
-                <p className="break-all rounded-xl border border-cyan-400/15 bg-black/40 px-3 py-3.5 font-mono text-[11px] leading-relaxed text-cyan-100/95">
+                <p className="break-all rounded-xl bg-[#0a0a0a] px-3 py-3.5 font-mono text-[11px] leading-relaxed text-neutral-200">
                   {dMethod.address}
                 </p>
                 <button
                   type="button"
                   onClick={() => void copyAddress()}
-                  className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 py-3 text-xs font-bold text-cyan-100 transition active:scale-[0.98]"
+                  className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500/10 py-3 text-[12px] font-medium text-orange-300 active:opacity-90"
                 >
-                  {copied ? (<><Check className="size-3.5" /> Address copied</>) : (<><Copy className="size-3.5" /> Copy address</>)}
+                  {copied ? (
+                    <>
+                      <Check className="size-3.5" strokeWidth={1.75} /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-3.5" strokeWidth={1.75} /> Copy address
+                    </>
+                  )}
                 </button>
               </>
             ) : (
-              <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-3 text-center">
-                <p className="text-xs font-bold text-amber-200">Deposit address not configured</p>
-                <p className="mt-1 text-[10px] text-amber-200/70">This network is supported, but TaskoraPlus has not configured a real receiving address yet. Do not send funds until an address appears here.</p>
+              <div className="rounded-xl bg-amber-500/10 px-3 py-3 text-center">
+                <p className="text-[12px] font-medium text-amber-200">Address not configured</p>
+                <p className="mt-1 text-[10px] font-normal text-amber-200/70">
+                  Do not send funds until an address appears here.
+                </p>
               </div>
             )}
-            <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-center">
-              <p className="text-[11px] font-semibold text-amber-200">
-                ⚠ Send only {dMethod?.label} on {dMethod?.network}
-              </p>
-              <p className="mt-0.5 text-[10px] text-amber-200/70">
-                Wrong network or asset = permanent loss. Double-check before sending.
-              </p>
-            </div>
+            <p className="mt-3 text-center text-[10px] font-normal text-amber-200/80">
+              Send only {dMethod?.label} on {dMethod?.network}
+            </p>
           </div>
 
-          <div className="space-y-2.5 rounded-2xl border border-white/8 bg-[#0b1628] p-4">
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              {"Amount sent (USD) · min " + formatUsd(minDep)}
+          <div className="space-y-2.5 rounded-2xl bg-[#121212] p-4">
+            <label className="block text-[10px] font-normal text-neutral-500">
+              Amount (USD) · min {formatUsd(minDep)}
             </label>
-            <input value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder="e.g. 25.0000" inputMode="decimal" className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3.5 text-sm text-white outline-none focus:border-cyan-400/40" />
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Transaction hash / TX ID (recommended)</label>
-            <input value={dTxHash} onChange={(e) => setDTxHash(e.target.value)} placeholder="Paste TX hash for faster confirmation" className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3.5 text-sm text-white outline-none focus:border-cyan-400/40" />
-            <button type="button" disabled={dBusy} onClick={() => void onDeposit()} className="mt-1 w-full rounded-2xl py-3.5 text-sm font-black text-white shadow-lg disabled:opacity-50" style={{ background: BLUE_GRAD }}>
-              {dBusy ? "Submitting…" : "Submit deposit for confirmation"}
+            <input
+              value={dAmount}
+              onChange={(e) => setDAmount(e.target.value)}
+              placeholder="e.g. 25.00"
+              inputMode="decimal"
+              className="w-full rounded-xl bg-[#0a0a0a] px-4 py-3.5 text-sm font-normal text-neutral-100 outline-none focus:ring-1 focus:ring-orange-400/30"
+            />
+            <label className="block text-[10px] font-normal text-neutral-500">TX hash (recommended)</label>
+            <input
+              value={dTxHash}
+              onChange={(e) => setDTxHash(e.target.value)}
+              placeholder="Paste TX hash"
+              className="w-full rounded-xl bg-[#0a0a0a] px-4 py-3.5 text-sm font-normal text-neutral-100 outline-none focus:ring-1 focus:ring-orange-400/30"
+            />
+            <button
+              type="button"
+              disabled={dBusy}
+              onClick={() => void onDeposit()}
+              className="mt-1 w-full rounded-2xl py-3.5 text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: ACCENT_GRAD }}
+            >
+              {dBusy ? "Submitting…" : "Submit deposit"}
             </button>
-            {dMsg ? (<p className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 px-3 py-2 text-center text-xs text-cyan-100/90">{dMsg}</p>) : null}
-            <p className="text-center text-[10px] text-slate-500">Credits appear only after real on-chain confirmation. Never send funds to an address that is not shown as configured.</p>
+            {dMsg ? (
+              <p className="rounded-xl bg-orange-500/10 px-3 py-2 text-center text-[12px] font-normal text-orange-200">
+                {dMsg}
+              </p>
+            ) : null}
           </div>
         </section>
       ) : null}
 
       {tab === "withdraw" ? (
         <section className="space-y-3">
-          <p className="text-xs text-slate-400">{`Min ${formatUsd(minWd)} · processed by owner after review · first withdrawals may need extra checks.`}</p>
-          <AppLink to="/payout-proofs" className="block text-center text-[11px] font-semibold text-cyan-300 underline-offset-2 hover:underline">View public payout proofs →</AppLink>
+          <p className="text-[12px] font-normal text-neutral-500">
+            Min {formatUsd(minWd)} · processed after review
+          </p>
+          <AppLink
+            to="/payout-proofs"
+            className="block text-center text-[11px] font-medium text-orange-400"
+          >
+            View public payout proofs →
+          </AppLink>
           <div className="grid grid-cols-2 gap-2">
             {WITHDRAW_METHODS.map((m) => {
               const active = wMethod === m.id;
               return (
-                <button key={m.id} type="button" onClick={() => setWMethod(m.id)} className={`flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-left transition ${
-                  active ? "border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(56,189,248,0.12)]" : "border-white/8 bg-[#0b1628]"
-                }`}>
-                  <CryptoLogo method={m.id} size={36} />
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setWMethod(m.id)}
+                  className={`flex items-center gap-2.5 rounded-2xl px-3 py-3 text-left transition ${
+                    active ? "bg-orange-500/15" : "bg-[#121212]"
+                  }`}
+                >
+                  <CryptoLogo method={m.id} size={32} />
                   <div>
-                    <p className="text-xs font-bold text-white">{m.label}</p>
-                    <p className="text-[10px] text-slate-400">{m.network}</p>
+                    <p className="text-[12px] font-medium text-neutral-100">{m.label}</p>
+                    <p className="text-[10px] font-normal text-neutral-500">{m.network}</p>
                   </div>
                 </button>
               );
             })}
           </div>
-          <div className="space-y-2 rounded-2xl border border-white/8 bg-[#0b1628] p-4">
-            <p className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              <CryptoLogo method={wMethod} size={18} />
-              {resolveCryptoId(wMethod).toUpperCase()} payout address
+          <div className="space-y-2 rounded-2xl bg-[#121212] p-4">
+            <p className="mb-1 flex items-center gap-2 text-[10px] font-normal text-neutral-500">
+              <CryptoLogo method={wMethod} size={16} />
+              {resolveCryptoId(wMethod).toUpperCase()} address
             </p>
-            <input value={wAddress} onChange={(e) => setWAddress(e.target.value)} placeholder="Your wallet address" className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400/40" />
-            <input value={wAmount} onChange={(e) => setWAmount(e.target.value)} placeholder="Amount (USD)" inputMode="decimal" className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400/40" />
-            <button type="button" disabled={wBusy} onClick={() => void onWithdraw()} className="w-full rounded-2xl py-3.5 text-sm font-black text-white disabled:opacity-50" style={{ background: BLUE_GRAD }}>
+            <input
+              value={wAddress}
+              onChange={(e) => setWAddress(e.target.value)}
+              placeholder="Your wallet address"
+              className="w-full rounded-xl bg-[#0a0a0a] px-4 py-3 text-sm font-normal text-neutral-100 outline-none focus:ring-1 focus:ring-orange-400/30"
+            />
+            <input
+              value={wAmount}
+              onChange={(e) => setWAmount(e.target.value)}
+              placeholder="Amount (USD)"
+              inputMode="decimal"
+              className="w-full rounded-xl bg-[#0a0a0a] px-4 py-3 text-sm font-normal text-neutral-100 outline-none focus:ring-1 focus:ring-orange-400/30"
+            />
+            <button
+              type="button"
+              disabled={wBusy}
+              onClick={() => void onWithdraw()}
+              className="w-full rounded-2xl py-3.5 text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: ACCENT_GRAD }}
+            >
               {wBusy ? "Submitting…" : "Request withdrawal"}
             </button>
-            {wMsg ? (<p className="text-center text-xs text-cyan-100/90">{wMsg}</p>) : null}
+            {wMsg ? (
+              <p className="text-center text-[12px] font-normal text-orange-200">{wMsg}</p>
+            ) : null}
           </div>
         </section>
       ) : null}
 
       {tab === "activity" ? (
         <section>
-          <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/8 bg-[#0b1628]">
+          <div className="overflow-hidden rounded-2xl bg-[#121212]">
             {txs.length === 0 ? (
-              <p className="p-5 text-center text-sm text-slate-400">No transactions yet.</p>
+              <p className="p-5 text-center text-[13px] font-normal text-neutral-500">No transactions yet.</p>
             ) : (
               txs.slice(0, 40).map((e: { id: string; amount: number | string; label: string; created_at: string }) => {
                 const amt = Number(e.amount);
                 return (
-                  <div key={e.id} className="flex items-center gap-3 px-3.5 py-3">
-                    <span className={`inline-flex size-9 items-center justify-center rounded-full ${
-                      amt < 0 ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"
-                    }`}>
-                      {amt < 0 ? <ArrowUpRight className="size-4" /> : <ArrowDownLeft className="size-4" />}
+                  <div
+                    key={e.id}
+                    className="flex items-center gap-3 border-b border-white/[0.04] px-3.5 py-3 last:border-0"
+                  >
+                    <span
+                      className={`inline-flex size-8 items-center justify-center rounded-lg ${
+                        amt < 0 ? "bg-red-500/10 text-red-400" : "bg-emerald-500/10 text-emerald-400"
+                      }`}
+                    >
+                      {amt < 0 ? (
+                        <ArrowUpRight className="size-4" strokeWidth={1.75} />
+                      ) : (
+                        <ArrowDownLeft className="size-4" strokeWidth={1.75} />
+                      )}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-white">{e.label}</p>
-                      <p className="text-[10px] text-slate-500">{new Date(e.created_at).toLocaleString()}</p>
+                      <p className="truncate text-[13px] font-medium text-neutral-100">{e.label}</p>
+                      <p className="text-[10px] font-normal text-neutral-600">
+                        {new Date(e.created_at).toLocaleString()}
+                      </p>
                     </div>
-                    <p className={`text-sm font-bold tabular-nums ${amt < 0 ? "text-red-300" : "text-emerald-300"}`}>
-                      {amt < 0 ? "−" : "+"}{formatUsd(Math.abs(amt))}
+                    <p
+                      className={`text-[13px] font-medium tabular-nums ${
+                        amt < 0 ? "text-red-400" : "text-emerald-400"
+                      }`}
+                    >
+                      {amt < 0 ? "−" : "+"}
+                      {formatUsd(Math.abs(amt))}
                     </p>
                   </div>
                 );
