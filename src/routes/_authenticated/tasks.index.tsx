@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   ChevronRight,
@@ -15,6 +15,8 @@ import { PlatformLogo, platformLabel, type Platform } from "@/components/Platfor
 import { TASKORA_LOGO } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle } from "@/lib/taskora-display";
 import { AppLink } from "@/components/AppLink";
+import { PlatformStats, tasksStatsCards } from "@/components/PlatformStats";
+import { getPlatformStats } from "@/lib/platform-stats.functions";
 
 const CATEGORIES: { key: "all" | Platform; label: string }[] = [
   { key: "all", label: "All tasks" },
@@ -30,18 +32,29 @@ type SortMode = "recommended" | "reward" | "newest" | "slots";
 
 export const Route = createFileRoute("/_authenticated/tasks/")({
   loader: async () => {
-    const rows = await listTasks().catch(() => []);
-    return { rows: rows.filter((task) => !isDemoTaskTitle(task.title)) };
+    const [rows, stats] = await Promise.all([
+      listTasks().catch(() => []),
+      getPlatformStats().catch(() => null),
+    ]);
+    return {
+      rows: rows.filter((task) => !isDemoTaskTitle(task.title)),
+      stats,
+    };
   },
   head: () => ({ meta: [{ title: "Tasks — TASKORA" }] }),
   component: TasksScreen,
 });
 
 function TasksScreen() {
-  const { rows } = Route.useLoaderData();
+  const { rows, stats: loaderStats } = Route.useLoaderData();
   const [filter, setFilter] = useState<"all" | Platform>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("recommended");
+  const [stats, setStats] = useState(loaderStats);
+
+  useEffect(() => {
+    if (loaderStats) setStats(loaderStats);
+  }, [loaderStats]);
 
   const tasks = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -66,6 +79,13 @@ function TasksScreen() {
     });
   }, [rows, filter, query, sort]);
 
+  // Prefer server stats; fall back to client-computed from rows
+  const tasksAvailable = stats?.tasksAvailable ?? rows.length;
+  const rewardPool =
+    stats?.rewardPoolUsd ??
+    Math.round(rows.reduce((s, t) => s + Number(t.reward ?? 0), 0) * 100) / 100;
+  const referrals = stats?.referralsTotal ?? 0;
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#05080f] px-3.5 pb-28 pt-4 text-white">
       <header className="mb-4 flex items-center gap-2.5">
@@ -84,9 +104,17 @@ function TasksScreen() {
           <p className="text-[10px] text-slate-500">Verified · catalog pricing · real USDT</p>
         </div>
         <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold text-cyan-200">
-          {rows.length} live
+          {tasksAvailable} live
         </span>
       </header>
+
+      <PlatformStats
+        cards={tasksStatsCards({
+          tasksAvailable,
+          rewardPoolUsd: rewardPool,
+          referrals,
+        })}
+      />
 
       <div className="mb-3 flex items-center gap-2 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.06] px-3 py-2 text-[10px] text-cyan-100/90">
         <ShieldCheck className="size-3.5 shrink-0 text-cyan-300" />

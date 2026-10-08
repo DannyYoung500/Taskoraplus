@@ -13,22 +13,25 @@ import { creditBonusAd, getBonusAdSession } from "@/lib/bonus-ad.functions";
 import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
 import { formatUsd } from "@/lib/taskora-display";
 import { AppLink } from "@/components/AppLink";
+import { PlatformStats, watchStatsCards } from "@/components/PlatformStats";
+import { getPlatformStats } from "@/lib/platform-stats.functions";
 
 export const Route = createFileRoute("/_authenticated/watch-earn")({
   head: () => ({ meta: [{ title: "Watch & Earn — TASKORA" }] }),
   loader: async () => {
-    const [videos, dashboard, features] = await Promise.all([
+    const [videos, dashboard, features, stats] = await Promise.all([
       listWatchVideos().catch(() => [] as WatchVideo[]),
       getDashboard().catch(() => null),
       getPublicFeatures().catch(() => null),
+      getPlatformStats().catch(() => null),
     ]);
-    return { videos, dashboard, features };
+    return { videos, dashboard, features, stats };
   },
   component: WatchEarnPage,
 });
 
 function WatchEarnPage() {
-  const { videos, dashboard, features } = Route.useLoaderData();
+  const { videos, dashboard, features, stats: loaderStats } = Route.useLoaderData();
   const bonusReward = Math.max(0, Number((features as any)?.bonus_ad_reward_usdt ?? 0.003));
   const bonusDailyLimit = Math.max(0, Math.floor(Number((features as any)?.bonus_ad_daily_limit ?? 5)));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -70,6 +73,17 @@ function WatchEarnPage() {
     if (!activeId) return videos.slice(0, 10);
     return videos.filter((v) => v.id !== activeId).slice(0, 10);
   }, [videos, activeId]);
+
+  // Platform stats: prefer server, fall back to local
+  const videosToWatch =
+    loaderStats?.videosToWatch ?? videos.filter((v) => !doneIds.has(v.id)).length;
+  const totalEarnable =
+    loaderStats?.videosEarnableUsd ??
+    Math.round(
+      videos
+        .filter((v) => !doneIds.has(v.id))
+        .reduce((s, v) => s + Number(v.rewardUsdt ?? 0), 0) * 100,
+    ) / 100;
 
   useEffect(() => {
     if (!activeId) return;
@@ -183,6 +197,14 @@ function WatchEarnPage() {
       </header>
 
       <section className="px-3.5 pt-4">
+        <PlatformStats
+          cards={watchStatsCards({
+            videosToWatch,
+            totalEarnableUsd: totalEarnable,
+            bonusLeft,
+          })}
+        />
+
         <div className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-cyan-400" />
           <p className="text-[13px] font-bold text-slate-100">Watch videos, earn</p>
@@ -248,7 +270,7 @@ function getVideoThumbnail(video: WatchVideo): string | null {
 function hourlyRateLabel(video: WatchVideo): string {
   const reward = Number(video.rewardUsdt ?? 0);
   if (reward > 0) return `+${formatUsd(reward)}`;
-  const pts = Number(video.rewardPoints ?? 0);
+  const pts = Number((video as { rewardPoints?: number }).rewardPoints ?? 0);
   return pts > 0 ? `+${pts} TP` : "Earn";
 }
 
@@ -312,7 +334,7 @@ function WatchPlayer({
         <div className="rounded-2xl border border-cyan-400/20 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,.12),transparent_55%),#0a1424] px-4 py-4 text-center">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Earned this session</p>
           <p className="mt-1 text-3xl font-black tabular-nums text-cyan-200">{formatUsd(sessionDisplay)}</p>
-          <p className="mt-1 text-[10px] text-slate-500">{Number(active.rewardUsdt) > 0 ? `${formatUsd(active.rewardUsdt)} per completed watch` : `+${Number(active.rewardPoints || 0)} TP per completed watch`}</p>
+          <p className="mt-1 text-[10px] text-slate-500">{Number(active.rewardUsdt) > 0 ? `${formatUsd(active.rewardUsdt)} per completed watch` : `+${Number((active as { rewardPoints?: number }).rewardPoints || 0)} TP per completed watch`}</p>
         </div>
         <button type="button" disabled={!canComplete || busy} onClick={onComplete} className="mt-3 w-full rounded-2xl py-3.5 text-sm font-black text-white disabled:opacity-45" style={{ background: BLUE_GRAD }}>
           {busy ? "Claiming…" : canComplete ? "Claim reward" : `Watch ${Math.max(0, required - elapsed)}s more`}
@@ -369,19 +391,15 @@ function getEmbedUrl(videoUrl: string | null, _providerName: string | null) {
       else if (url.pathname.startsWith("/watch")) id = url.searchParams.get("v") ?? "";
       else if (url.pathname.startsWith("/shorts/")) id = url.pathname.split("/")[2] ?? "";
       else if (url.pathname.startsWith("/embed/")) id = url.pathname.split("/")[2] ?? "";
-      return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1` : null;
+      return id ? `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1` : null;
     }
-    if (host === "vimeo.com" || host === "player.vimeo.com") {
-      const id = url.pathname.split("/").filter(Boolean).pop();
-      return id && /^\d+$/.test(id) ? `https://player.vimeo.com/video/${id}?autoplay=1` : null;
-    }
-  } catch { return null; }
+  } catch {}
   return null;
 }
 
-function formatTime(totalSeconds: number) {
-  const total = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+function formatTime(seconds: number) {
+  const s = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
 }
