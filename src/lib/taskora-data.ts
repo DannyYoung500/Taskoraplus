@@ -31,9 +31,11 @@ export const CATEGORIES: { key: "all" | Platform; label: string }[] = [
   { key: "linkedin", label: "LinkedIn" },
   { key: "twitch", label: "Twitch" },
   { key: "telegram", label: "Channels" },
+  { key: "pinterest", label: "Pinterest" },
+  { key: "github", label: "GitHub" },
 ];
 
-/** Social accounts users can link (Telegram omitted — already identity). WhatsApp removed (not scrapable). Threads added for bio verify. */
+/** Social accounts users can link (Telegram omitted — already identity). */
 export const CONNECTABLE_PLATFORMS: Platform[] = [
   "youtube",
   "x",
@@ -45,4 +47,6 @@ export const CONNECTABLE_PLATFORMS: Platform[] = [
   "linkedin",
   "twitch",
   "threads",
+  "pinterest",
+  "github",
 ];
