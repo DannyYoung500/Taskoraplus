@@ -21,7 +21,7 @@ import { HomeStrongStrip } from "@/components/HomeStrongStrip";
 import { listDailyMissions } from "@/lib/daily-missions.functions";
 import { recordSecuritySignal } from "@/lib/security-engine.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
-import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
 
@@ -61,12 +61,20 @@ const getMyLevelStats = createServerFn({ method: "GET" })
       else break;
     }
     const next = LEVEL_REQUIREMENTS[Math.min(level, LEVEL_REQUIREMENTS.length - 1)];
-    const progress = level >= LEVEL_REQUIREMENTS.length ? 100 : Math.min(99, Math.round(Math.min(
-      activity.tasks / Math.max(1, next.tasks),
-      activity.videos / Math.max(1, next.videos),
-      activity.games / Math.max(1, next.games),
-      activity.ads / Math.max(1, next.ads),
-    ) * 100));
+    const progress =
+      level >= LEVEL_REQUIREMENTS.length
+        ? 100
+        : Math.min(
+            99,
+            Math.round(
+              Math.min(
+                activity.tasks / Math.max(1, next.tasks),
+                activity.videos / Math.max(1, next.videos),
+                activity.games / Math.max(1, next.games),
+                activity.ads / Math.max(1, next.ads),
+              ) * 100,
+            ),
+          );
     return { level, progress };
   });
 
@@ -98,18 +106,12 @@ function HomePage() {
     .reduce((sum, s) => sum + Number(s.tasks?.reward ?? 0), 0);
 
   const profile = dash?.profile as
-    | {
-        display_name?: string | null;
-        photo_url?: string | null;
-        streak?: number;
-        level_num?: number | null;
-      }
+    | { display_name?: string | null; photo_url?: string | null; streak?: number; level_num?: number | null }
     | null;
 
   const name = profile?.display_name ?? "Tasker";
   const photo = profile?.photo_url ?? null;
   const streak = profile?.streak ?? 0;
-
   const levelNum = Number(levelStats?.level ?? profile?.level_num ?? 1);
   const progressPct = Number(levelStats?.progress ?? 0);
   const isOwner = Boolean(dash?.isOwner);
@@ -117,7 +119,6 @@ function HomePage() {
   useEffect(() => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (timezone) void syncMyTimezone({ data: { timezone } }).catch(() => {});
-
     let cancelled = false;
     void (async () => {
       try {
@@ -149,10 +150,9 @@ function HomePage() {
           });
         }
       } catch {
-        // Security telemetry must never block the app.
+        /* soft */
       }
     })();
-
     return () => {
       cancelled = true;
     };
@@ -166,11 +166,7 @@ function HomePage() {
     setCheckMsg(null);
     try {
       const r = await dailyCheckin();
-      setCheckMsg(
-        r.already
-          ? `Already checked in · streak ${r.streak}`
-          : `Day ${r.streak} · Check-in complete`,
-      );
+      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · Check-in complete`);
     } catch (e) {
       setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
     } finally {
@@ -179,130 +175,92 @@ function HomePage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#030814] px-3 pb-28 pt-2.5 text-white">
-      <header className="mb-3.5 flex items-center gap-2">
-        <img
-          src={TASKORA_LOGO}
-          alt="TASKORA"
-          className="size-9 rounded-full object-cover ring-1 ring-cyan-400/40 shadow-[0_0_16px_rgba(34,211,238,0.22)]"
-        />
+    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#080808] px-4 pb-28 pt-3 text-neutral-100">
+      <header className="mb-4 flex items-center gap-2.5">
+        <img src={TASKORA_LOGO} alt="TASKORA" className="size-9 rounded-lg object-cover" />
         <div className="min-w-0 flex-1">
-          <p
-            className="text-[19px] font-semibold leading-none tracking-[0.01em]"
-            style={{
-              background: "linear-gradient(90deg,#e0f2fe,#38bdf8,#2563eb)",
-              WebkitBackgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            TASKORA
-          </p>
-          <p className="mt-0.5 text-[8px] font-medium tracking-[0.12em] text-slate-400">
-            Earn · Play · Grow
-          </p>
+          <p className="text-[17px] font-semibold tracking-wide text-neutral-50">TASKORA</p>
+          <p className="text-[10px] font-normal text-neutral-500">Earn · Watch · Grow</p>
         </div>
-        <AppLink
-          to="/notifications"
-          aria-label="Notifications"
-          className="relative rounded-full border border-white/8 bg-white/[0.035] p-2 text-slate-300"
-        >
-          <Bell className="size-4" />
+        <AppLink to="/notifications" aria-label="Notifications" className="p-2 text-neutral-400">
+          <Bell className="size-5" strokeWidth={1.75} />
         </AppLink>
-        <AppLink
-          to="/profile"
-          className="flex items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.035] py-1 pl-1 pr-2"
-        >
+        <AppLink to="/profile" className="flex items-center gap-1.5 rounded-full bg-[#141414] py-1 pl-1 pr-2.5">
           {photo ? (
             <img src={photo} alt="" className="size-7 rounded-full object-cover" />
           ) : (
-            <span className="flex size-8 items-center justify-center rounded-full bg-cyan-500/20 text-xs font-bold">
+            <span className="flex size-7 items-center justify-center rounded-full bg-neutral-800 text-xs font-medium text-neutral-300">
               {name.charAt(0)}
             </span>
           )}
           <div className="min-w-0 leading-tight">
-            <p className="max-w-[68px] truncate text-[10px] font-medium">{name}</p>
-            <p className="text-[8px] text-slate-500">Level {levelNum}</p>
+            <p className="max-w-[64px] truncate text-[11px] font-medium text-neutral-200">{name}</p>
+            <p className="text-[9px] font-normal text-neutral-500">Level {levelNum}</p>
           </div>
-          <ChevronRight className="size-3 text-slate-500" />
         </AppLink>
       </header>
 
       {isOwner ? (
         <AppLink
           to="/owner"
-          className="mb-3 flex items-center justify-between rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-3.5 py-2.5 text-xs font-bold text-cyan-100"
+          className="mb-3 flex items-center justify-between rounded-2xl bg-orange-500/10 px-3.5 py-2.5 text-[12px] font-medium text-orange-200"
         >
           <span className="inline-flex items-center gap-2">
-            <Crown className="size-4 text-cyan-300" /> Owner Control Center
+            <Crown className="size-4" strokeWidth={1.75} /> Owner Control Center
           </span>
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-4" strokeWidth={1.75} />
         </AppLink>
       ) : null}
 
       <HomeStrongStrip />
 
-      <section
-        className="relative mb-3.5 overflow-hidden rounded-[18px] border border-blue-400/20 p-3.5 shadow-[0_12px_32px_rgba(2,8,23,0.28)]"
-        style={{
-          background:
-            "radial-gradient(circle at 92% 20%,rgba(56,189,248,0.28),transparent 36%), linear-gradient(145deg,#0a1a33 0%,#071221 55%,#050d1a 100%)",
-        }}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-              Total Balance
-            </span>
-            <p className="mt-2 text-[42px] font-black leading-none tracking-tight text-white">
-              {formatUsd(balance)}
-            </p>
-            <p className="mt-1.5 text-[11px] text-slate-400">
-              Available: <span className="font-semibold text-cyan-200">{formatUsd(balance)}</span>
-              {pending > 0 ? (
-                <span className="text-slate-500"> · Pending {formatUsd(pending)}</span>
-              ) : null}
-            </p>
-          </div>
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/20 to-blue-600/10">
-            <WalletCards className="size-8 text-cyan-200" />
-          </div>
-        </div>
+      {/* Balance — soft, no heavy border */}
+      <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#121212] p-4">
+        <p className="text-[11px] font-normal text-neutral-500">Total balance</p>
+        <p className="mt-1.5 text-[36px] font-semibold leading-none tracking-tight text-neutral-50">
+          {formatUsd(balance)}
+        </p>
+        <p className="mt-2 text-[12px] font-normal text-neutral-500">
+          Available {formatUsd(balance)}
+          {pending > 0 ? <span> · Pending {formatUsd(pending)}</span> : null}
+        </p>
         <AppLink
           to="/wallet"
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-medium text-white shadow-[0_6px_20px_rgba(37,99,235,0.28)]"
-          style={{ background: BLUE_GRAD }}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-medium text-white"
+          style={{ background: ACCENT_GRAD }}
         >
-          <WalletCards className="size-3.5" />
+          <WalletCards className="size-3.5" strokeWidth={1.75} />
           Withdraw
-          <ChevronRight className="size-3.5" />
         </AppLink>
       </section>
 
-      <section className="mb-3.5">
-        <div className="grid grid-cols-5 gap-1.5">
+      {/* Quick links — soft tiles, no borders */}
+      <section className="mb-4">
+        <div className="grid grid-cols-3 gap-2">
           <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
           <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
           <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
           <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
           <Quick to="/ambassador" label="Invite" Icon={Users} />
-          <Quick to="/my-tasks" label="My Posted Tasks" Icon={ClipboardList} />
+          <Quick to="/my-tasks" label="My tasks" Icon={ClipboardList} />
         </div>
       </section>
 
-      <section className="mb-3.5 overflow-hidden rounded-[20px] border border-cyan-400/20 bg-[#0b1628] p-3.5">
+      {/* Level — soft */}
+      <section className="mb-4 rounded-2xl bg-[#121212] p-3.5">
         <div className="flex items-center gap-3">
-          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-400/10 text-cyan-200">
-            <Trophy className="size-6" />
-          </span>
+          <Trophy className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Level {levelNum}</p>
-            <p className="mt-0.5 text-[10px] text-slate-500">Keep completing activities to reach the next level.</p>
+            <p className="text-[13px] font-medium text-neutral-100">Level {levelNum}</p>
+            <p className="text-[11px] font-normal text-neutral-500">Keep going for the next level</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-semibold text-slate-400">Progress</p>
-            <p className="text-[11px] font-bold text-cyan-200">{progressPct}%</p>
-            <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" style={{ width: progressPct + "%" }} />
+            <p className="text-[12px] font-medium text-orange-400">{progressPct}%</p>
+            <div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-orange-400"
+                style={{ width: progressPct + "%" }}
+              />
             </div>
           </div>
         </div>
@@ -312,63 +270,64 @@ function HomePage() {
         type="button"
         disabled={checkBusy}
         onClick={() => void onCheckin()}
-        className="mb-3.5 flex w-full items-center gap-3 rounded-2xl border border-blue-400/20 bg-[#0b1628] px-3.5 py-3 text-left active:scale-[0.99]"
+        className="mb-4 flex w-full items-center gap-3 rounded-2xl bg-[#121212] px-3.5 py-3 text-left active:opacity-90"
       >
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-cyan-300">
-          <CalendarCheck className="size-5" />
-        </span>
+        <CalendarCheck className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">Daily check-in</p>
-          <p className="truncate text-[11px] text-slate-400">
-            {checkMsg ?? `Streak ${streak}d · claim today's check-in reward`}
+          <p className="text-[13px] font-medium text-neutral-100">Daily check-in</p>
+          <p className="truncate text-[11px] font-normal text-neutral-500">
+            {checkMsg ?? `Streak ${streak}d · claim today's reward`}
           </p>
         </div>
-        <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-[10px] font-black text-cyan-300">
-          {checkBusy ? "…" : "Claim"}
-        </span>
+        <span className="text-[11px] font-medium text-orange-400">{checkBusy ? "…" : "Claim"}</span>
       </button>
 
-      <section className="mb-3.5">
-        <div className="mb-2 flex items-center justify-between">
-          <div>
-            <h2 className="flex items-center gap-1.5 text-sm font-black">
-              <CalendarCheck className="size-4 text-cyan-300" /> Daily Missions
-            </h2>
-            <p className="text-[10px] text-slate-500">Complete today's missions and earn extra rewards.</p>
-          </div>
-          <AppLink to="/daily-missions" className="text-[11px] font-bold text-cyan-300">View All →</AppLink>
+      <section className="mb-4">
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="text-[13px] font-medium text-neutral-200">Daily missions</p>
+          <AppLink to="/daily-missions" className="text-[11px] font-normal text-orange-400">
+            View all
+          </AppLink>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {missions.slice(0,3).map((m:any)=>(
-            <AppLink key={m.id} to="/daily-missions" className="rounded-2xl border border-blue-400/15 bg-[#0b1628] p-2.5 active:scale-[0.98]">
-              <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/15 text-cyan-300">
-                {m.mission_type==="rewarded_ad"?<PlayCircle className="size-4"/>:<ClipboardCheck className="size-4"/>}
-              </span>
-              <p className="mt-2 line-clamp-2 text-[11px] font-bold leading-tight">{m.title}</p>
-              <p className="mt-0.5 text-[10px] font-black text-cyan-300">{Number(m.reward_usdt)>0?formatUsd(m.reward_usdt):"Bonus"}</p>
-              <p className="mt-1 text-[9px] text-slate-500">{m.completed?"Completed":"Open mission"}</p>
+          {missions.slice(0, 3).map((m: any) => (
+            <AppLink
+              key={m.id}
+              to="/daily-missions"
+              className="rounded-2xl bg-[#121212] p-2.5 active:opacity-90"
+            >
+              {m.mission_type === "rewarded_ad" ? (
+                <PlayCircle className="size-4 text-orange-400" strokeWidth={1.75} />
+              ) : (
+                <ClipboardCheck className="size-4 text-emerald-400" strokeWidth={1.75} />
+              )}
+              <p className="mt-2 line-clamp-2 text-[11px] font-medium leading-tight text-neutral-200">{m.title}</p>
+              <p className="mt-1 text-[10px] font-normal text-orange-400">
+                {Number(m.reward_usdt) > 0 ? formatUsd(m.reward_usdt) : "Bonus"}
+              </p>
             </AppLink>
           ))}
-          {missions.length===0?<AppLink to="/daily-missions" className="col-span-3 rounded-2xl border border-white/8 bg-[#0b1628] p-4 text-center text-[11px] text-slate-500">No missions today · check back later</AppLink>:null}
+          {missions.length === 0 ? (
+            <p className="col-span-3 rounded-2xl bg-[#121212] p-4 text-center text-[12px] font-normal text-neutral-600">
+              No missions today
+            </p>
+          ) : null}
         </div>
       </section>
 
       <section>
-        <div className="mb-2 flex items-center justify-between">
-          <div>
-            <h2 className="flex items-center gap-1.5 text-sm font-black">
-              <Flame className="size-4 text-orange-300" /> Top Tasks
-            </h2>
-            <p className="text-[10px] text-slate-500">High earning tasks, complete now!</p>
-          </div>
-          <AppLink to="/tasks" className="text-[11px] font-bold text-cyan-300">
-            View All →
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-200">
+            <Flame className="size-3.5 text-orange-400" strokeWidth={1.75} /> Top tasks
+          </p>
+          <AppLink to="/tasks" className="text-[11px] font-normal text-orange-400">
+            View all
           </AppLink>
         </div>
         <div className="space-y-2">
           {tasks.length === 0 ? (
-            <p className="rounded-2xl border border-white/8 bg-[#0b1628] p-4 text-sm text-slate-400">
-              No live tasks yet. Publish from Advertise or Owner Center.
+            <p className="rounded-2xl bg-[#121212] p-4 text-[13px] font-normal text-neutral-500">
+              No live tasks yet
             </p>
           ) : (
             tasks.map((t: { id: string; title: string; reward: number; platform: string }) => (
@@ -376,21 +335,16 @@ function HomePage() {
                 key={t.id}
                 to="/tasks/$taskId"
                 params={{ taskId: t.id }}
-                className="flex items-center gap-3 rounded-2xl border border-blue-400/15 bg-[#0b1628] p-3 active:scale-[0.995]"
+                className="flex items-center gap-3 rounded-2xl bg-[#121212] p-3 active:opacity-90"
               >
-                <PlatformLogo platform={t.platform as Platform} size={42} />
+                <PlatformLogo platform={t.platform as Platform} size={40} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">{t.title}</p>
-                  <p className="text-[10px] text-slate-500">
+                  <p className="truncate text-[13px] font-medium text-neutral-100">{t.title}</p>
+                  <p className="text-[11px] font-normal text-neutral-500">
                     {platformLabel(t.platform as Platform)} · +{formatUsd(t.reward)}
                   </p>
                 </div>
-                <span
-                  className="inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-[11px] font-black text-white"
-                  style={{ background: BLUE_GRAD }}
-                >
-                  Start →
-                </span>
+                <span className="text-[11px] font-medium text-orange-400">Start</span>
               </AppLink>
             ))
           )}
@@ -404,26 +358,18 @@ function Quick({
   to,
   label,
   Icon,
-  platform,
 }: {
   to: string;
   label: string;
-  Icon: ComponentType<{ className?: string }>;
-  platform?: Platform;
+  Icon: ComponentType<{ className?: string; strokeWidth?: number }>;
 }) {
   return (
     <AppLink
       to={to}
-      className="flex min-w-0 min-h-[68px] flex-col items-center justify-center rounded-[14px] border border-blue-400/15 bg-[#0b1628]/80 px-1 py-2 text-center shadow-[0_4px_14px_rgba(15,23,42,0.16)] active:scale-[0.98]"
+      className="flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[#121212] px-1 py-2.5 text-center active:opacity-90"
     >
-      {platform ? (
-        <PlatformLogo platform={platform} size={40} />
-      ) : (
-        <span className="inline-flex size-7 items-center justify-center rounded-lg bg-blue-500/10 text-cyan-300">
-          <Icon className="size-5" />
-        </span>
-      )}
-      <p className="mt-1 w-full truncate text-[9px] font-medium leading-tight text-slate-300">{label}</p>
+      <Icon className="size-5 text-orange-400" strokeWidth={1.75} />
+      <p className="mt-1.5 w-full truncate text-[10px] font-normal text-neutral-400">{label}</p>
     </AppLink>
   );
 }

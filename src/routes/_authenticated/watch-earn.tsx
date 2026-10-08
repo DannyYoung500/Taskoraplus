@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Bell, Gift, Play, Zap } from "lucide-react";
+import { ArrowLeft, Bell, Gift, Play, Zap, X } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import { getPublicFeatures } from "@/lib/owner-economy.functions";
 import {
@@ -10,7 +10,7 @@ import {
   type WatchVideo,
 } from "@/lib/watch-video.functions";
 import { creditBonusAd, getBonusAdSession } from "@/lib/bonus-ad.functions";
-import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
 import { formatUsd } from "@/lib/taskora-display";
 import { AppLink } from "@/components/AppLink";
 import { PlatformStats, watchStatsCards } from "@/components/PlatformStats";
@@ -70,19 +70,16 @@ function WatchEarnPage() {
   }, [active]);
 
   const upNext = useMemo(() => {
-    if (!activeId) return videos.slice(0, 10);
-    return videos.filter((v) => v.id !== activeId).slice(0, 10);
-  }, [videos, activeId]);
+    if (!activeId) return videos.slice(0, 12);
+    return videos.filter((v) => v.id !== activeId && !doneIds.has(v.id)).slice(0, 12);
+  }, [videos, activeId, doneIds]);
 
-  // Platform stats: prefer server, fall back to local
   const videosToWatch =
     loaderStats?.videosToWatch ?? videos.filter((v) => !doneIds.has(v.id)).length;
   const totalEarnable =
     loaderStats?.videosEarnableUsd ??
     Math.round(
-      videos
-        .filter((v) => !doneIds.has(v.id))
-        .reduce((s, v) => s + Number(v.rewardUsdt ?? 0), 0) * 100,
+      videos.filter((v) => !doneIds.has(v.id)).reduce((s, v) => s + Number(v.rewardUsdt ?? 0), 0) * 100,
     ) / 100;
 
   useEffect(() => {
@@ -119,7 +116,7 @@ function WatchEarnPage() {
     setMessage(null);
     try {
       const result = await completeWatchVideo({ data: { sessionId } });
-      const earned = Number((result as { rewardUsdt?: number }).rewardUsdt ?? 0);
+      const earned = Number((result as { rewardUsdt?: number; earned?: number }).earned ?? (result as { rewardUsdt?: number }).rewardUsdt ?? 0);
       setSessionEarned((v) => v + earned);
       setDoneIds((prev) => new Set(prev).add(active.id));
       setMessage(earned > 0 ? `Earned ${formatUsd(earned)}` : "Watch completed.");
@@ -181,22 +178,33 @@ function WatchEarnPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#05080f] pb-28 text-white">
-      <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-[#05080f]/95 px-3.5 py-3 backdrop-blur-xl">
-        <div className="flex items-center gap-2.5">
-          <img src={TASKORA_LOGO} alt="" className="size-9 rounded-full object-cover ring-1 ring-cyan-400/40" draggable={false} />
+    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#080808] pb-28 text-neutral-100">
+      {/* Header — soft, no heavy rings */}
+      <header className="sticky top-0 z-20 bg-[#080808]/95 px-4 py-3 backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <img src={TASKORA_LOGO} alt="" className="size-8 rounded-lg object-cover" draggable={false} />
           <div className="min-w-0 flex-1">
-            <p className="text-base font-black tracking-wide" style={{ background: "linear-gradient(90deg,#e0f2fe,#38bdf8,#2563eb)", WebkitBackgroundClip: "text", color: "transparent" }}>TASKORA</p>
-            <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-cyan-300/70">Watch & Earn</p>
+            <p className="text-[15px] font-semibold tracking-wide text-neutral-50">
+              TASKORA
+            </p>
+            <p className="text-[10px] font-normal text-neutral-500">Watch & Earn</p>
           </div>
-          <AppLink to="/notifications" aria-label="Notifications" className="rounded-full p-2 text-slate-300 hover:bg-white/5"><Bell className="size-5" /></AppLink>
-          <AppLink to="/profile" aria-label="Profile" className="overflow-hidden rounded-full ring-1 ring-white/10">
-            {profile?.photo_url ? <img src={profile.photo_url} alt="" className="size-8 object-cover" /> : <span className="flex size-8 items-center justify-center bg-cyan-500/15 text-xs font-black text-cyan-200">{(profile?.display_name ?? "T").charAt(0)}</span>}
+          <AppLink to="/notifications" aria-label="Notifications" className="p-2 text-neutral-400">
+            <Bell className="size-5" strokeWidth={1.75} />
+          </AppLink>
+          <AppLink to="/profile" aria-label="Profile" className="overflow-hidden rounded-full">
+            {profile?.photo_url ? (
+              <img src={profile.photo_url} alt="" className="size-8 object-cover" />
+            ) : (
+              <span className="flex size-8 items-center justify-center bg-neutral-800 text-xs font-medium text-neutral-300">
+                {(profile?.display_name ?? "T").charAt(0)}
+              </span>
+            )}
           </AppLink>
         </div>
       </header>
 
-      <section className="px-3.5 pt-4">
+      <section className="px-4 pt-3">
         <PlatformStats
           cards={watchStatsCards({
             videosToWatch,
@@ -205,40 +213,59 @@ function WatchEarnPage() {
           })}
         />
 
-        <div className="flex items-center gap-2">
-          <span className="size-1.5 rounded-full bg-cyan-400" />
-          <p className="text-[13px] font-bold text-slate-100">Watch videos, earn</p>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="size-1.5 rounded-full bg-orange-400" />
+          <p className="text-[13px] font-medium text-neutral-200">Watch videos, earn</p>
         </div>
 
-        <button type="button" disabled={bonusLeft <= 0 || bonusBusy} onClick={() => void onBonusAd()} className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-amber-400/25 bg-gradient-to-r from-amber-500/15 to-orange-500/10 px-3.5 py-3 text-left active:scale-[0.99] disabled:opacity-50">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/20 text-amber-200"><Gift className="size-5" /></span>
+        {/* Bonus ad — soft card, no border ring */}
+        <button
+          type="button"
+          disabled={bonusLeft <= 0 || bonusBusy}
+          onClick={() => void onBonusAd()}
+          className="mb-4 flex w-full items-center gap-3 rounded-2xl bg-[#1a1510] px-3.5 py-3 text-left active:opacity-90 disabled:opacity-40"
+        >
+          <Gift className="size-5 shrink-0 text-amber-400" strokeWidth={1.75} />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black text-amber-50">Watch a bonus ad</p>
-            <p className="mt-0.5 text-[11px] text-amber-200/80">+{formatUsd(bonusReward)} · {bonusLeft}/{bonusDailyLimit} left today</p>
+            <p className="text-[13px] font-medium text-neutral-100">Watch a bonus ad</p>
+            <p className="mt-0.5 text-[11px] font-normal text-neutral-500">
+              +{formatUsd(bonusReward)} · {bonusLeft}/{bonusDailyLimit} left today
+            </p>
           </div>
-          <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-[10px] font-black text-amber-100">{bonusBusy ? "…" : "AD"}</span>
+          <span className="text-[11px] font-medium text-amber-400/90">{bonusBusy ? "…" : "Go"}</span>
         </button>
 
-        {message ? <p className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-center text-[11px] text-cyan-100">{message}</p> : null}
+        {message ? (
+          <p className="mb-3 rounded-xl bg-orange-500/10 px-3 py-2 text-center text-[12px] font-normal text-orange-200">
+            {message}
+          </p>
+        ) : null}
       </section>
 
-      <section className="mt-4 space-y-4">
+      {/* Video feed — large cards, soft labels */}
+      <section className="space-y-5 pb-4">
         {videos.length === 0 ? (
-          <div className="mx-3.5 rounded-3xl border border-white/10 bg-white/[0.03] p-10 text-center">
-            <Play className="mx-auto size-10 text-slate-600" />
-            <p className="mt-3 text-sm font-bold text-slate-300">No videos yet</p>
-            <p className="mt-1 text-[10px] text-slate-500">Owner adds YouTube URLs in the advertise / watch inventory.</p>
+          <div className="mx-4 rounded-2xl bg-[#141414] p-10 text-center">
+            <Play className="mx-auto size-9 text-neutral-600" strokeWidth={1.5} />
+            <p className="mt-3 text-sm font-medium text-neutral-400">No videos yet</p>
+            <p className="mt-1 text-[11px] font-normal text-neutral-600">Owner adds videos in inventory.</p>
           </div>
         ) : (
           videos.map((video, index) => (
-            <VideoFeedCard key={video.id} video={video} rank={index} done={doneIds.has(video.id)} onSelect={() => setActiveId(video.id)} />
+            <VideoFeedCard
+              key={video.id}
+              video={video}
+              rank={index}
+              done={doneIds.has(video.id)}
+              onSelect={() => setActiveId(video.id)}
+            />
           ))
         )}
       </section>
 
       {sessionEarned > 0 ? (
-        <div className="fixed bottom-24 right-4 z-30 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5 text-xs font-black text-amber-100 shadow-lg backdrop-blur">
-          {formatUsd(sessionEarned).replace("$", "")}
+        <div className="fixed bottom-24 right-4 z-30 rounded-full bg-orange-500/20 px-3 py-1.5 text-xs font-medium text-orange-200 backdrop-blur">
+          {formatUsd(sessionEarned)}
         </div>
       ) : null}
     </main>
@@ -269,35 +296,66 @@ function getVideoThumbnail(video: WatchVideo): string | null {
 
 function hourlyRateLabel(video: WatchVideo): string {
   const reward = Number(video.rewardUsdt ?? 0);
-  if (reward > 0) return `+${formatUsd(reward)}`;
-  const pts = Number((video as { rewardPoints?: number }).rewardPoints ?? 0);
-  return pts > 0 ? `+${pts} TP` : "Earn";
+  const secs = Math.max(30, Number(video.durationSeconds ?? 60));
+  if (reward > 0) {
+    const perHour = reward * (3600 / secs);
+    if (perHour >= 0.01) return `${formatUsd(perHour)}/hr`;
+    return `+${formatUsd(reward)}`;
+  }
+  return "Earn";
 }
 
-function VideoFeedCard({ video, rank, done, onSelect }: { video: WatchVideo; rank: number; done: boolean; onSelect: () => void }) {
+function VideoFeedCard({
+  video,
+  rank,
+  done,
+  onSelect,
+}: {
+  video: WatchVideo;
+  rank: number;
+  done: boolean;
+  onSelect: () => void;
+}) {
   const thumb = getVideoThumbnail(video);
   return (
-    <article className="px-3.5">
-      <button type="button" onClick={onSelect} className="block w-full text-left active:scale-[0.995]">
-        <div className="relative aspect-video overflow-hidden rounded-2xl bg-[#101722] ring-1 ring-white/[0.08]">
+    <article className="px-4">
+      <button type="button" onClick={onSelect} className="block w-full text-left active:opacity-95">
+        <div className="relative aspect-video overflow-hidden rounded-2xl bg-[#111]">
           {thumb ? (
-            <img src={thumb} alt="" className="size-full object-cover" loading={rank < 2 ? "eager" : "lazy"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <img
+              src={thumb}
+              alt=""
+              className="size-full object-cover"
+              loading={rank < 2 ? "eager" : "lazy"}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
           ) : (
-            <div className="flex size-full items-center justify-center bg-[radial-gradient(circle_at_50%_30%,rgba(34,211,238,.2),transparent_45%),#0b1420]">
-              <Play className="size-10 fill-white/90 text-white/90" />
+            <div className="flex size-full items-center justify-center bg-[#111]">
+              <Play className="size-10 text-neutral-500" strokeWidth={1.5} />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           <span className="absolute inset-0 flex items-center justify-center">
-            <span className="flex size-14 items-center justify-center rounded-full bg-black/45 text-white shadow-2xl ring-1 ring-white/25 backdrop-blur-sm">
-              <Play className="ml-0.5 size-6 fill-white" />
+            <span className="flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
+              <Play className="ml-0.5 size-5 fill-white" strokeWidth={0} />
             </span>
           </span>
-          {done ? <span className="absolute right-2.5 top-2.5 rounded-full bg-emerald-400 px-2 py-1 text-[8px] font-black text-slate-950">DONE</span> : null}
+          {done ? (
+            <span className="absolute right-2.5 top-2.5 rounded-md bg-emerald-500/90 px-2 py-0.5 text-[9px] font-medium text-white">
+              Done
+            </span>
+          ) : null}
         </div>
-        <div className="flex items-start justify-between gap-3 px-0.5 pt-2.5">
-          <h3 className="line-clamp-2 min-w-0 flex-1 text-[14px] font-extrabold leading-snug text-slate-100">{video.title || "Watch & Earn video"}</h3>
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-black text-cyan-300"><Zap className="size-3.5" />{hourlyRateLabel(video)}</span>
+        <div className="flex items-start justify-between gap-3 pt-2.5">
+          <h3 className="line-clamp-2 min-w-0 flex-1 text-[14px] font-medium leading-snug text-neutral-100">
+            {video.title || "Watch & Earn video"}
+          </h3>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-orange-400">
+            <Zap className="size-3.5" strokeWidth={1.75} />
+            {hourlyRateLabel(video)}
+          </span>
         </div>
       </button>
     </article>
@@ -305,64 +363,130 @@ function VideoFeedCard({ video, rank, done, onSelect }: { video: WatchVideo; ran
 }
 
 function WatchPlayer({
-  active, upNext, elapsed, required, progress, canComplete, busy, message, sessionDisplay, hourlyRate, onBack, onComplete, onSelect,
+  active,
+  upNext,
+  elapsed,
+  required,
+  progress,
+  canComplete,
+  busy,
+  message,
+  sessionDisplay,
+  hourlyRate,
+  onBack,
+  onComplete,
+  onSelect,
 }: {
-  active: WatchVideo; upNext: WatchVideo[]; elapsed: number; required: number; progress: number; canComplete: boolean; busy: boolean; message: string | null; sessionDisplay: number; hourlyRate: number; onBack: () => void; onComplete: () => void; onSelect: (id: string) => void;
+  active: WatchVideo;
+  upNext: WatchVideo[];
+  elapsed: number;
+  required: number;
+  progress: number;
+  canComplete: boolean;
+  busy: boolean;
+  message: string | null;
+  sessionDisplay: number;
+  hourlyRate: number;
+  onBack: () => void;
+  onComplete: () => void;
+  onSelect: (id: string) => void;
 }) {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#05080f] pb-10 text-white">
-      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-white/[0.07] bg-[#05080f]/95 px-3 py-2.5 backdrop-blur-xl">
-        <button type="button" onClick={onBack} aria-label="Back" className="rounded-full p-2 text-slate-200 hover:bg-white/5"><ArrowLeft className="size-5" /></button>
-        <p className="min-w-0 flex-1 truncate text-sm font-bold">{active.title}</p>
+    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#080808] pb-10 text-neutral-100">
+      <header className="sticky top-0 z-30 flex items-center gap-2 bg-[#080808]/95 px-3 py-2.5 backdrop-blur-xl">
+        <button type="button" onClick={onBack} aria-label="Back" className="p-2 text-neutral-300">
+          <X className="size-5" strokeWidth={1.75} />
+        </button>
+        <p className="min-w-0 flex-1 truncate text-sm font-medium">{active.title}</p>
       </header>
+
       <section className="bg-black">
         <div className="relative aspect-video w-full">
           <VideoPlayer video={active} />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
-          <div className="absolute inset-x-3 bottom-2.5">
-            <div className="mb-1.5 h-1 overflow-hidden rounded-full bg-white/20">
-              <div className="h-full rounded-full bg-cyan-300 transition-[width]" style={{ width: `${progress}%` }} />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/70 to-transparent" />
+          <div className="absolute inset-x-3 bottom-2">
+            <div className="mb-1 h-0.5 overflow-hidden rounded-full bg-white/15">
+              <div
+                className="h-full rounded-full bg-orange-400 transition-[width]"
+                style={{ width: `${progress}%` }}
+              />
             </div>
-            <div className="flex justify-between text-[9px] font-bold text-white/75">
-              <span>{formatTime(elapsed)} / {formatTime(required)}</span>
+            <div className="flex justify-between text-[9px] font-normal text-white/70">
+              <span>
+                {formatTime(elapsed)} / {formatTime(required)}
+              </span>
               <span>{progress}%</span>
             </div>
           </div>
         </div>
       </section>
-      <section className="px-3.5 pt-4">
-        <div className="rounded-2xl border border-cyan-400/20 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,.12),transparent_55%),#0a1424] px-4 py-4 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Earned this session</p>
-          <p className="mt-1 text-3xl font-black tabular-nums text-cyan-200">{formatUsd(sessionDisplay)}</p>
-          <p className="mt-1 text-[10px] text-slate-500">{Number(active.rewardUsdt) > 0 ? `${formatUsd(active.rewardUsdt)} per completed watch` : `+${Number((active as { rewardPoints?: number }).rewardPoints || 0)} TP per completed watch`}</p>
+
+      {/* Earned this session — NEWTUBE style, soft orange */}
+      <section className="px-4 pt-4">
+        <div className="rounded-2xl bg-[#141414] px-4 py-5 text-center">
+          <p className="text-[11px] font-normal text-neutral-500">Earned this session</p>
+          <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-orange-400">
+            {formatUsd(sessionDisplay)}
+          </p>
+          <p className="mt-1.5 text-[11px] font-normal text-neutral-500">
+            {hourlyRate > 0
+              ? `${formatUsd(hourlyRate)} earned per hour watched`
+              : Number(active.rewardUsdt) > 0
+                ? `${formatUsd(active.rewardUsdt)} per completed watch`
+                : "Complete the timer to claim"}
+          </p>
         </div>
-        <button type="button" disabled={!canComplete || busy} onClick={onComplete} className="mt-3 w-full rounded-2xl py-3.5 text-sm font-black text-white disabled:opacity-45" style={{ background: BLUE_GRAD }}>
+
+        <button
+          type="button"
+          disabled={!canComplete || busy}
+          onClick={onComplete}
+          className="mt-3 w-full rounded-2xl py-3.5 text-sm font-medium text-white disabled:opacity-40"
+          style={{ background: ACCENT_GRAD }}
+        >
           {busy ? "Claiming…" : canComplete ? "Claim reward" : `Watch ${Math.max(0, required - elapsed)}s more`}
         </button>
-        {message ? <p className="mt-2 text-center text-xs text-cyan-200">{message}</p> : null}
+        {message ? <p className="mt-2 text-center text-xs font-normal text-orange-300">{message}</p> : null}
       </section>
-      <section className="mt-5 px-3.5">
-        <div className="mb-2.5 flex items-center gap-2">
-          <span className="size-1.5 rounded-full bg-cyan-400" />
-          <p className="text-sm font-black">Up next</p>
+
+      {/* Up next */}
+      <section className="mt-6 px-4">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="size-1.5 rounded-full bg-orange-400" />
+          <p className="text-[13px] font-medium text-neutral-200">Up next</p>
         </div>
         <div className="space-y-2.5">
           {upNext.map((v) => {
             const t = getVideoThumbnail(v);
             return (
-              <button key={v.id} type="button" onClick={() => onSelect(v.id)} className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2 text-left active:bg-white/[0.06]">
-                <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-[#101722]">
-                  {t ? <img src={t} alt="" className="size-full object-cover" loading="lazy" /> : <span className="flex size-full items-center justify-center"><Play className="size-5 text-slate-500" /></span>}
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/25"><Play className="size-4 fill-white text-white" /></span>
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => onSelect(v.id)}
+                className="flex w-full items-center gap-3 rounded-xl bg-[#121212] p-2 text-left active:bg-[#1a1a1a]"
+              >
+                <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-[#1a1a1a]">
+                  {t ? (
+                    <img src={t} alt="" className="size-full object-cover" loading="lazy" />
+                  ) : (
+                    <span className="flex size-full items-center justify-center">
+                      <Play className="size-4 text-neutral-500" strokeWidth={1.5} />
+                    </span>
+                  )}
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <Play className="size-3.5 fill-white text-white" strokeWidth={0} />
+                  </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[12px] font-bold leading-snug text-slate-100">{v.title}</p>
-                  <p className="mt-0.5 text-[10px] font-semibold text-cyan-300/90">{hourlyRateLabel(v)}</p>
+                  <p className="line-clamp-2 text-[13px] font-medium leading-snug text-neutral-100">{v.title}</p>
+                  <p className="mt-0.5 text-[11px] font-normal text-orange-400/90">{hourlyRateLabel(v)}</p>
                 </div>
               </button>
             );
           })}
-          {upNext.length === 0 ? <p className="py-6 text-center text-[11px] text-slate-500">No more videos in queue</p> : null}
+          {upNext.length === 0 ? (
+            <p className="py-6 text-center text-[12px] font-normal text-neutral-600">No more videos</p>
+          ) : null}
         </div>
       </section>
     </main>
@@ -372,12 +496,34 @@ function WatchPlayer({
 function VideoPlayer({ video }: { video: WatchVideo }) {
   const embed = getEmbedUrl(video.videoUrl ?? "", video.providerName);
   if (embed) {
-    return <iframe title={video.title || "Watch"} src={embed} className="size-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />;
+    return (
+      <iframe
+        title={video.title || "Watch"}
+        src={embed}
+        className="size-full border-0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    );
   }
   if (video.videoUrl) {
-    return <a href={video.videoUrl} target="_blank" rel="noreferrer" className="flex size-full flex-col items-center justify-center gap-2 bg-[#0b1420] text-cyan-200"><Play className="size-12" /><span className="text-xs font-bold">Open on {video.providerName || "platform"}</span></a>;
+    return (
+      <a
+        href={video.videoUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="flex size-full flex-col items-center justify-center gap-2 bg-[#0a0a0a] text-orange-300"
+      >
+        <Play className="size-10" strokeWidth={1.5} />
+        <span className="text-xs font-medium">Open on {video.providerName || "platform"}</span>
+      </a>
+    );
   }
-  return <div className="flex size-full items-center justify-center bg-[#0b1420] text-slate-500"><Play className="size-12" /></div>;
+  return (
+    <div className="flex size-full items-center justify-center bg-[#0a0a0a] text-neutral-600">
+      <Play className="size-10" strokeWidth={1.5} />
+    </div>
+  );
 }
 
 function getEmbedUrl(videoUrl: string | null, _providerName: string | null) {
