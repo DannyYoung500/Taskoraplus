@@ -59,8 +59,11 @@ export function resolveCryptoId(method: string): CryptoId {
   const m = method.toLowerCase();
   if (m.includes("btc") || m.includes("bitcoin")) return "btc";
   if (m.includes("ton")) return "ton";
-  if (m.includes("bnb") || m.includes("bep20") || m.includes("bsc")) return "bnb";
+  // USDT on BEP20 / TRC20 still shows USDT logo (not BNB)
+  if (m.includes("usdt") || m.includes("trc20") || m.includes("trx") || m.includes("tether")) return "usdt";
+  if (m.includes("bnb") && !m.includes("usdt")) return "bnb";
   if (m.includes("eth") || m.includes("erc20")) return "eth";
+  if (m.includes("bep20") || m.includes("bsc")) return "usdt";
   return "usdt";
 }
 
