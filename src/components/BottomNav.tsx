@@ -17,6 +17,10 @@ const HIDE_EXACT = new Set([
   "/telegram-gate",
 ]);
 
+/**
+ * Bottom nav uses <button> + router.navigate (not <a href>)
+ * so Telegram long-press cannot show “Open link” with the route URL.
+ */
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();

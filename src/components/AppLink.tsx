@@ -2,6 +2,7 @@
  * Internal navigation without <a href>.
  * Telegram long-press on real links shows “Open link” with the URL —
  * AppLink uses a <button> + router.navigate so that sheet never appears.
+ * External https:// links should stay as normal <a>.
  */
 import { useRouter } from "@tanstack/react-router";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
@@ -40,9 +41,10 @@ export function AppLink({
       disabled={disabled}
       className={className}
       style={{
-        // Ensure buttons used as cards/rows don't get browser button quirks
         appearance: "none",
         WebkitAppearance: "none",
+        display: "flex",
+        boxSizing: "border-box",
         ...style,
       }}
       onClick={(e) => {
