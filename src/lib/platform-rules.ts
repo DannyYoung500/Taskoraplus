@@ -109,6 +109,7 @@ export const PLATFORM_URL_HOSTS: Record<string, string[]> = {
   soundcloud: ["soundcloud.com", "www.soundcloud.com"],
   audiomack: ["audiomack.com", "www.audiomack.com"],
   pinterest: ["pinterest.com", "www.pinterest.com", "pin.it"],
+  github: ["github.com", "www.github.com"],
   reddit: ["reddit.com", "www.reddit.com", "old.reddit.com"],
   twitch: ["twitch.tv", "www.twitch.tv"],
 };
