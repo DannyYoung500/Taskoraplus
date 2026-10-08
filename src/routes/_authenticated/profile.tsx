@@ -84,7 +84,6 @@ function ProfileScreen() {
       </header>
 
       <div className="px-4 pt-3">
-        {/* Identity card — no overflow-hidden that clips content */}
         <section className="rounded-2xl bg-[#121212] p-4">
           <div className="flex items-center gap-3.5">
             <div className="relative shrink-0">
@@ -111,6 +110,7 @@ function ProfileScreen() {
               </div>
             </div>
           </div>
+
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between text-[11px]">
               <span className="font-normal text-neutral-500">Level progress</span>
@@ -128,6 +128,7 @@ function ProfileScreen() {
               {nextLevelAt} more verified to next band
             </p>
           </div>
+
           <div className="mt-4 grid grid-cols-3 gap-2">
             <Stat label="Balance" value={formatUsd(balance)} accent />
             <Stat label="Verified" value={String(verified)} />
@@ -158,8 +159,7 @@ function ProfileScreen() {
           </AppLink>
         </section>
 
-        {/* Menu rows as separate full cards — nothing cut in half */}
-        <section className="mt-3 space-y-2">
+        <section className="mt-3 flex flex-col gap-2">
           <MenuRow
             to="/ambassador"
             icon={Users}
@@ -218,7 +218,6 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-/** Full-width menu row — never clipped by overflow-hidden parent */
 function MenuRow({
   to,
   icon: Icon,
@@ -235,12 +234,13 @@ function MenuRow({
   return (
     <AppLink
       to={to}
-      className="flex w-full min-h-[56px] items-center gap-3 rounded-2xl bg-[#121212] px-3.5 py-3.5 text-left active:opacity-90"
+      className="flex w-full min-h-[64px] items-center gap-3 rounded-2xl bg-[#121212] px-4 py-4 text-left active:opacity-90"
+      style={{ width: "100%" }}
     >
       <Icon className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium leading-snug text-neutral-100">{label}</p>
-        <p className="mt-0.5 text-[11px] font-normal leading-snug text-neutral-500">{sub}</p>
+      <div className="min-w-0 flex-1 overflow-visible">
+        <p className="text-[14px] font-medium leading-tight text-neutral-100">{label}</p>
+        <p className="mt-1 text-[11px] font-normal leading-tight text-neutral-500">{sub}</p>
       </div>
       {badge ? (
         <span className="shrink-0 rounded-md bg-orange-500/15 px-2 py-0.5 text-[11px] font-medium text-orange-400">
