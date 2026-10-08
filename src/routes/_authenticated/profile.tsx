@@ -64,7 +64,7 @@ function ProfileScreen() {
   const nextLevelAt = band - intoBand;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#080808] pb-28 text-neutral-100">
+    <main className="mx-auto min-h-screen w-full max-w-md bg-[#080808] pb-28 text-neutral-100">
       <header className="sticky top-0 z-20 bg-[#080808]/95 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <img src={TASKORA_LOGO} alt="" className="size-8 rounded-lg object-cover" draggable={false} />
@@ -84,7 +84,8 @@ function ProfileScreen() {
       </header>
 
       <div className="px-4 pt-3">
-        <section className="overflow-hidden rounded-2xl bg-[#121212] p-4">
+        {/* Identity card — no overflow-hidden that clips content */}
+        <section className="rounded-2xl bg-[#121212] p-4">
           <div className="flex items-center gap-3.5">
             <div className="relative shrink-0">
               {photo ? (
@@ -137,9 +138,9 @@ function ProfileScreen() {
         <section className="mt-3 grid grid-cols-2 gap-2">
           <AppLink
             to="/wallet"
-            className="flex items-center gap-2.5 rounded-2xl bg-[#121212] p-3.5 active:opacity-90"
+            className="flex w-full items-center gap-2.5 rounded-2xl bg-[#121212] p-3.5 text-left active:opacity-90"
           >
-            <WalletCards className="size-5 text-orange-400" strokeWidth={1.75} />
+            <WalletCards className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-neutral-100">Wallet</p>
               <p className="text-[10px] font-normal text-neutral-500">Deposit · withdraw</p>
@@ -147,9 +148,9 @@ function ProfileScreen() {
           </AppLink>
           <AppLink
             to="/leaderboard"
-            className="flex items-center gap-2.5 rounded-2xl bg-[#121212] p-3.5 active:opacity-90"
+            className="flex w-full items-center gap-2.5 rounded-2xl bg-[#121212] p-3.5 text-left active:opacity-90"
           >
-            <Trophy className="size-5 text-orange-400" strokeWidth={1.75} />
+            <Trophy className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-neutral-100">Rank</p>
               <p className="text-[10px] font-normal text-neutral-500">Leaderboard</p>
@@ -157,18 +158,24 @@ function ProfileScreen() {
           </AppLink>
         </section>
 
-        <section className="mt-3 overflow-hidden rounded-2xl bg-[#121212]">
-          <Row to="/ambassador" icon={Users} label="Invite & Earn" sub="USDT milestones + commission" />
-          <Row
+        {/* Menu rows as separate full cards — nothing cut in half */}
+        <section className="mt-3 space-y-2">
+          <MenuRow
+            to="/ambassador"
+            icon={Users}
+            label="Invite & Earn"
+            sub="USDT milestones + commission"
+          />
+          <MenuRow
             to="/connected"
             icon={Link2}
             label="Connected accounts"
             sub={connectedCount > 0 ? `${connectedCount} linked` : "Link social accounts"}
             badge={connectedCount > 0 ? String(connectedCount) : undefined}
           />
-          <Row to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
-          <Row to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
-          <Row to="/notifications" icon={Bell} label="Notifications" sub="Alerts & updates" />
+          <MenuRow to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
+          <MenuRow to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
+          <MenuRow to="/notifications" icon={Bell} label="Notifications" sub="Alerts & updates" />
         </section>
 
         <section className="mt-3 rounded-2xl bg-[#121212] p-3.5">
@@ -187,7 +194,7 @@ function ProfileScreen() {
           </div>
         </section>
 
-        <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-emerald-500/5 px-3.5 py-3 text-[11px] font-normal leading-relaxed text-emerald-200/80">
+        <div className="mt-3 mb-2 flex items-start gap-2.5 rounded-2xl bg-emerald-500/5 px-3.5 py-3 text-[11px] font-normal leading-relaxed text-emerald-200/80">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-400" strokeWidth={1.75} />
           <span>Telegram-native · real ledger · no demo money.</span>
         </div>
@@ -211,7 +218,8 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-function Row({
+/** Full-width menu row — never clipped by overflow-hidden parent */
+function MenuRow({
   to,
   icon: Icon,
   label,
@@ -227,15 +235,17 @@ function Row({
   return (
     <AppLink
       to={to}
-      className="flex items-center gap-3 border-b border-white/[0.04] px-3.5 py-3.5 last:border-0 active:bg-white/[0.03]"
+      className="flex w-full min-h-[56px] items-center gap-3 rounded-2xl bg-[#121212] px-3.5 py-3.5 text-left active:opacity-90"
     >
-      <Icon className="size-4 shrink-0 text-orange-400" strokeWidth={1.75} />
+      <Icon className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium text-neutral-100">{label}</p>
-        <p className="text-[10px] font-normal text-neutral-500">{sub}</p>
+        <p className="text-[13px] font-medium leading-snug text-neutral-100">{label}</p>
+        <p className="mt-0.5 text-[11px] font-normal leading-snug text-neutral-500">{sub}</p>
       </div>
       {badge ? (
-        <span className="text-[11px] font-medium text-orange-400">{badge}</span>
+        <span className="shrink-0 rounded-md bg-orange-500/15 px-2 py-0.5 text-[11px] font-medium text-orange-400">
+          {badge}
+        </span>
       ) : null}
       <ChevronRight className="size-4 shrink-0 text-neutral-600" strokeWidth={1.75} />
     </AppLink>
