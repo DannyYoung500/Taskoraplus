@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Send,
   Settings,
+  Shield,
   Users,
   Wallet,
 } from "lucide-react";
@@ -18,6 +19,10 @@ import { loadOwnerDashboard } from "@/lib/owner-dashboard.loader";
 import { TaskoraLogo } from "@/components/TaskoraLogo";
 import { OwnerShell } from "@/components/OwnerShell";
 import { ownerSendOpsDigest } from "@/lib/owner-strong.functions";
+import {
+  ownerTestWithdrawalNotify,
+  ownerTestNewUserNotify,
+} from "@/lib/owner-notify-tests";
 
 export const Route = createFileRoute("/_authenticated/owner/")({
   loader: async () => loadOwnerDashboard(),
@@ -38,6 +43,7 @@ const NAV = [
   { to: "/owner/payout-policy", label: "Payout Policy", icon: Settings },
   { to: "/owner/economy", label: "Economy", icon: Settings },
   { to: "/owner/settings", label: "Settings", icon: Settings },
+  { to: "/owner/settings?tab=gate", label: "Telegram Gate", icon: Shield },
 ] as const;
 
 function OwnerHub() {
@@ -47,6 +53,34 @@ function OwnerHub() {
   const payouts = Array.isArray(withdrawals) ? withdrawals.slice(0, 5) : [];
   const [digestMsg, setDigestMsg] = useState<string | null>(null);
   const [digestBusy, setDigestBusy] = useState(false);
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [notifyMsg, setNotifyMsg] = useState<string | null>(null);
+
+  async function testWithdrawNotify() {
+    setNotifyBusy(true);
+    setNotifyMsg(null);
+    try {
+      await ownerTestWithdrawalNotify();
+      setNotifyMsg("Test withdrawal notification sent to owner Telegram.");
+    } catch (e) {
+      setNotifyMsg(e instanceof Error ? e.message : "Notify failed");
+    } finally {
+      setNotifyBusy(false);
+    }
+  }
+
+  async function testNewUserNotify() {
+    setNotifyBusy(true);
+    setNotifyMsg(null);
+    try {
+      await ownerTestNewUserNotify();
+      setNotifyMsg("Test new-user notification sent to owner Telegram.");
+    } catch (e) {
+      setNotifyMsg(e instanceof Error ? e.message : "Notify failed");
+    } finally {
+      setNotifyBusy(false);
+    }
+  }
 
   async function sendDigest() {
     setDigestBusy(true);
@@ -104,7 +138,7 @@ function OwnerHub() {
           <nav className="mb-5 flex gap-2 overflow-x-auto pb-1">
             {NAV.map(({ to, label, icon: Icon }) => (
               <Link
-                key={to}
+                key={label}
                 to={to as any}
                 className="flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-400/15 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:border-cyan-400/30 hover:text-cyan-200"
               >
@@ -144,8 +178,8 @@ function OwnerHub() {
               {[
                 ["/owner/reviews", "Review tasks", ClipboardCheck],
                 ["/owner/withdrawals", "Payouts", Wallet],
-                ["/owner/users", "Users", Users],
-                ["/owner/economy", "Economy", Settings],
+                ["/owner/settings?tab=gate", "Telegram Gate", Shield],
+                ["/owner/settings", "Settings", Settings],
               ].map(([to, title, Icon]) => (
                 <Link
                   key={title as string}
@@ -185,6 +219,45 @@ function OwnerHub() {
                 meta: money(r.amount),
               }))}
             />
+          </section>
+
+          <section className="mt-5 rounded-2xl border border-amber-400/20 bg-[#08172a] p-4">
+            <div className="mb-3">
+              <p className="text-sm font-black text-amber-100">Notification tests</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                Send sample alerts to TASKORA_OWNER_TELEGRAM_IDS so you can verify bot delivery.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={notifyBusy}
+                onClick={() => void testWithdrawNotify()}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] font-bold text-amber-100 disabled:opacity-50"
+              >
+                <Wallet className="size-3.5" />
+                {notifyBusy ? "Sending…" : "Test withdrawal"}
+              </button>
+              <button
+                type="button"
+                disabled={notifyBusy}
+                onClick={() => void testNewUserNotify()}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-100 disabled:opacity-50"
+              >
+                <Users className="size-3.5" />
+                {notifyBusy ? "Sending…" : "Test new user"}
+              </button>
+              <Link
+                to={"/owner/settings?tab=gate" as any}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[11px] font-bold text-sky-200"
+              >
+                <Shield className="size-3.5" />
+                Open Telegram Gate
+              </Link>
+            </div>
+            {notifyMsg ? (
+              <p className="mt-3 text-[11px] text-amber-100/90">{notifyMsg}</p>
+            ) : null}
           </section>
 
           <section className="mt-5 rounded-2xl border border-cyan-400/10 bg-[#08172a] p-4">
