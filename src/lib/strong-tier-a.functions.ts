@@ -143,7 +143,9 @@ export function assertPostbackSecret(requestUrl: string): void {
     process.env.ADSGRAM_POSTBACK_SECRET ??
     process.env.MONETAG_POSTBACK_SECRET ??
     "";
-  if (!secret) return;
+  if (!secret) {
+    throw new Error("Ad postback secret is not configured");
+  }
   const url = new URL(requestUrl);
   const got =
     url.searchParams.get("secret") ||
@@ -202,9 +204,12 @@ export async function creditDailyMissionFromPostback(opts: {
     return { ok: true, credited: false, reason: "claim_provider_mismatch" };
   }
 
-  const eventId =
-    opts.eventId ||
-    `${opts.providerKey}:reward:${opts.telegramId}:${claim.id}`;
+  const rawEventId = String(opts.eventId ?? "").trim();
+  const eventId = rawEventId
+    ? rawEventId.startsWith(`${opts.providerKey}:`)
+      ? rawEventId
+      : `${opts.providerKey}:${rawEventId}`
+    : `${opts.providerKey}:reward:${opts.telegramId}:${claim.id}`;
 
   const { data: creditResult, error: creditError } = await (s as any).rpc(
     "complete_daily_mission_reward",
