@@ -125,6 +125,15 @@ export const createAdvertiseCampaign = createServerFn({ method: "POST" })
     if (!/^https?:\/\//i.test(target)) throw new Error("Enter a valid video or target URL.");
     assertPlatformUrl(String(service.platform), target);
 
+    // Strong Telegram channel / group / bot link validation
+    if (String(service.platform).toLowerCase() === "telegram") {
+      const { assertTelegramTargetForService } = await import("@/lib/telegram-link.functions");
+      await assertTelegramTargetForService({
+        serviceId: String(service.service_id),
+        link: target,
+      });
+    }
+
     const unitService = {
       serviceId: service.service_id,
       platform: service.platform,
@@ -218,7 +227,6 @@ export const createAdvertiseCampaign = createServerFn({ method: "POST" })
           `Complete the ${service.service_name} action and submit the required proof.`;
 
     const campaignId = crypto.randomUUID();
-    // IMPORTANT: use "draft" not "unfunded" — satisfies campaigns_funding_status_check
     const { data: campaign, error: campaignError } = await supabaseAdmin
       .from("campaigns")
       .insert({
@@ -261,7 +269,6 @@ export const createAdvertiseCampaign = createServerFn({ method: "POST" })
         } as never)
         .eq("id", campaign.id);
       if (sponsoredCampaignError) {
-        // Fallback if "sponsored" not in check constraint yet — use funded
         const { error: retryErr } = await supabaseAdmin
           .from("campaigns")
           .update({
