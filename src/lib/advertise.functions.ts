@@ -15,6 +15,20 @@ export const listAdvertiseServices=createServerFn({method:"GET"}).handler(async(
   if(error) throw new Error(error.message); return data??[];
 });
 
+
+export const getAdvertisePostingAccess = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profile, error } = await supabaseAdmin
+      .from("profiles")
+      .select("telegram_id")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { ownerFree: isOwnerTelegramId(profile?.telegram_id ?? null) };
+  });
+
 export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
 .inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number;targetCountryCode?:string;targetCountryName?:string;allowOtherCountriesIfUnavailable?:boolean;description?:string;instructions?:string;warningText?:string;proofRequirements?:string[];difficulty?:"easy"|"medium"|"hard";screenshotsRequired?:number;featured?:boolean;verificationMode?:"automatic"|"screenshot"})=>d)
 .handler(async({data,context})=>{
@@ -191,7 +205,8 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   } catch {}
   if (ownerFree) {
     await supabaseAdmin.from("campaigns").update({
-      funding_status: "funded",
+      owner_sponsored: true,
+      funding_status: "sponsored",
       funding_reserved: 0,
       status: "active",
       budget: customerTotalWithFeature,
