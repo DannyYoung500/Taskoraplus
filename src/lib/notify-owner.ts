@@ -13,7 +13,11 @@ async function ownerChatIds(): Promise<{ botToken: string; ownerIds: string[] }>
 }
 
 function esc(v: unknown) {
-  return String(v ?? "").replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """);
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 async function resolveOpsId(): Promise<string> {
