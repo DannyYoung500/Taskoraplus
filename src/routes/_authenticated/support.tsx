@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { createSupportTicket, listMyTickets, uploadSupportImage } from "@/lib/support.functions";
 import { Screen, ScreenTitle, Card, GoldButton } from "@/components/Screen";
-import { ImagePlus, Paperclip } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/support")({
   loader: async () => {
     const tickets = await listMyTickets().catch(() => []);
     return { tickets };
   },
+  head: () => ({ meta: [{ title: "Support — TASKORA" }] }),
   component: SupportPage,
 });
 
@@ -89,31 +90,32 @@ function SupportPage() {
   return (
     <Screen>
       <ScreenTitle title="Support" subtitle="Contact TASKORA owner · upload screenshot · replies below" />
+
       <Card className="space-y-3 p-4">
         <input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Subject"
-          className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-cyan-300/40"
+          className="w-full rounded-xl bg-[#1a1a1a] px-3.5 py-2.5 text-sm font-normal text-neutral-100 outline-none placeholder:text-neutral-600 focus:ring-1 focus:ring-orange-500/40"
         />
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Describe your issue"
           rows={4}
-          className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-cyan-300/40"
+          className="w-full rounded-xl bg-[#1a1a1a] px-3.5 py-2.5 text-sm font-normal text-neutral-100 outline-none placeholder:text-neutral-600 focus:ring-1 focus:ring-orange-500/40"
         />
 
-        <div className="rounded-xl border border-dashed border-white/15 bg-black/20 p-3">
-          <p className="mb-2 text-[11px] font-semibold text-white/50">Screenshot (optional)</p>
+        <div className="rounded-xl bg-[#1a1a1a] p-3">
+          <p className="mb-2 text-[11px] font-medium text-neutral-500">Screenshot (optional)</p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={uploading}
               onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-[11px] font-bold text-cyan-100 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/15 px-3 py-2 text-[11px] font-medium text-orange-400 disabled:opacity-50"
             >
-              <ImagePlus className="size-3.5" />
+              <ImagePlus className="size-3.5" strokeWidth={1.75} />
               {uploading ? "Uploading…" : "Upload image"}
             </button>
             <input
@@ -132,55 +134,58 @@ function SupportPage() {
             }}
             placeholder="Or paste image URL (https://…)"
             inputMode="url"
-            className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none placeholder:text-white/25"
+            className="mt-2 w-full rounded-lg bg-[#121212] px-3 py-2 text-xs font-normal text-neutral-100 outline-none placeholder:text-neutral-600 focus:ring-1 focus:ring-orange-500/30"
           />
-          {(preview || attachmentUrl) && (
-            <div className="mt-2 overflow-hidden rounded-lg border border-white/10">
-              <img
-                src={preview || attachmentUrl}
-                alt="Attachment preview"
-                className="max-h-40 w-full object-contain bg-black/40"
-              />
+          {preview ? (
+            <div className="mt-2 overflow-hidden rounded-lg">
+              <img src={preview} alt="" className="max-h-40 w-full object-contain" />
             </div>
-          )}
+          ) : null}
         </div>
 
-        <GoldButton disabled={busy || uploading} onClick={() => void send()}>
+        {msg ? (
+          <p className="text-[12px] font-normal text-orange-300">{msg}</p>
+        ) : null}
+
+        <GoldButton disabled={busy || !subject.trim() || !body.trim()} onClick={() => void send()}>
           {busy ? "Sending…" : "Submit ticket"}
         </GoldButton>
-        {msg ? <p className="text-xs text-white/50">{msg}</p> : null}
       </Card>
-      <div className="mt-6 space-y-2">
-        {list.map((t) => (
-          <Card key={t.id} className="space-y-1.5 p-3 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-semibold">{t.subject}</p>
-              <span className="text-[10px] uppercase text-white/40">{t.status}</span>
-            </div>
-            {t.body ? <p className="text-[11px] text-white/45">{t.body}</p> : null}
-            {t.attachment_url ? (
-              <a
-                href={t.attachment_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 underline"
-              >
-                <Paperclip className="size-3" />
-                Attachment
-              </a>
-            ) : null}
-            {t.owner_reply ? (
-              <p className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-2 text-[11px] text-cyan-100">
-                <span className="font-bold">Owner reply: </span>
-                {t.owner_reply}
+
+      {list.length > 0 ? (
+        <div className="mt-5 space-y-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">Your tickets</p>
+          {list.map((t) => (
+            <Card key={t.id} className="p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[13px] font-medium text-neutral-100">{t.subject}</p>
+                <span
+                  className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium ${
+                    t.status === "open" || t.status === "pending"
+                      ? "bg-orange-500/15 text-orange-400"
+                      : t.status === "resolved" || t.status === "closed"
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : "bg-neutral-800 text-neutral-400"
+                  }`}
+                >
+                  {t.status}
+                </span>
+              </div>
+              {t.body ? (
+                <p className="mt-1.5 line-clamp-2 text-[11px] font-normal text-neutral-500">{t.body}</p>
+              ) : null}
+              {t.owner_reply ? (
+                <p className="mt-2 rounded-lg bg-orange-500/10 px-2.5 py-2 text-[11px] font-normal text-orange-200">
+                  Owner: {t.owner_reply}
+                </p>
+              ) : null}
+              <p className="mt-1.5 text-[10px] font-normal text-neutral-600">
+                {new Date(t.created_at).toLocaleString()}
               </p>
-            ) : null}
-            <p className="text-[10px] text-white/35">
-              {t.created_at ? new Date(t.created_at).toLocaleString() : ""}
-            </p>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      ) : null}
     </Screen>
   );
 }
