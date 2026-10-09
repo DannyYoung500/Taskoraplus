@@ -13,11 +13,13 @@ import {
   WalletCards,
   ClipboardList,
   Trophy,
+  Flame,
 } from "lucide-react";
-import { getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
+import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
 import { AppLink } from "@/components/AppLink";
 import { listDailyMissions } from "@/lib/daily-missions.functions";
 import { recordSecuritySignal } from "@/lib/security-engine.functions";
+import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
@@ -77,18 +79,24 @@ const getMyLevelStats = createServerFn({ method: "GET" })
 
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
-    const [dash, missions, levelStats] = await Promise.all([
+    const [tasks, dash, missions, levelStats] = await Promise.all([
+      listTasks().catch(() => []),
       getDashboard().catch(() => null),
       listDailyMissions().catch(() => []),
       getMyLevelStats().catch(() => ({ level: 1, progress: 0 })),
     ]);
-    return { dash, missions, levelStats };
+    return {
+      tasks: tasks.filter((task) => !isDemoTaskTitle(task.title)).slice(0, 8),
+      dash,
+      missions,
+      levelStats,
+    };
   },
   component: HomePage,
 });
 
 function HomePage() {
-  const { dash, missions, levelStats } = Route.useLoaderData();
+  const { tasks, dash, missions, levelStats } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
   const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
   const balance = rawBalance <= 0.00005 ? 0 : Math.max(0, rawBalance);
@@ -294,21 +302,63 @@ function HomePage() {
         </div>
       </section>
 
-      <AppLink
-        to="/tasks"
-        className="flex w-full items-center justify-between rounded-2xl bg-[#121212] px-4 py-3.5 active:opacity-90"
-      >
-        <div className="min-w-0">
-          <p className="text-[14px] font-medium text-neutral-50">Browse all tasks</p>
-          <p className="mt-0.5 text-[11px] text-neutral-500">Earn real USDT · verified campaigns</p>
+      <section>
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-200">
+            <Flame className="size-3.5 text-orange-400" strokeWidth={1.75} /> Top tasks
+          </p>
+          <AppLink to="/tasks" className="text-[11px] font-normal text-orange-400">
+            View all
+          </AppLink>
         </div>
-        <span
-          className="inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-[11px] font-semibold text-white"
-          style={{ background: ACCENT_GRAD }}
-        >
-          Open →
-        </span>
-      </AppLink>
+        <div className="space-y-2">
+          {tasks.length === 0 ? (
+            <p className="rounded-2xl bg-[#121212] p-4 text-[13px] font-normal text-neutral-500">
+              No tasks yet — check back soon
+            </p>
+          ) : (
+            tasks.map((t: { id: string; title: string; reward: number; platform: string; advertiser?: string; seconds?: number; featured?: boolean }) => (
+              <article key={t.id} className="rounded-2xl bg-[#121212] p-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#1a1a1a]">
+                    <PlatformLogo platform={t.platform as Platform} size={26} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-medium text-neutral-50">{t.title}</p>
+                        <p className="mt-0.5 text-[11px] text-neutral-500">
+                          {platformLabel(t.platform as Platform)}
+                        </p>
+                      </div>
+                      {t.featured ? (
+                        <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase text-amber-400">
+                          Featured
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[16px] font-semibold text-emerald-400">
+                        {formatUsd(Number(t.reward))}
+                      </span>
+                      <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-400">
+                        EASY
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <AppLink
+                  to="/tasks/$taskId"
+                  params={{ taskId: String(t.id) }}
+                  className="mt-3 flex w-full items-center justify-center rounded-xl bg-orange-500 py-2.5 text-[13px] font-medium text-[#0a0a0a]"
+                >
+                  Start Task
+                </AppLink>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
     </main>
   );
 }
