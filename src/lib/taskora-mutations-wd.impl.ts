@@ -34,6 +34,13 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
 
+    try {
+      const { assertVelocityBurstOk } = await import("@/lib/strong-velocity.functions");
+      await assertVelocityBurstOk({ userId, kind: "withdraw_request" });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Too many")) throw e;
+    }
+
     const maint = await getMaintenanceSwitches();
     if (maint.read_only || maint.withdrawals_paused) throw new Error("Withdrawals are temporarily paused by the owner.");
 
@@ -217,24 +224,4 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     return { ok: true, requiresDual, holdUntil };
   });
 
-export const requestDepositGuarded = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { method: string; amount: number; txHash?: string | undefined; note?: string | undefined }) => d)
-  .handler(async ({ data, context }) => {
-    const { userId } = context;
-    const maint = await getMaintenanceSwitches();
-    if (maint.read_only || maint.deposits_paused) throw new Error("Deposits are temporarily paused by the owner.");
-    const amount = Number(data.amount);
-    if (!(amount >= 1)) throw new Error("Minimum deposit is $1.00.");
-    if (!(amount <= 50_000)) throw new Error("Maximum single deposit is $50,000.");
-    const method = (data.method || "").trim();
-    if (!method) throw new Error("Choose a deposit network.");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profile } = await supabaseAdmin.from("profiles").select("status").eq("id", userId).maybeSingle();
-    if (profile && String((profile as { status?: string }).status ?? "active") !== "active") throw new Error("Account is not allowed to deposit.");
-    const { data: row, error } = await supabaseAdmin.from("deposits").insert({
-      user_id: userId, amount, method, status: "pending", reference: data.txHash?.trim() || null, notes: data.note?.trim() || null,
-    } as never).select("id, status, amount, method, created_at").single();
-    if (error) throw new Error(error.message);
-    return row;
-  });
+export { requestDepositGuarded } from "./taskora-mutations-deposit.impl";
