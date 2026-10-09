@@ -1,10 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Bell, ChevronRight, Trophy, Crown } from "lucide-react";
 import { getDashboard } from "@/lib/taskora.functions";
 import { getLeaderboard, type LeaderboardRow } from "@/lib/leaderboard.functions";
-import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
 import { formatUsd } from "@/lib/taskora-display";
+import { AppLink } from "@/components/AppLink";
 
 export const Route = createFileRoute("/_authenticated/leaderboard")({
   head: () => ({ meta: [{ title: "Rank — TASKORA" }] }),
@@ -36,7 +37,9 @@ function RankPage() {
     | {
         display_name?: string | null;
         photo_url?: string | null;
+        task_points?: number;
         level_num?: number | null;
+        id?: string;
       }
     | null;
 
@@ -50,177 +53,164 @@ function RankPage() {
     transactions.reduce((s, t) => s + Number(t.amount), 0),
   );
 
-  // Real ranking only — no invented users
   const sorted = [...rows]
     .filter((r) => {
       if (tab === "referrers") return r.referrals > 0;
       if (tab === "usdt") return Number(r.usdt_earned ?? 0) > 0;
       if (tab === "tasks") return Number(r.tasks_completed ?? 0) > 0;
+      return true;
     })
     .sort((a, b) => {
       if (tab === "referrers") return b.referrals - a.referrals;
       if (tab === "usdt") return Number(b.usdt_earned ?? 0) - Number(a.usdt_earned ?? 0);
       if (tab === "tasks") return Number(b.tasks_completed ?? 0) - Number(a.tasks_completed ?? 0);
+      return b.task_points - a.task_points;
     });
 
   const myRank =
-    sorted.findIndex((r) => r.display_name === name || r.user_id === (dash as { profile?: { id?: string } } | null)?.profile?.id) + 1;
+    sorted.findIndex(
+      (r) =>
+        r.display_name === name ||
+        r.user_id === profile?.id,
+    ) + 1;
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "usdt", label: "Earnings" },
+    { id: "tasks", label: "Tasks" },
+    { id: "referrers", label: "Referrals" },
+  ];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#030814] px-3.5 pb-28 pt-3 text-white">
-      <header className="mb-4 flex items-center gap-2">
-        <Link to="/home" className="rounded-full border border-white/10 p-2 text-slate-400">
-          <ChevronRight className="size-4 rotate-180" />
-        </Link>
-        <img src={TASKORA_LOGO} alt="" className="size-9 rounded-full ring-2 ring-cyan-400/40" />
+    <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#080808] px-4 pb-28 pt-3 text-neutral-100">
+      <header className="mb-4 flex items-center gap-2.5">
+        <AppLink to="/home" className="p-2 text-neutral-500" aria-label="Back">
+          <ChevronRight className="size-4 rotate-180" strokeWidth={1.75} />
+        </AppLink>
+        <img src={TASKORA_LOGO} alt="" className="size-9 rounded-full object-cover" draggable={false} />
         <div className="min-w-0 flex-1">
-          <p
-            className="text-lg font-black tracking-[0.06em]"
-            style={{
-              background: "linear-gradient(90deg,#e0f2fe,#38bdf8,#2563eb)",
-              WebkitBackgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            Rank
-          </p>
-          <p className="text-[10px] text-slate-500">Live leaderboard · real data only</p>
+          <p className="text-lg font-medium tracking-tight text-neutral-50">Rank</p>
+          <p className="text-[11px] font-normal text-neutral-500">Live leaderboard · real data only</p>
         </div>
-        <Link to="/home" className="rounded-full border border-white/10 bg-[#0b1628] p-2">
-          <Bell className="size-4 text-slate-300" />
-        </Link>
+        <AppLink to="/notifications" className="p-2 text-neutral-400" aria-label="Notifications">
+          <Bell className="size-4" strokeWidth={1.75} />
+        </AppLink>
       </header>
 
-      <section
-        className="mb-3.5 overflow-hidden rounded-[22px] border border-cyan-400/30 p-4"
-        style={{
-          background:
-            "radial-gradient(circle at 90% 10%,rgba(56,189,248,0.22),transparent 40%), linear-gradient(145deg,#0a1a33,#060f1c)",
-        }}
-      >
+      <section className="mb-3.5 rounded-2xl bg-[#121212] p-4">
         <div className="flex items-center gap-3">
           {photo ? (
-            <img src={photo} alt="" className="size-14 rounded-full object-cover ring-2 ring-amber-400/50" />
+            <img src={photo} alt="" className="size-14 rounded-full object-cover" draggable={false} />
           ) : (
-            <span className="flex size-14 items-center justify-center rounded-full bg-cyan-500/20 text-lg font-black ring-2 ring-amber-400/40">
+            <span className="flex size-14 items-center justify-center rounded-full bg-neutral-800 text-lg font-medium text-neutral-300">
               {name.charAt(0)}
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-slate-400">Your standing</p>
-            <p className="truncate text-base font-black">
+            <p className="text-[11px] font-normal text-neutral-500">Your standing</p>
+            <p className="truncate text-[15px] font-medium text-neutral-50">
               {name}{" "}
-              <Crown className="inline size-3.5 text-amber-300" />
+              <Crown className="inline size-3.5 text-orange-400" strokeWidth={1.75} />
             </p>
-            <span className="mt-0.5 inline-flex rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-200">
+            <span className="mt-1 inline-flex rounded-md bg-orange-500/15 px-2 py-0.5 text-[10px] font-medium text-orange-400">
               Level {levelNum}
               {myRank > 0 ? ` · #${myRank}` : ""}
             </span>
           </div>
           <div className="text-right">
-            <p className="text-[9px] font-semibold text-slate-400">USDT</p>
-            <p className="text-sm font-black">{formatUsd(balance)}</p>
+            <p className="text-[11px] text-neutral-500">Balance</p>
+            <p className="text-sm font-medium text-orange-400">{formatUsd(balance)}</p>
           </div>
         </div>
+        <p className="mt-3 text-[10px] font-normal text-neutral-600">{weekLabel()}</p>
       </section>
 
-      <section className="mb-3 overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-r from-[#1a1408] via-[#121a28] to-[#0c1524] p-3.5">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex size-12 items-center justify-center rounded-full border border-amber-300/40 bg-amber-400/15 text-amber-200">
-            <Trophy className="size-6" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-black">Leaderboard</p>
-            <p className="text-[10px] text-slate-500">{weekLabel()} · real profiles only</p>
-          </div>
-          <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-200">
-            Live
-          </span>
-        </div>
-      </section>
-
-      <div className="mb-3 flex gap-1 rounded-2xl border border-white/8 bg-[#0b1628] p-1">
-        {(
-          [
-            ["usdt", "USDT"],
-            ["tasks", "Tasks"],
-            ["referrers", "Invites"],
-          ] as const
-        ).map(([id, label]) => (
+      <div className="mb-3 flex gap-1 rounded-2xl bg-[#121212] p-1">
+        {tabs.map((t) => (
           <button
-            key={id}
+            key={t.id}
             type="button"
-            onClick={() => setTab(id)}
-            className={`flex-1 rounded-xl px-1.5 py-2.5 text-[10px] font-bold transition ${
-              tab === id ? "text-[#04101c]" : "text-slate-400"
+            onClick={() => setTab(t.id)}
+            className={`flex-1 rounded-xl py-2 text-[12px] font-medium transition ${
+              tab === t.id
+                ? "bg-orange-500/20 text-orange-400"
+                : "text-neutral-500"
             }`}
-            style={tab === id ? { background: BLUE_GRAD } : undefined}
           >
-            {label}
+            {t.label}
           </button>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/8 bg-[#0b1628]">
-        <div className="grid grid-cols-[32px_1fr_auto] gap-2 border-b border-white/5 px-3.5 py-2.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+      <section className="rounded-2xl bg-[#121212]">
+        <div className="grid grid-cols-[32px_1fr_auto] gap-2 px-3.5 py-2.5 text-[9px] font-medium uppercase tracking-wider text-neutral-600">
           <span>#</span>
           <span>User</span>
           <span className="text-right">
-            {tab === "referrers" ? "Invites" : tab === "usdt" ? "USDT" : "Tasks"}
+            {tab === "usdt" ? "Earned" : tab === "tasks" ? "Tasks" : "Refs"}
           </span>
         </div>
         {sorted.length === 0 ? (
-          <div className="p-8 text-center">
-            <Trophy className="mx-auto size-8 text-slate-600" />
-            <p className="mt-3 text-sm font-bold text-slate-300">No ranked users yet</p>
-            <p className="mt-1 text-[12px] text-slate-500">
-              Complete verified activity to appear here.
-            </p>
+          <div className="px-3.5 py-10 text-center">
+            <Trophy className="mx-auto size-8 text-neutral-700" strokeWidth={1.5} />
+            <p className="mt-2 text-[13px] font-medium text-neutral-400">No rankings yet</p>
+            <p className="mt-1 text-[11px] text-neutral-600">Complete tasks to appear here</p>
           </div>
         ) : (
-          sorted.slice(0, 50).map((row, i) => {
-            const rank = i + 1;
-            const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+          sorted.slice(0, 50).map((r, i) => {
+            const isMe =
+              r.display_name === name || r.user_id === profile?.id;
             const value =
-              tab === "referrers"
-                ? row.referrals
-                : tab === "usdt"
-                  ? Number(row.usdt_earned ?? 0)
-                  : tab === "tasks"
-                    ? Number(row.tasks_completed ?? 0)
-                    : Number(row.tasks_completed ?? 0);
+              tab === "usdt"
+                ? formatUsd(Number(r.usdt_earned ?? 0))
+                : tab === "tasks"
+                  ? String(r.tasks_completed ?? 0)
+                  : String(r.referrals);
             return (
               <div
-                key={row.user_id}
-                className="grid grid-cols-[32px_1fr_auto] items-center gap-2 border-b border-white/5 px-3.5 py-3 last:border-0"
+                key={r.user_id ?? i}
+                className={`grid grid-cols-[32px_1fr_auto] items-center gap-2 px-3.5 py-3 ${
+                  isMe ? "bg-orange-500/8" : ""
+                }`}
               >
-                <span className="text-center text-sm font-black text-slate-400">{medal ?? rank}</span>
-                <div className="flex min-w-0 items-center gap-2.5">
-                  {row.photo_url ? (
-                    <img src={row.photo_url} alt="" className="size-9 rounded-full object-cover ring-1 ring-white/10" />
+                <span
+                  className={`text-[12px] font-medium ${
+                    i < 3 ? "text-orange-400" : "text-neutral-500"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <div className="flex min-w-0 items-center gap-2">
+                  {r.photo_url ? (
+                    <img
+                      src={r.photo_url}
+                      alt=""
+                      className="size-8 rounded-full object-cover"
+                      draggable={false}
+                    />
                   ) : (
-                    <span className="flex size-9 items-center justify-center rounded-full bg-cyan-500/15 text-[11px] font-bold text-cyan-200">
-                      {row.display_name.charAt(0)}
+                    <span className="flex size-8 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-medium text-neutral-400">
+                      {(r.display_name ?? "?").charAt(0)}
                     </span>
                   )}
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-bold">{row.display_name}</p>
-                    <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[8px] font-semibold text-slate-400">
-                      Lv. {Math.max(1, Math.floor(Number(row.tasks_completed ?? 0) / 10) + 1)}
-                    </span>
-                  </div>
+                  <span className={`truncate text-[13px] font-medium ${isMe ? "text-orange-300" : "text-neutral-200"}`}>
+                    {r.display_name ?? "User"}
+                    {isMe ? " · you" : ""}
+                  </span>
                 </div>
-                <span className="text-sm font-black tabular-nums text-cyan-200">
-                  {tab === "usdt" ? formatUsd(Number(value)) : Number(value).toLocaleString()}
+                <span
+                  className="text-right text-[12px] font-medium"
+                  style={i === 0 ? { color: "#f97316" } : undefined}
+                >
+                  {value}
                 </span>
               </div>
             );
           })
         )}
-      </div>
+      </section>
 
-      <p className="mt-3 text-center text-[10px] text-slate-500">
-        Real profiles only · verified activity · no Task Points.
+      <p className="mt-4 text-center text-[10px] font-normal text-neutral-600">
+        Rankings update from verified activity only
       </p>
     </main>
   );
