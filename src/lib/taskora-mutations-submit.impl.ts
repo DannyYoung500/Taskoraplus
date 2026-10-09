@@ -31,6 +31,12 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
     try {
+      const { assertVelocityBurstOk } = await import("@/lib/strong-velocity.functions");
+      await assertVelocityBurstOk({ userId, kind: "submit" });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Too many")) throw e;
+    }
+    try {
       const { assertNotImpossibleProgression } = await import("@/lib/strong-tier-b.functions");
       await assertNotImpossibleProgression({ userId });
     } catch (e) {
@@ -147,6 +153,10 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
         p_reason: "Automatic verification confirmed the required platform action.",
       } as never);
       if (verificationError) throw new Error(verificationError.message);
+      try {
+        const { applyTrustOutcome } = await import("@/lib/strong-escrow.functions");
+        await applyTrustOutcome({ userId, outcome: "approved" });
+      } catch { /* soft */ }
       return { status: "verified" as const, autoVerified: true, submissionId: String(submissionId), verification: verificationResult };
     }
     return { status: "pending" as const, autoVerified: false, submissionId: String(submissionId) };
