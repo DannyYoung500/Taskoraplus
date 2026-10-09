@@ -184,23 +184,63 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
       }
     }
 
-    await (s as any)
+    // Create the idempotent reward transaction before completing the session.
+    // A unique DB index on (user_id, label) for this session prevents replay credits.
+    const rewardLabel = `Watch video — ${String(v.title)} [session:${String(session.id)}]`;
+    if (rewardUsdt > 0) {
+      const { error } = await s.from("transactions").insert({
+        user_id: context.userId,
+        label: rewardLabel,
+        amount: rewardUsdt,
+        kind: "reward",
+      });
+      if (error) {
+        if (String((error as { code?: string }).code) !== "23505") {
+          throw new Error(error.message);
+        }
+        // A retry may encounter the reward created by an earlier attempt.
+        const { data: existingReward, error: lookupError } = await s
+          .from("transactions")
+          .select("id,amount")
+          .eq("user_id", context.userId)
+          .eq("label", rewardLabel)
+          .eq("kind", "reward")
+          .maybeSingle();
+        if (lookupError || !existingReward) {
+          throw new Error(lookupError?.message ?? "Could not verify the existing watch reward.");
+        }
+        if (Number(existingReward.amount) !== rewardUsdt) {
+          throw new Error("The recorded watch reward does not match this session.");
+        }
+      }
+    }
+
+    const { data: completedSession, error: completionError } = await (s as any)
       .from("watch_video_sessions")
       .update({
         status: "completed",
         completed_at: new Date().toISOString(),
         reward_usdt: rewardUsdt,
       })
-      .eq("id", data.sessionId);
+      .eq("id", data.sessionId)
+      .eq("user_id", context.userId)
+      .eq("status", "started")
+      .select("id")
+      .maybeSingle();
 
-    if (rewardUsdt > 0) {
-      const { error } = await s.from("transactions").insert({
-        user_id: context.userId,
-        label: `Watch video — ${String(v.title)}`,
-        amount: rewardUsdt,
-        kind: "reward",
-      });
-      if (error) throw new Error(error.message);
+    if (completionError) throw new Error(completionError.message);
+    if (!completedSession) {
+      const { data: currentSession, error: sessionLookupError } = await (s as any)
+        .from("watch_video_sessions")
+        .select("status")
+        .eq("id", data.sessionId)
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (sessionLookupError) throw new Error(sessionLookupError.message);
+      if (currentSession?.status !== "completed") {
+        throw new Error("The watch session could not be completed. Please retry.");
+      }
+      return { ok: true as const, already: true as const, earned: 0 };
     }
 
     await (s as any)
