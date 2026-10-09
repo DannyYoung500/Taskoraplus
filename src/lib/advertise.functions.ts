@@ -30,7 +30,7 @@ export const getAdvertisePostingAccess = createServerFn({ method: "GET" })
   });
 
 export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
-.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number;targetCountryCode?:string;targetCountryName?:string;allowOtherCountriesIfUnavailable?:boolean;description?:string;instructions?:string;warningText?:string;proofRequirements?:string[];difficulty?:"easy"|"medium"|"hard";screenshotsRequired?:number;featured?:boolean;verificationMode?:"automatic"|"screenshot"})=>d)
+.inputValidator((d:{serviceId:string;title?:string;link:string;quantity:number;watchSeconds?:number;videoSource?:string;videoDurationSeconds?:number;targetCountryCode?:string;targetCountryName?:string;allowOtherCountriesIfUnavailable?:boolean;description?:string;instructions?:string;warningText?:string;proofRequirements?:string[];difficulty?:"easy"|"medium"|"hard";screenshotsRequired?:number;featured?:boolean;ownerRewardPerTask?:number;verificationMode?:"automatic"|"screenshot"})=>d)
 .handler(async({data,context})=>{
   const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
   const [{data:service,error:serviceError},{data:economy,error:economyError}]=await Promise.all([
@@ -40,6 +40,12 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   if(serviceError) throw new Error(serviceError.message);
   if(economyError) throw new Error(economyError.message);
   if(!service) throw new Error("Advertise service is unavailable.");
+
+  let ownerFree = false;
+  try {
+    const { data: ownerProfile } = await supabaseAdmin.from("profiles").select("telegram_id").eq("id", context.userId).maybeSingle();
+    ownerFree = isOwnerTelegramId(ownerProfile?.telegram_id ?? null);
+  } catch {}
 
   let quantity=Math.floor(Number(data.quantity));
   if(quantity<Number(service.min_quantity)||quantity>Number(service.max_quantity)) throw new Error(`Quantity must be between ${service.min_quantity.toLocaleString()} and ${service.max_quantity.toLocaleString()}.`);
@@ -110,6 +116,15 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   } as const;
   const pricing=calculateAdvertiseOrder(unitService,quantity,watchSeconds);
 
+  const catalogTaskReward=service.pricing_model==="watch_second"
+    ? Number((Number(service.tasker_unit_reward)*watchSeconds).toFixed(8))
+    : Number(service.tasker_unit_reward);
+  const ownerRewardInput=Number(data.ownerRewardPerTask);
+  if (ownerFree && data.ownerRewardPerTask !== undefined && (!Number.isFinite(ownerRewardInput) || ownerRewardInput <= 0 || ownerRewardInput > 10)) {
+    throw new Error("Owner reward must be greater than $0 and no more than $10 per completion.");
+  }
+  const perTaskReward=ownerFree && data.ownerRewardPerTask !== undefined ? Number(ownerRewardInput.toFixed(8)) : catalogTaskReward;
+  if (ownerFree && perTaskReward * quantity > 1000) throw new Error("Owner-sponsored reward total cannot exceed $1,000 per campaign.");
   const featureFee=Boolean(data.featured)?5:0;
   const customerTotalWithFeature=Number((pricing.customerTotal+featureFee).toFixed(8));
   const globalMin=Number(economy?.global_min_campaign_value_usd??0);
@@ -126,9 +141,6 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
     }
   }
 
-  const perTaskReward=service.pricing_model==="watch_second"
-    ? Number((Number(service.tasker_unit_reward)*watchSeconds).toFixed(8))
-    : Number(service.tasker_unit_reward);
   const perTaskCustomer=service.pricing_model==="watch_second"
     ? Number((Number(service.customer_unit_price)*watchSeconds).toFixed(8))
     : Number(service.customer_unit_price);
@@ -193,16 +205,7 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
   } as never).select("*").single();
   if(campaignError||!campaign) throw new Error(campaignError?.message??"Could not create campaign.");
 
-  // Owner posts free — no wallet debit, no budget reserve
-  let ownerFree = false;
-  try {
-    const { data: ownerProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("telegram_id")
-      .eq("id", context.userId)
-      .maybeSingle();
-    ownerFree = isOwnerTelegramId(ownerProfile?.telegram_id ?? null);
-  } catch {}
+  // Owner-sponsored campaigns are published without advertiser wallet debit.
   if (ownerFree) {
     await supabaseAdmin.from("campaigns").update({
       owner_sponsored: true,
