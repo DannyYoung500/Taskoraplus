@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { TASKORA_LOGO, BLUE_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
 
+/** Soft NEWTUBE-inspired shell — warm orange on near-black, no heavy borders */
 export function Screen({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <main
-      className={`mx-auto min-h-screen w-full max-w-md bg-[#0b1424] px-4 pb-28 pt-5 text-slate-100 ${className}`}
+      className={`mx-auto min-h-screen w-full max-w-md bg-[#080808] px-4 pb-28 pt-5 text-neutral-100 ${className}`}
     >
       {children}
     </main>
@@ -18,33 +19,24 @@ export function ScreenTitle({ title, subtitle }: { title: string; subtitle?: str
         <img
           src={TASKORA_LOGO}
           alt=""
-          className="tk-logo size-9 rounded-full object-cover ring-2 ring-blue-400/40"
+          className="tk-logo size-9 rounded-full object-cover"
           draggable={false}
           data-no-preview
           onContextMenu={(e) => e.preventDefault()}
           style={{ pointerEvents: "none" }}
         />
-        <span
-          className="text-[11px] font-extrabold uppercase tracking-[0.28em]"
-          style={{
-            background: "linear-gradient(90deg,#93c5fd,#3b82f6)",
-            WebkitBackgroundClip: "text",
-            color: "transparent",
-          }}
-        >
+        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-400/90">
           TASKORA
         </span>
       </div>
-      <h1 className="text-xl font-bold tracking-tight text-white">{title}</h1>
-      {subtitle ? <p className="mt-1 text-xs text-slate-400">{subtitle}</p> : null}
+      <h1 className="text-xl font-medium tracking-tight text-neutral-50">{title}</h1>
+      {subtitle ? <p className="mt-1 text-xs font-normal text-neutral-500">{subtitle}</p> : null}
     </header>
   );
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl border border-slate-500/15 bg-[#121f33] ${className}`}>{children}</div>
-  );
+  return <div className={`rounded-2xl bg-[#121212] ${className}`}>{children}</div>;
 }
 
 export function GoldButton({
@@ -65,8 +57,8 @@ export function GoldButton({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold text-white disabled:opacity-50 ${className}`}
-      style={{ background: BLUE_GRAD }}
+      className={`w-full rounded-2xl px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50 ${className}`}
+      style={{ background: ACCENT_GRAD }}
     >
       {children}
     </button>
