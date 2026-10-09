@@ -206,40 +206,29 @@ export async function creditDailyMissionFromPostback(opts: {
     opts.eventId ||
     `${opts.providerKey}:reward:${opts.telegramId}:${claim.id}`;
 
-  const { data: updated, error } = await (s as any)
-    .from("daily_mission_claims")
-    .update({
-      status: "completed",
-      provider_event_id: eventId,
-      reward_usdt: Number(mission.reward_usdt || 0),
-      reward_points: Number(mission.reward_points || 0),
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", claim.id)
-    .eq("status", "pending")
-    .select("id")
-    .maybeSingle();
+  const { data: creditResult, error: creditError } = await (s as any).rpc(
+    "complete_daily_mission_reward",
+    {
+      p_claim_id: claim.id,
+      p_user_id: profile.id,
+      p_provider_key: opts.providerKey,
+      p_event_id: eventId,
+    },
+  );
 
-  if (error || !updated) return { ok: true, credited: false, reason: "already_processed" };
+  if (creditError) {
+    return { ok: false, credited: false, reason: creditError.message };
+  }
 
-  if (Number(mission.reward_usdt || 0) > 0) {
-    const { error: e } = await s.from("transactions").insert({
-      user_id: profile.id,
-      label: `Daily mission — ${String(mission.title)}`,
-      amount: Number(mission.reward_usdt),
-      kind: "reward",
-    });
-    if (e) return { ok: false, credited: false, reason: e.message };
+  const credit = Array.isArray(creditResult) ? creditResult[0] : creditResult;
+  if (!credit?.ok || !credit?.credited) {
+    return {
+      ok: Boolean(credit?.ok),
+      credited: false,
+      reason: String(credit?.reason ?? "reward_not_credited"),
+    };
   }
-  if (Number(mission.reward_points || 0) > 0) {
-    const { data: p } = await s.from("profiles").select("task_points").eq("id", profile.id).maybeSingle();
-    await s
-      .from("profiles")
-      .update({
-        task_points: Number((p as { task_points?: number } | null)?.task_points || 0) + Number(mission.reward_points),
-      } as never)
-      .eq("id", profile.id);
-  }
+
   try {
     await s.from("notifications").insert({
       user_id: profile.id,
