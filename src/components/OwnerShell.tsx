@@ -213,7 +213,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
             to="/home"
             className="rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-[11px] font-semibold text-blue-300"
           >
-            App
+            Open App 🚀
           </Link>
         </header>
         <div className="flex-1 pb-10">{children}</div>
