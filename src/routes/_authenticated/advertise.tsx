@@ -23,20 +23,22 @@ import {
 } from "@/components/PlatformIcon";
 import { getDashboard } from "@/lib/taskora.functions";
 import { getYoutubeVideoMetadata } from "@/lib/watch-video.functions";
-import { createAdvertiseCampaign, listAdvertiseServices } from "@/lib/advertise.functions";
+import { createAdvertiseCampaign, getAdvertisePostingAccess, listAdvertiseServices } from "@/lib/advertise.functions";
 import { SERVICES, FEATURE_FEE_USD, type ServiceDef } from "@/lib/advertise-services";
 import { extractYoutubeId, youtubeWatchUrl } from "@/lib/youtube-url";
 
 export const Route = createFileRoute("/_authenticated/advertise")({
   head: () => ({ meta: [{ title: "Advertise — TASKORA" }] }),
   loader: async () => {
-    const [dashResult, catalogResult] = await Promise.allSettled([
+    const [dashResult, catalogResult, accessResult] = await Promise.allSettled([
       getDashboard(),
       listAdvertiseServices(),
+      getAdvertisePostingAccess(),
     ]);
     return {
       balance: dashResult.status === "fulfilled" ? Number(dashResult.value?.balance ?? 0) : 0,
       catalog: catalogResult.status === "fulfilled" ? catalogResult.value : [],
+      ownerFree: accessResult.status === "fulfilled" && Boolean(accessResult.value?.ownerFree),
     };
   },
   component: AdvertisePage,
@@ -71,7 +73,7 @@ function taskTypeLabel(taskType: string): string {
 }
 
 function AdvertisePage() {
-  const { balance, catalog } = Route.useLoaderData();
+  const { balance, catalog, ownerFree } = Route.useLoaderData();
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [service, setService] = useState<ServiceDef | null>(null);
   const [link, setLink] = useState("");
@@ -157,7 +159,7 @@ function AdvertisePage() {
   const baseTotal = unitCustomer * qtyNum;
   const featureFee = featured ? FEATURE_FEE_USD : 0;
   const total = baseTotal + featureFee;
-  const insufficient = balance < total;
+  const insufficient = !ownerFree && balance < total;
   const ytId = isWatch ? extractYoutubeId(link) : null;
   const detectedMaxSeconds = videoDuration ? Math.min(videoDuration, 10800) : 10800;
 
@@ -289,7 +291,7 @@ function AdvertisePage() {
           verificationMode: isWatch ? "automatic" : verificationMode,
         },
       });
-      setMsg(`Order placed · ${result.task.id.slice(0, 8)}… Waiting for activation.`);
+      setMsg(result.ownerFree ? `Owner task published · reward ${formatUsd(Number(result.task.reward ?? 0))} per completion · ${qtyNum.toLocaleString()} slots available.` : `Order placed · ${result.task.id.slice(0, 8)}… Waiting for activation.`);
       setService(null);
       setPlatform(null);
     } catch (e) {
@@ -329,7 +331,7 @@ function AdvertisePage() {
             {formHeading}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-sky-100/80">
-            {isWatch ? "Paste the YouTube URL, preview the video, set watch time and quantity. Video information is gathered automatically." : "Set your link, quantity, title, steps, and proof. Pricing is catalog-locked (earner reward + TASKORA margin)."}
+            {ownerFree ? "Owner publishing is free: your task goes live without a wallet debit, and eligible users can earn the displayed reward. You cannot earn from your own task." : isWatch ? "Paste the YouTube URL, preview the video, set watch time and quantity. Video information is gathered automatically." : "Set your link, quantity, title, steps, and proof. Pricing is catalog-locked (earner reward + TASKORA margin)."}
           </p>
         </div>
         <div className="space-y-3">
@@ -507,9 +509,11 @@ function AdvertisePage() {
               <div className="flex justify-between"><span>TASKORA margin</span><span className="text-white">{formatUsd(platformFee)}</span></div>
               <div className="flex justify-between"><span>Estimated delivery</span><span className="text-white">{service.delivery.replace("~", "")}</span></div>
               {featured ? <div className="flex justify-between"><span>Feature fee</span><span className="text-white">{formatUsd(featureFee)}</span></div> : null}
-              <div className="flex justify-between border-t border-white/10 pt-2 text-[15px] font-black"><span className="text-white">Total</span><span className="text-emerald-400">{formatUsd(total)}</span></div>
+              <div className="flex justify-between border-t border-white/10 pt-2 text-[15px] font-black"><span className="text-white">{ownerFree ? "Advertiser charge" : "Total"}</span><span className="text-emerald-400">{ownerFree ? "$0.00" : formatUsd(total)}</span></div>
             </div>
-            {insufficient ? (
+            {ownerFree ? (
+              <p className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-200">Owner benefit: publish for free · users still earn the task reward.</p>
+            ) : insufficient ? (
               <p className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-[12px] font-semibold text-red-300">⚠ Wallet: {formatUsd(balance)} (insufficient balance)</p>
             ) : (
               <p className="mt-3 text-[11px] text-white/40">Balance: {formatUsd(balance)}</p>
@@ -517,7 +521,7 @@ function AdvertisePage() {
           </div>
           {msg ? <p className={`text-xs ${msg.includes("placed") || msg.includes("created") ? "text-emerald-300" : "text-amber-300"}`}>{msg}</p> : null}
           <button type="button" disabled={busy || insufficient} onClick={() => void publish()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-sm font-black text-white disabled:opacity-40">
-            🚀 {busy ? "Placing order…" : `Create ${typeLabel} Task — ${formatUsd(total)}`}
+            🚀 {busy ? "Publishing…" : ownerFree ? `Publish Task Free` : `Create ${typeLabel} Task — ${formatUsd(total)}`}
           </button>
         </div>
       </main>
@@ -581,7 +585,7 @@ function AdvertisePage() {
         <ol className="space-y-2.5">
           <li className="flex gap-3"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-black text-sky-200">1</span><div><p className="text-[12px] font-semibold text-white/90">Pick platform & service</p><p className="text-[11px] leading-relaxed text-white/45">Instagram, YouTube, TikTok, Telegram and more — choose the growth action you need.</p></div></li>
           <li className="flex gap-3"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-black text-sky-200">2</span><div><p className="text-[12px] font-semibold text-white/90">Set link, quantity & task details</p><p className="text-[11px] leading-relaxed text-white/45">Paste your URL, choose how many, write the title and steps earners will follow.</p></div></li>
-          <li className="flex gap-3"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-black text-sky-200">3</span><div><p className="text-[12px] font-semibold text-white/90">Pay from wallet & go live</p><p className="text-[11px] leading-relaxed text-white/45">Catalog price (70% earners / 30% TASKORA). Order activates after review.</p></div></li>
+          <li className="flex gap-3"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-black text-sky-200">3</span><div><p className="text-[12px] font-semibold text-white/90">{ownerFree ? "Publish free for other users" : "Pay from wallet & go live"}</p><p className="text-[11px] leading-relaxed text-white/45">{ownerFree ? "Owner campaigns skip wallet payment; eligible users can earn the listed reward, but the owner cannot complete their own task." : "Catalog price (70% earners / 30% TASKORA). Order activates after review."}</p></div></li>
         </ol>
         <div className="mt-3 flex flex-wrap gap-2 border-t border-white/8 pt-3">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] text-white/55"><CheckCircle2 className="size-3 text-emerald-400" /> Catalog pricing</span>
