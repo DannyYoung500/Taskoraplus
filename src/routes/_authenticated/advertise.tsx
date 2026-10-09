@@ -156,7 +156,7 @@ function AdvertisePage() {
   const unitCustomer = isWatch ? customerRate * watchTotalSeconds : customerRate;
   const unitTasker = isWatch ? taskerRate * watchTotalSeconds : taskerRate;
   const unitMargin = isWatch ? marginRate * watchTotalSeconds : marginRate;
-  const earnerPayouts = unitTasker * qtyNum;
+  const earnerPayouts = (ownerFree ? (ownerRewardPerTask ?? unitTasker) : unitTasker) * qtyNum;
   const platformFee = unitMargin * qtyNum;
   const baseTotal = unitCustomer * qtyNum;
   const featureFee = featured ? FEATURE_FEE_USD : 0;
