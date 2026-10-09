@@ -89,6 +89,7 @@ function AdvertisePage() {
   const [verificationMode, setVerificationMode] = useState<"automatic" | "screenshot">("screenshot");
   const [watchMinutes, setWatchMinutes] = useState(1);
   const [watchSeconds, setWatchSeconds] = useState(0);
+  const [ownerRewardPerTask, setOwnerRewardPerTask] = useState<number | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [ytMetadata, setYtMetadata] = useState<{ videoId: string; url: string; title: string; authorName: string; thumbnailUrl: string } | null>(null);
   const youtubePlayerRef = useRef<any>(null);
@@ -140,6 +141,7 @@ function AdvertisePage() {
     );
     setWatchMinutes(1);
     setWatchSeconds(0);
+    setOwnerRewardPerTask(null);
     setVideoDuration(null);
     setYtMetadata(null);
     setMsg(null);
@@ -288,6 +290,7 @@ function AdvertisePage() {
           difficulty,
           screenshotsRequired,
           featured,
+          ownerRewardPerTask: ownerFree ? (ownerRewardPerTask ?? unitTasker) : undefined,
           verificationMode: isWatch ? "automatic" : verificationMode,
         },
       });
@@ -376,6 +379,13 @@ function AdvertisePage() {
                   <input type="number" min={0} max={59} value={watchSeconds} onChange={(e) => setWatchDurationParts(watchMinutes, Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/10 bg-[#141820] px-3 py-2.5 text-sm outline-none" />
                 </div>
               </div>
+            </div>
+          ) : null}
+          {ownerFree ? (
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold text-emerald-200">Reward per successful user (USD)</label>
+              <input type="number" min="0.000001" max="10" step="0.000001" value={ownerRewardPerTask ?? unitTasker} onChange={(e) => setOwnerRewardPerTask(Number(e.target.value))} className="w-full rounded-xl border border-emerald-400/20 bg-[#141820] px-3.5 py-3 text-sm outline-none focus:border-emerald-400/50" />
+              <p className="mt-1 text-[10px] text-white/40">Owner posts are free. Reward is paid to eligible users after verification; max $10 per completion and $1,000 total reward exposure per campaign.</p>
             </div>
           ) : null}
           <div>
