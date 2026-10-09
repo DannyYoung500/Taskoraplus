@@ -12,15 +12,12 @@ import {
   CalendarCheck,
   WalletCards,
   ClipboardList,
-  Flame,
   Trophy,
 } from "lucide-react";
-import { listTasks, getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
+import { getDashboard, dailyCheckin, syncMyTimezone } from "@/lib/taskora.functions";
 import { AppLink } from "@/components/AppLink";
-import { HomeStrongStrip } from "@/components/HomeStrongStrip";
 import { listDailyMissions } from "@/lib/daily-missions.functions";
 import { recordSecuritySignal } from "@/lib/security-engine.functions";
-import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
@@ -80,24 +77,18 @@ const getMyLevelStats = createServerFn({ method: "GET" })
 
 export const Route = createFileRoute("/_authenticated/home")({
   loader: async () => {
-    const [tasks, dash, missions, levelStats] = await Promise.all([
-      listTasks().catch(() => []),
+    const [dash, missions, levelStats] = await Promise.all([
       getDashboard().catch(() => null),
       listDailyMissions().catch(() => []),
       getMyLevelStats().catch(() => ({ level: 1, progress: 0 })),
     ]);
-    return {
-      tasks: tasks.filter((task) => !isDemoTaskTitle(task.title)).slice(0, 8),
-      dash,
-      missions,
-      levelStats,
-    };
+    return { dash, missions, levelStats };
   },
   component: HomePage,
 });
 
 function HomePage() {
-  const { tasks, dash, missions, levelStats } = Route.useLoaderData();
+  const { dash, missions, levelStats } = Route.useLoaderData();
   const transactions = (dash?.transactions ?? []).filter((tx) => !isDemoTransactionLabel(tx.label));
   const rawBalance = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
   const balance = rawBalance <= 0.00005 ? 0 : Math.max(0, rawBalance);
@@ -212,9 +203,6 @@ function HomePage() {
         </AppLink>
       ) : null}
 
-      <HomeStrongStrip />
-
-      {/* Balance — soft, no heavy border */}
       <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#121212] p-4">
         <p className="text-[11px] font-normal text-neutral-500">Total balance</p>
         <p className="mt-1.5 text-[36px] font-semibold leading-none tracking-tight text-neutral-50">
@@ -234,7 +222,6 @@ function HomePage() {
         </AppLink>
       </section>
 
-      {/* Quick links — soft tiles, no borders */}
       <section className="mb-4">
         <div className="grid grid-cols-3 gap-2">
           <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
@@ -242,11 +229,10 @@ function HomePage() {
           <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
           <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
           <Quick to="/ambassador" label="Invite" Icon={Users} />
-          <Quick to="/my-tasks" label="My tasks" Icon={ClipboardList} />
+          <Quick to="/my-tasks" label="My orders" Icon={ClipboardList} />
         </div>
       </section>
 
-      {/* Level — soft */}
       <section className="mb-4 rounded-2xl bg-[#121212] p-3.5">
         <div className="flex items-center gap-3">
           <Trophy className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
@@ -257,10 +243,7 @@ function HomePage() {
           <div className="text-right">
             <p className="text-[12px] font-medium text-orange-400">{progressPct}%</p>
             <div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-orange-400"
-                style={{ width: progressPct + "%" }}
-              />
+              <div className="h-full rounded-full bg-orange-400" style={{ width: progressPct + "%" }} />
             </div>
           </div>
         </div>
@@ -291,11 +274,7 @@ function HomePage() {
         </div>
         <div className="grid grid-cols-3 gap-2">
           {missions.slice(0, 3).map((m: any) => (
-            <AppLink
-              key={m.id}
-              to="/daily-missions"
-              className="rounded-2xl bg-[#121212] p-2.5 active:opacity-90"
-            >
+            <AppLink key={m.id} to="/daily-missions" className="rounded-2xl bg-[#121212] p-2.5 active:opacity-90">
               {m.mission_type === "rewarded_ad" ? (
                 <PlayCircle className="size-4 text-orange-400" strokeWidth={1.75} />
               ) : (
@@ -315,41 +294,21 @@ function HomePage() {
         </div>
       </section>
 
-      <section>
-        <div className="mb-2.5 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-200">
-            <Flame className="size-3.5 text-orange-400" strokeWidth={1.75} /> Top tasks
-          </p>
-          <AppLink to="/tasks" className="text-[11px] font-normal text-orange-400">
-            View all
-          </AppLink>
+      <AppLink
+        to="/tasks"
+        className="flex w-full items-center justify-between rounded-2xl bg-[#121212] px-4 py-3.5 active:opacity-90"
+      >
+        <div className="min-w-0">
+          <p className="text-[14px] font-medium text-neutral-50">Browse all tasks</p>
+          <p className="mt-0.5 text-[11px] text-neutral-500">Earn real USDT · verified campaigns</p>
         </div>
-        <div className="space-y-2">
-          {tasks.length === 0 ? (
-            <p className="rounded-2xl bg-[#121212] p-4 text-[13px] font-normal text-neutral-500">
-              No live tasks yet
-            </p>
-          ) : (
-            tasks.map((t: { id: string; title: string; reward: number; platform: string }) => (
-              <AppLink
-                key={t.id}
-                to="/tasks/$taskId"
-                params={{ taskId: t.id }}
-                className="flex items-center gap-3 rounded-2xl bg-[#121212] p-3 active:opacity-90"
-              >
-                <PlatformLogo platform={t.platform as Platform} size={40} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-neutral-100">{t.title}</p>
-                  <p className="text-[11px] font-normal text-neutral-500">
-                    {platformLabel(t.platform as Platform)} · +{formatUsd(t.reward)}
-                  </p>
-                </div>
-                <span className="text-[11px] font-medium text-orange-400">Start</span>
-              </AppLink>
-            ))
-          )}
-        </div>
-      </section>
+        <span
+          className="inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-[11px] font-semibold text-white"
+          style={{ background: ACCENT_GRAD }}
+        >
+          Open →
+        </span>
+      </AppLink>
     </main>
   );
 }
