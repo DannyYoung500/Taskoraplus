@@ -207,13 +207,17 @@ export const createAdvertiseCampaign=createServerFn({method:"POST"}).middleware(
 
   // Owner-sponsored campaigns are published without advertiser wallet debit.
   if (ownerFree) {
-    await supabaseAdmin.from("campaigns").update({
+    const { error: sponsoredCampaignError } = await supabaseAdmin.from("campaigns").update({
       owner_sponsored: true,
       funding_status: "sponsored",
       funding_reserved: 0,
       status: "active",
       budget: customerTotalWithFeature,
     } as never).eq("id", campaign.id);
+    if (sponsoredCampaignError) {
+      await supabaseAdmin.from("campaigns").delete().eq("id", campaign.id);
+      throw new Error(sponsoredCampaignError.message);
+    }
   } else {
     const {error:fundingError}=await supabaseAdmin.rpc("reserve_campaign_budget",{p_advertiser_id:context.userId,p_campaign_id:campaign.id,p_amount:customerTotalWithFeature});
     if(fundingError){ await supabaseAdmin.rpc("release_campaign_budget",{p_campaign_id:campaign.id});
