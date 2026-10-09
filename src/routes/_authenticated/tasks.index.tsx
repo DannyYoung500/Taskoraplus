@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CheckCircle2, DollarSign, Search, Sparkles, Users } from "lucide-react";
+import { CheckCircle2, Clock3, DollarSign, Search, Sparkles, Users } from "lucide-react";
 import { listTasks } from "@/lib/taskora.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
-import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
+import { TASKORA_LOGO } from "@/lib/brand";
 import { formatUsd, isDemoTaskTitle } from "@/lib/taskora-display";
 import { AppLink } from "@/components/AppLink";
 
@@ -27,6 +27,20 @@ export const Route = createFileRoute("/_authenticated/tasks/")({
   head: () => ({ meta: [{ title: "Tasks — TASKORA" }] }),
   component: TasksScreen,
 });
+
+function difficultyLabel(d?: string | null) {
+  const v = String(d || "easy").toLowerCase();
+  if (v === "hard") return "HARD";
+  if (v === "medium") return "MEDIUM";
+  return "EASY";
+}
+
+function estimateMins(seconds?: number | null) {
+  const s = Math.max(0, Number(seconds || 0));
+  if (s <= 0) return "2 mins";
+  if (s < 60) return `${s}s`;
+  return `${Math.max(1, Math.round(s / 60))} mins`;
+}
 
 function TasksScreen() {
   const { rows } = Route.useLoaderData();
@@ -158,47 +172,74 @@ function TasksScreen() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {tasks.map((t) => {
+            const slotsLeft = Number(t.slots_left ?? 0);
+            const slotsTotal = Number(t.slots_total ?? 0);
             const featured = Boolean((t as { featured?: boolean }).featured);
+            const almostFull =
+              slotsTotal > 0 && slotsLeft > 0 && slotsLeft / slotsTotal <= 0.2;
+            const diff = difficultyLabel((t as { difficulty?: string }).difficulty);
             const secs = Number((t as { seconds?: number }).seconds ?? 0);
+
             return (
-              <AppLink
-                key={t.id}
-                to="/tasks/$taskId"
-                params={{ taskId: String(t.id) }}
-                className="flex w-full items-center gap-3 rounded-2xl bg-[#121212] p-3 text-left active:scale-[0.995]"
-              >
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#1a1a1a]">
-                  <PlatformLogo platform={t.platform as Platform} size={28} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-[14px] font-medium text-neutral-50">{t.title}</p>
-                    {featured ? (
-                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-orange-400">
-                        <Sparkles className="size-2.5" /> Hot
-                      </span>
-                    ) : null}
+              <article key={t.id} className="rounded-2xl bg-[#121212] p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#1a1a1a]">
+                    <PlatformLogo platform={t.platform as Platform} size={28} />
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] text-neutral-500">
-                    {String((t as { advertiser?: string }).advertiser || "TASKORA")} ·{" "}
-                    {platformLabel(t.platform as Platform)}
-                    {secs > 0 ? ` · ${secs}s` : ""}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-medium leading-snug text-neutral-50">
+                          {t.title}
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-neutral-500">
+                          {platformLabel(t.platform as Platform)}
+                        </p>
+                      </div>
+                      {featured ? (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-400">
+                          <Sparkles className="size-2.5" /> Featured
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-2.5 flex items-center justify-between gap-2">
+                      <span className="text-[18px] font-semibold text-emerald-400">
+                        {formatUsd(Number(t.reward))}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-full bg-neutral-800 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-300">
+                          {diff}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-neutral-800 px-2.5 py-1 text-[10px] font-medium text-neutral-400">
+                          <Clock3 className="size-3" strokeWidth={1.75} />
+                          {estimateMins(secs)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-neutral-600">
+                        {slotsLeft}
+                        {slotsTotal ? ` / ${slotsTotal}` : ""} spots available
+                      </p>
+                      {almostFull ? (
+                        <span className="text-[11px] font-medium text-orange-400">Almost full!</span>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="text-[14px] font-semibold text-emerald-400">
-                    {formatUsd(Number(t.reward))}
-                  </span>
-                  <span
-                    className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
-                    style={{ background: ACCENT_GRAD }}
-                  >
-                    Start →
-                  </span>
-                </div>
-              </AppLink>
+
+                <AppLink
+                  to="/tasks/$taskId"
+                  params={{ taskId: String(t.id) }}
+                  className="mt-3.5 flex w-full items-center justify-center rounded-xl bg-orange-500 py-3 text-[14px] font-medium text-[#0a0a0a]"
+                >
+                  Start Task
+                </AppLink>
+              </article>
             );
           })}
         </div>
