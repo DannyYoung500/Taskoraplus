@@ -1,11 +1,9 @@
 /**
  * Internal navigation without <a href>.
- * Telegram long-press on real links shows “Open link” with the URL —
- * AppLink uses a <button> + router.navigate so that sheet never appears.
- * External https:// links should stay as normal <a>.
+ * Speed: haptic + immediate navigate + touchstart preload + no double-fire.
  */
 import { useRouter } from "@tanstack/react-router";
-import type { CSSProperties, MouseEvent, ReactNode } from "react";
+import { useRef, type CSSProperties, type MouseEvent, type ReactNode, type TouchEvent } from "react";
 
 type AppLinkProps = {
   to: string;
@@ -21,6 +19,17 @@ type AppLinkProps = {
   disabled?: boolean;
 };
 
+function hapticLight() {
+  try {
+    const tg = (window as unknown as {
+      Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred?: (s: string) => void } } };
+    }).Telegram?.WebApp;
+    tg?.HapticFeedback?.impactOccurred?.("light");
+  } catch {
+    /* soft */
+  }
+}
+
 export function AppLink({
   to,
   params,
@@ -34,6 +43,39 @@ export function AppLink({
   ...rest
 }: AppLinkProps) {
   const router = useRouter();
+  const navigating = useRef(false);
+
+  function go() {
+    if (disabled || navigating.current) return;
+    navigating.current = true;
+    hapticLight();
+    void router
+      .navigate({
+        to: to as never,
+        params: params as never,
+        search: search as never,
+        replace,
+      })
+      .finally(() => {
+        setTimeout(() => {
+          navigating.current = false;
+        }, 400);
+      });
+  }
+
+  function onTouchStart(e: TouchEvent<HTMLButtonElement>) {
+    if (disabled) return;
+    try {
+      void router.preloadRoute({
+        to: to as never,
+        params: params as never,
+        search: search as never,
+      } as never);
+    } catch {
+      /* soft */
+    }
+    void e;
+  }
 
   return (
     <button
@@ -45,18 +87,17 @@ export function AppLink({
         WebkitAppearance: "none",
         display: "flex",
         boxSizing: "border-box",
+        touchAction: "manipulation",
+        WebkitTapHighlightColor: "transparent",
         ...style,
       }}
       onClick={(e) => {
         onClick?.(e);
         if (e.defaultPrevented || disabled) return;
-        void router.navigate({
-          to: to as never,
-          params: params as never,
-          search: search as never,
-          replace,
-        });
+        e.stopPropagation();
+        go();
       }}
+      onTouchStart={onTouchStart}
       onContextMenu={(e) => e.preventDefault()}
       draggable={false}
       {...rest}
