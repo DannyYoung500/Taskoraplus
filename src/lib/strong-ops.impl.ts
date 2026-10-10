@@ -142,7 +142,13 @@ export async function assertAddressAllowlisted(opts: {
       "Address saved. For security, wait 24 hours before the first withdrawal to a new payout address.",
     );
   } catch (e) {
-    if (e instanceof Error && (e.message.includes("cool") || e.message.includes("24") || e.message.includes("wait") || e.message.includes("Address saved"))) {
+    if (
+      e instanceof Error &&
+      (e.message.includes("cool") ||
+        e.message.includes("24") ||
+        e.message.includes("wait") ||
+        e.message.includes("Address saved"))
+    ) {
       throw e;
     }
     console.warn("[allowlist]", e);
@@ -174,7 +180,9 @@ export async function assertActionRateLimit(opts: {
   }
 }
 
-export async function isReferralUnlocked(userId: string): Promise<{ unlocked: boolean; reason?: string }> {
+export async function isReferralUnlocked(
+  userId: string,
+): Promise<{ unlocked: boolean; reason?: string }> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { count: tasks } = await supabaseAdmin
@@ -235,7 +243,9 @@ export async function maybeCreditReferralShare(opts: {
         .select("id, device_fp")
         .in("id", [inviterId, opts.refereeUserId]);
       const inv = (list ?? []).find((r) => r.id === inviterId) as { device_fp?: string } | undefined;
-      const ref = (list ?? []).find((r) => r.id === opts.refereeUserId) as { device_fp?: string } | undefined;
+      const ref = (list ?? []).find((r) => r.id === opts.refereeUserId) as
+        | { device_fp?: string }
+        | undefined;
       if (inv?.device_fp && ref?.device_fp && inv.device_fp === ref.device_fp && inv.device_fp.length >= 8) {
         return { credited: false, reason: "sybil_same_device" };
       }
@@ -257,7 +267,7 @@ export async function maybeCreditReferralShare(opts: {
   }
 }
 
-export async function flagProofForReviewQueue(opts: {
+export async function flagProofForReviewQueue(_opts: {
   userId: string;
   submissionHint?: string;
   proofText?: string | null;
@@ -287,14 +297,14 @@ export async function applyGraduatedWithdrawalHold(opts: {
   }
 }
 
-export async function assertIpFamilyVelocity(opts: {
+export async function assertIpFamilyVelocity(_opts: {
   userId: string;
   ipHint?: string | null;
 }): Promise<{ blocked?: string; dualRequired?: boolean }> {
   return {};
 }
 
-export function assertGeoMethodMatch(opts: {
+export function assertGeoMethodMatch(_opts: {
   countryCode: string;
   method: string;
   hardBlock?: boolean;
@@ -302,11 +312,13 @@ export function assertGeoMethodMatch(opts: {
   return {};
 }
 
+/** Never required for Telegram — Mini App already proves Telegram identity. */
 export async function assertConnectedAccountForPlatform(opts: {
   userId: string;
   platform: string;
 }): Promise<void> {
-  const p = opts.platform.toLowerCase();
+  const p = String(opts.platform || "").toLowerCase();
+  if (p === "telegram" || p === "discord") return;
   if (!RULES.requireConnectedAccountPlatforms.includes(p as never)) return;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -316,7 +328,9 @@ export async function assertConnectedAccountForPlatform(opts: {
       .eq("user_id", opts.userId)
       .ilike("platform", p);
     if ((count ?? 0) < 1) {
-      throw new Error(`Connect your ${opts.platform} account in Connected Accounts before submitting.`);
+      throw new Error(
+        `Connect your ${opts.platform} account in Connected Accounts before submitting.`,
+      );
     }
   } catch (e) {
     if (e instanceof Error && e.message.includes("Connect your")) throw e;
@@ -343,7 +357,9 @@ export async function assertPlatformDailyCompletionCap(opts: {
   }
 }
 
-export async function assertEarnerQuality(opts: { userId: string }): Promise<{ rejectRate: number; samples: number }> {
+export async function assertEarnerQuality(opts: {
+  userId: string;
+}): Promise<{ rejectRate: number; samples: number }> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin
@@ -355,7 +371,9 @@ export async function assertEarnerQuality(opts: { userId: string }): Promise<{ r
       .limit(20);
     const samples = (rows ?? []).length;
     if (samples < 5) return { rejectRate: 0, samples };
-    const rejected = (rows ?? []).filter((r: { status?: string }) => r.status === "rejected").length;
+    const rejected = (rows ?? []).filter(
+      (r: { status?: string }) => r.status === "rejected",
+    ).length;
     const rejectRate = rejected / samples;
     if (rejectRate >= RULES.earnerMaxRejectRate) {
       throw new Error(
@@ -369,14 +387,14 @@ export async function assertEarnerQuality(opts: { userId: string }): Promise<{ r
   }
 }
 
-export async function assertPlatformSubmitCooldown(opts: {
+export async function assertPlatformSubmitCooldown(_opts: {
   userId: string;
   platform: string;
 }): Promise<void> {
   /* soft */
 }
 
-export async function assertSoftKycForWithdrawal(opts: {
+export async function assertSoftKycForWithdrawal(_opts: {
   userId: string;
 }): Promise<{ ok: boolean; reason?: string }> {
   return { ok: true };
