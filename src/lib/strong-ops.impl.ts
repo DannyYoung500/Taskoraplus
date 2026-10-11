@@ -312,13 +312,17 @@ export function assertGeoMethodMatch(_opts: {
   return {};
 }
 
-/** Never required for Telegram — Mini App already proves Telegram identity. */
+/**
+ * Connected Accounts gate.
+ * Telegram ONLY is exempt (Mini App already proves Telegram identity).
+ * Discord MUST be connected before completing Discord tasks.
+ */
 export async function assertConnectedAccountForPlatform(opts: {
   userId: string;
   platform: string;
 }): Promise<void> {
   const p = String(opts.platform || "").toLowerCase();
-  if (p === "telegram" || p === "discord") return;
+  if (p === "telegram") return;
   if (!RULES.requireConnectedAccountPlatforms.includes(p as never)) return;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
