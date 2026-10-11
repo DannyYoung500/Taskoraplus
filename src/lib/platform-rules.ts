@@ -38,8 +38,13 @@ export const RULES = {
   advertiserTrustMaxCampaignUsd: 25,
   minScreenshotsFollowLike: 2,
   maxCompletionsPerPlatform24h: 25,
-  /** Telegram excluded — users already authenticated via Telegram Mini App */
+  /**
+   * Platforms that require a Connected Account before submit.
+   * Telegram is NEVER here — Mini App already proves Telegram identity.
+   * Discord IS required — user must link Discord before join/screenshot Discord tasks.
+   */
   requireConnectedAccountPlatforms: [
+    "discord",
     "instagram",
     "tiktok",
     "youtube",
