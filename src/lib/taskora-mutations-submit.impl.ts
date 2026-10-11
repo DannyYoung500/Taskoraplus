@@ -114,7 +114,9 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
         assertEarnerQuality,
         assertPlatformSubmitCooldown,
       } = await import("@/lib/strong-ops");
-      if (platform !== "telegram" && platform !== "discord") {
+      // Telegram Mini App already authenticates Telegram identity.
+      // Discord MUST connect Discord account before submit.
+      if (platform !== "telegram") {
         await assertConnectedAccountForPlatform({ userId, platform });
       }
       await assertPlatformDailyCompletionCap({ userId, platform });
@@ -140,15 +142,13 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     }
 
     const metadata = ((task as { task_metadata?: unknown }).task_metadata ?? {}) as Record<string, unknown>;
-    const verificationMethods = Array.isArray(metadata.verification_methods)
-      ? metadata.verification_methods.map(String)
-      : [];
     const proofMode = String((task as { proof?: string }).proof ?? "").toLowerCase();
+    // Source of truth = task.proof chosen at publish time.
+    // If advertiser picked "screenshot", never auto-verify — even for join tasks.
     const isAutoProof =
-      proofText === "auto:telegram_membership" ||
-      proofText.startsWith("auto:") ||
-      verificationMethods.includes("automatic") ||
-      (proofMode === "auto" && ["telegram", "discord"].includes(platform));
+      proofMode === "auto" ||
+      proofMode === "automatic" ||
+      (proofText.startsWith("auto:") && proofMode !== "screenshot" && proofMode !== "manual" && proofMode !== "image");
 
     let autoVerified = false;
     if (isAutoProof && ["telegram", "discord"].includes(platform)) {
