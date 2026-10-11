@@ -1,7 +1,7 @@
 import { createFileRoute, notFound, redirect, useRouter } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, Camera, CheckCircle2, Clock3, Copy, ExternalLink, ListChecks, AlertTriangle, ShieldCheck, X,
+  ArrowLeft, Camera, CheckCircle2, Copy, ExternalLink, ListChecks, AlertTriangle, ShieldCheck, X,
 } from "lucide-react";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
 import { getTask } from "@/lib/taskora.functions";
@@ -52,6 +52,7 @@ function TaskDetail() {
   const link = String(task.link ?? "").trim();
   const screenshotsRequired = Math.max(1, Math.min(3, Number((task as { screenshots_required?: number }).screenshots_required ?? 1)));
   const needsUsername = !isAuto && ["x", "instagram", "tiktok", "youtube", "facebook", "threads"].includes(platform);
+  const taskIdStr = String((task as { id?: string }).id ?? "");
   const defaultSteps = useMemo(() => {
     if (steps.length) return steps;
     if (isAuto && platform === "telegram") {
@@ -73,7 +74,7 @@ function TaskDetail() {
   async function onAutoVerify() {
     setBusy(true); setError(null); setAutoStatus("Checking membership…");
     try {
-      await submitTaskGuarded({ data: { taskId: task.id, proofText: "auto:telegram_membership" } });
+      await submitTaskGuarded({ data: { taskId: taskIdStr, proofText: "auto:telegram_membership" } });
       setSubmitted(true); setAutoStatus("Verified · membership confirmed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Verification failed"); setAutoStatus(null);
@@ -87,7 +88,7 @@ function TaskDetail() {
       const filled = shots.filter(Boolean);
       if (filled.length < screenshotsRequired) throw new Error(`Add ${screenshotsRequired} screenshot(s).`);
       const proofText = [proofUsername.trim() ? `@${proofUsername.trim().replace(/^@/, "")}` : "", proofNote.trim()].filter(Boolean).join(" · ") || "screenshot_proof";
-      await submitTaskGuarded({ data: { taskId: task.id, proofText, proofUrl: filled[0] } });
+      await submitTaskGuarded({ data: { taskId: taskIdStr, proofText, proofUrl: filled[0] } });
       setSubmitted(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not submit proof");
@@ -101,6 +102,8 @@ function TaskDetail() {
     reader.onload = () => setShots((prev) => { const n = [...prev]; n[index] = String(reader.result || ""); return n; });
     reader.readAsDataURL(file);
   }
+
+  const quitCls = "mt-2 flex w-full items-center justify-center rounded-2xl border border-red-500/35 bg-red-500/10 py-3 text-[13px] font-medium text-red-400 disabled:opacity-50";
 
   if (submitted) {
     return (
@@ -121,7 +124,7 @@ function TaskDetail() {
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#080808] px-4 pb-28 pt-3 text-neutral-100">
       <div className="mb-3 flex items-center justify-between">
         <AppLink to="/tasks" className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500"><ArrowLeft className="size-4" /> Back</AppLink>
-        <button type="button" onClick={() => void router.navigate({ to: "/tasks" })} className="inline-flex items-center gap-1 rounded-full bg-[#1a1a1a] px-3 py-1.5 text-[11px] text-neutral-400"><X className="size-3.5" /> Quit task</button>
+        <button type="button" onClick={() => void router.navigate({ to: "/tasks" })} className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/15 px-3 py-1.5 text-[11px] font-medium text-red-400"><X className="size-3.5" /> Quit task</button>
       </div>
 
       <section className="rounded-2xl bg-[#121212] p-4">
@@ -169,7 +172,7 @@ function TaskDetail() {
           <button type="button" disabled={busy} onClick={() => void onAutoVerify()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-[14px] font-medium text-[#0a0a0a] disabled:opacity-50">
             <ShieldCheck className="size-4" /> {busy ? "Verifying…" : "Verify membership"}
           </button>
-          <button type="button" disabled={busy} onClick={() => void router.navigate({ to: "/tasks" })} className="mt-2 flex w-full items-center justify-center rounded-2xl bg-[#1a1a1a] py-3 text-[13px] text-neutral-400">Quit task</button>
+          <button type="button" disabled={busy} onClick={() => void router.navigate({ to: "/tasks" })} className={quitCls}>Quit task</button>
           {error ? <p className="mt-3 text-center text-[12px] text-amber-300">{error}</p> : null}
           {autoStatus ? <p className="mt-2 text-center text-[12px] text-emerald-400">{autoStatus}</p> : null}
         </section>
@@ -194,7 +197,7 @@ function TaskDetail() {
           <button type="button" disabled={busy || shotsFilled < screenshotsRequired} onClick={() => void onSubmitProof()} className="mt-3 flex w-full items-center justify-center rounded-2xl bg-orange-500 py-3.5 text-[14px] font-medium text-[#0a0a0a] disabled:opacity-40">
             {busy ? "Submitting…" : "Submit Proof"}
           </button>
-          <button type="button" disabled={busy} onClick={() => void router.navigate({ to: "/tasks" })} className="mt-2 flex w-full items-center justify-center rounded-2xl bg-[#1a1a1a] py-3 text-[13px] text-neutral-400">Quit task</button>
+          <button type="button" disabled={busy} onClick={() => void router.navigate({ to: "/tasks" })} className={quitCls}>Quit task</button>
           {error ? <p className="mt-2 text-center text-[12px] text-amber-300">{error}</p> : null}
         </section>
       )}
