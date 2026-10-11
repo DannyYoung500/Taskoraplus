@@ -41,10 +41,12 @@ function TaskDetail() {
   const platform = String(task.platform || "other").toLowerCase() as Platform;
   const proofMode = String((task as { proof?: string }).proof ?? "screenshot").toLowerCase();
   const taskType = String((task as { task_type?: string }).task_type || "").toLowerCase();
-  const isAuto =
-    proofMode === "auto" || proofMode === "automatic" ||
-    (platform === "telegram" && ["join", "subscribe", "bot_start", "start"].some((k) => taskType.includes(k)));
-  const isTgJoin = platform === "telegram" && (isAuto || ["join", "subscribe", "bot_start"].some((k) => taskType.includes(k)));
+  // Source of truth = proof chosen when the advertiser published the task.
+  // screenshot → screenshot UI · auto/automatic → Verify membership
+  const isAuto = proofMode === "auto" || proofMode === "automatic";
+  const isTgJoin =
+    platform === "telegram" &&
+    (isAuto || ["join", "subscribe", "bot_start", "start"].some((k) => taskType.includes(k)));
   const steps: string[] = Array.isArray((task as { steps?: string[] }).steps)
     ? (task as { steps: string[] }).steps
     : String((task as { instructions?: string }).instructions || "").split(/\n/).map((s) => s.trim()).filter(Boolean);
