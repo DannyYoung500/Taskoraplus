@@ -22,6 +22,7 @@ function proofOf(task: any) {
   return String(task?.proof || "").toLowerCase();
 }
 
+/** Telegram auto = proof auto/automatic OR join/subscribe/bot_start task types */
 function isTelegramJoin(task: any) {
   if (platformOf(task) !== "telegram") return false;
   const t = typeOf(task);
@@ -73,7 +74,7 @@ function telegramTarget(link: string): string {
   }
   if (/t\.me\/(\+|joinchat\/)/i.test(raw)) {
     throw new Error(
-      "Private invite links cannot be auto-verified unless the TASKORA bot is an admin. Use Screenshot verification, or a public @username link.",
+      "Private invite links cannot be auto-verified unless the TASKORA bot is already an admin in that chat. Use Screenshot verification, or add the bot as admin and use a public @username link.",
     );
   }
   throw new Error(
@@ -112,7 +113,7 @@ async function verifyTelegram(userId: string, task: any): Promise<AutoResult> {
     return {
       ok: false,
       method: "telegram_membership",
-      reason: "Your Telegram ID is missing. Re-open the Mini App from Telegram and try again.",
+      reason: "Your Telegram ID is missing from your profile. Re-open the Mini App from Telegram and try again.",
     };
   }
   let target: string;
@@ -143,7 +144,7 @@ async function verifyTelegram(userId: string, task: any): Promise<AutoResult> {
           ok: false,
           method: "telegram_membership",
           reason:
-            "Bot cannot see this channel yet. Advertiser must add the TASKORA bot as admin (or use a public @username).",
+            "Bot cannot see this channel yet. Advertiser must add the TASKORA bot as admin (or use a public @username). Try again after joining, or use screenshot if configured.",
         };
       }
       return { ok: false, method: "telegram_membership", reason: desc };
@@ -158,8 +159,7 @@ async function verifyTelegram(userId: string, task: any): Promise<AutoResult> {
           ok: false,
           method: "telegram_membership",
           externalStatus: status,
-          reason:
-            "You are not a member of the required Telegram channel/group yet. Open the link, join, then Verify again.",
+          reason: "You are not a member of the required Telegram channel/group yet. Open the link, join, then Verify again.",
         };
   } catch {
     return {
@@ -185,13 +185,14 @@ async function verifyDiscord(userId: string, task: any): Promise<AutoResult> {
       reason: "Connect your Discord account in Connected Accounts before verifying this task.",
     };
   }
-  const token = process.env["DISCORD_BOT_TOKEN"] || "";
+  const { resolveDiscordBotToken } = await import("@/lib/platform-tokens");
+  const token = (await resolveDiscordBotToken()) || "";
   if (!token.trim()) {
     return {
       ok: false,
       method: "discord_membership",
       reason:
-        "Discord auto-verify needs DISCORD_BOT_TOKEN (bot must be in the server). Connect Discord is still required.",
+        "Discord auto-verify needs a bot token. Owner: set DISCORD_BOT_TOKEN in env or paste it in Owner → Settings → Platforms. Bot must be invited to the server.",
     };
   }
   let code: string;
@@ -214,7 +215,10 @@ async function verifyDiscord(userId: string, task: any): Promise<AutoResult> {
       `https://discord.com/api/v10/invites/${encodeURIComponent(code)}?with_counts=true`,
       { headers, signal: AbortSignal.timeout(12_000) },
     );
-    const invite = (await inviteResponse.json()) as { guild?: { id?: string }; message?: string };
+    const invite = (await inviteResponse.json()) as {
+      guild?: { id?: string };
+      message?: string;
+    };
     if (!inviteResponse.ok || !invite.guild?.id) {
       return {
         ok: false,
@@ -242,7 +246,7 @@ async function verifyDiscord(userId: string, task: any): Promise<AutoResult> {
         ok: false,
         method: "discord_membership",
         reason:
-          "TASKORA bot cannot inspect that server. Advertiser must invite the bot, or use Screenshot verification.",
+          "TASKORA bot cannot inspect that server (not invited / missing permissions). Advertiser must invite the bot, or use Screenshot verification.",
       };
     }
     return {
