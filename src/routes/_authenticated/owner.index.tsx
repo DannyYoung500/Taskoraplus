@@ -43,6 +43,7 @@ const NAV = [
   { to: "/owner/withdrawals", label: "Withdrawals", icon: Wallet },
   { to: "/owner/deposits", label: "Deposits", icon: Wallet },
   { to: "/owner/health", label: "System Health", icon: Activity },
+  { to: "/owner/platforms", label: "Platforms", icon: Shield },
   { to: "/owner/fraud", label: "Fraud / Fortress", icon: Shield },
   { to: "/owner/payout-policy", label: "Payout Policy", icon: Settings },
   { to: "/owner/economy", label: "Economy", icon: Settings },
@@ -182,7 +183,7 @@ function OwnerHub() {
               {[
                 ["/owner/reviews", "Review tasks", ClipboardCheck],
                 ["/owner/withdrawals", "Payouts", Wallet],
-                ["/owner/settings?tab=gate", "Telegram Gate", Shield],
+                ["/owner/platforms", "Platform tokens", Shield],
                 ["/owner/settings", "Settings", Settings],
               ].map(([to, title, Icon]) => (
                 <AppLink
@@ -252,11 +253,11 @@ function OwnerHub() {
                 {notifyBusy ? "Sending…" : "Test new user"}
               </button>
               <AppLink
-                to="/owner/settings?tab=gate"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[11px] font-bold text-sky-200"
+                to="/owner/platforms"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/25 bg-violet-500/10 px-3 py-2 text-[11px] font-bold text-violet-200"
               >
                 <Shield className="size-3.5" />
-                Open Telegram Gate
+                Platform tokens
               </AppLink>
             </div>
             {notifyMsg ? (
