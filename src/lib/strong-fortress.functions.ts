@@ -1,6 +1,10 @@
 /**
- * Strong Fortress — daily earn cap, impossible progression, post-verify hooks,
- * nightly suite (includes membership leave-check).
+ * Strong Fortress — next-tier anti-fraud for TASKORA.
+ * - Daily earn cap (per user)
+ * - Impossible progression (burst verifies across many campaigns)
+ * - Post-verify hooks (escrow touch, reject-spike auto-pause)
+ * - Unified owner/cron nightly runner (includes membership leave-check)
+ * Soft-fail friendly; never blocks owner tooling.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -20,6 +24,7 @@ async function assertOwner(userId: string) {
   await ao(userId);
 }
 
+/** Rolling 24h reward earnings (tasks + watch + bonuses). */
 export async function assertDailyEarnCap(opts: {
   userId: string;
   addUsd: number;
@@ -109,8 +114,11 @@ export async function onSubmissionVerified(opts: {
   } catch {
     /* soft */
   }
+
   try {
-    if (opts.taskId) await maybeAutoPauseTaskOnRejectSpike(opts.taskId);
+    if (opts.taskId) {
+      await maybeAutoPauseTaskOnRejectSpike(opts.taskId);
+    }
   } catch {
     /* soft */
   }
