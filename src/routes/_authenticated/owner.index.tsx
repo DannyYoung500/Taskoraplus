@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Activity,
@@ -14,6 +14,7 @@ import {
   Shield,
   Users,
   Wallet,
+  Bell,
 } from "lucide-react";
 import { loadOwnerDashboard } from "@/lib/owner-dashboard.loader";
 import { TaskoraLogo } from "@/components/TaskoraLogo";
@@ -23,6 +24,7 @@ import {
   ownerTestWithdrawalNotify,
   ownerTestNewUserNotify,
 } from "@/lib/owner-notify-tests";
+import { AppLink } from "@/components/AppLink";
 
 export const Route = createFileRoute("/_authenticated/owner/")({
   loader: async () => loadOwnerDashboard(),
@@ -40,6 +42,8 @@ const NAV = [
   { to: "/owner/reviews", label: "Reviews", icon: CheckCircle2 },
   { to: "/owner/withdrawals", label: "Withdrawals", icon: Wallet },
   { to: "/owner/deposits", label: "Deposits", icon: Wallet },
+  { to: "/owner/health", label: "System Health", icon: Activity },
+  { to: "/owner/fraud", label: "Fraud / Fortress", icon: Shield },
   { to: "/owner/payout-policy", label: "Payout Policy", icon: Settings },
   { to: "/owner/economy", label: "Economy", icon: Settings },
   { to: "/owner/settings", label: "Settings", icon: Settings },
@@ -137,14 +141,14 @@ function OwnerHub() {
         <div className="mx-auto max-w-5xl px-4 py-5">
           <nav className="mb-5 flex gap-2 overflow-x-auto pb-1">
             {NAV.map(({ to, label, icon: Icon }) => (
-              <Link
+              <AppLink
                 key={label}
                 to={to as any}
                 className="flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-400/15 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:border-cyan-400/30 hover:text-cyan-200"
               >
                 <Icon className="size-3.5 text-cyan-400/80" />
                 {label}
-              </Link>
+              </AppLink>
             ))}
           </nav>
 
@@ -181,7 +185,7 @@ function OwnerHub() {
                 ["/owner/settings?tab=gate", "Telegram Gate", Shield],
                 ["/owner/settings", "Settings", Settings],
               ].map(([to, title, Icon]) => (
-                <Link
+                <AppLink
                   key={title as string}
                   to={to as any}
                   className="flex items-center gap-2.5 rounded-xl border border-blue-400/10 bg-blue-500/[0.06] p-3 hover:border-cyan-400/25"
@@ -191,7 +195,7 @@ function OwnerHub() {
                   </span>
                   <span className="min-w-0 flex-1 text-[11px] font-bold">{title as string}</span>
                   <ChevronRight className="size-3.5 text-cyan-400/50" />
-                </Link>
+                </AppLink>
               ))}
             </div>
           </section>
@@ -247,13 +251,13 @@ function OwnerHub() {
                 <Users className="size-3.5" />
                 {notifyBusy ? "Sending…" : "Test new user"}
               </button>
-              <Link
-                to={"/owner/settings?tab=gate" as any}
+              <AppLink
+                to="/owner/settings?tab=gate"
                 className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[11px] font-bold text-sky-200"
               >
                 <Shield className="size-3.5" />
                 Open Telegram Gate
-              </Link>
+              </AppLink>
             </div>
             {notifyMsg ? (
               <p className="mt-3 text-[11px] text-amber-100/90">{notifyMsg}</p>
@@ -285,12 +289,12 @@ function OwnerHub() {
                   <Send className="size-3.5" />
                   {digestBusy ? "Sending…" : "Ops digest"}
                 </button>
-                <Link
+                <AppLink
                   to="/owner/settings"
                   className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[11px] font-bold text-cyan-200"
                 >
                   Settings
-                </Link>
+                </AppLink>
               </div>
             </div>
             {digestMsg ? (
@@ -318,9 +322,9 @@ function QueueCard({
     <div className="overflow-hidden rounded-2xl border border-cyan-400/10 bg-[#08172a]">
       <div className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3">
         <h2 className="text-sm font-black">{title}</h2>
-        <Link to={href as any} className="text-[10px] font-bold text-cyan-300">
+        <AppLink to={href as any} className="text-[10px] font-bold text-cyan-300">
           View all
-        </Link>
+        </AppLink>
       </div>
       <div className="divide-y divide-white/[0.04]">
         {rows.length === 0 ? (
