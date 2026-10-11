@@ -1,22 +1,21 @@
 /**
- * Membership re-check (20–72h) — Telegram + Discord joins.
- * Reject leavers, clawback reward, restore slot.
+ * Membership re-check (20–72h) — re-verify Telegram + Discord joins,
+ * reject leavers, clawback reward, restore slot, audit_log.
+ * Owner + cron call runMembershipRecheckInternal.
+ * Discord path requires DISCORD_BOT_TOKEN + connected Discord account.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertOwner } from "@/lib/owner-guard.server";
 
-async function botTokenTg(): Promise<string | null> {
-  const t =
-    process.env["BOT_TOKEN"] ||
-    process.env["TELEGRAM_BOT_TOKEN"] ||
-    process.env["TG_BOT_TOKEN"] ||
-    "";
-  return t.trim() || null;
+async function botToken(): Promise<string | null> {
+  const { resolveTelegramBotToken } = await import("@/lib/platform-tokens");
+  return resolveTelegramBotToken();
 }
 
-function discordToken(): string | null {
-  return String(process.env["DISCORD_BOT_TOKEN"] || "").trim() || null;
+async function discordBotToken(): Promise<string | null> {
+  const { resolveDiscordBotToken } = await import("@/lib/platform-tokens");
+  return resolveDiscordBotToken();
 }
 
 async function tgGetChatMember(
@@ -60,35 +59,36 @@ function chatRefFromLink(link: string): string | null {
 }
 
 function discordInviteCode(link: string): string | null {
-  const m = String(link || "").match(
-    /discord(?:\.gg|app\.com\/invite|\.com\/invite)\/([A-Za-z0-9-]+)/i,
-  );
+  const raw = String(link || "").trim();
+  const m = raw.match(/discord(?:\.gg|app\.com\/invite|\.com\/invite)\/([A-Za-z0-9-]+)/i);
   return m ? m[1] : null;
 }
 
+/** Resolve invite → guild id, then check member. */
 async function discordMemberStatus(
   token: string,
   inviteCode: string,
   discordUserId: string,
 ): Promise<"member" | "left" | "unknown"> {
-  const headers = {
-    Authorization: `Bot ${token}`,
-    "Content-Type": "application/json",
-    "User-Agent": "TASKORA/2.0",
-  };
   try {
-    const inviteResponse = await fetch(
+    const headers = {
+      Authorization: `Bot ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "TASKORA/2.0",
+    };
+    const invR = await fetch(
       `https://discord.com/api/v10/invites/${encodeURIComponent(inviteCode)}?with_counts=true`,
       { headers, signal: AbortSignal.timeout(10_000) },
     );
-    const invite = (await inviteResponse.json()) as { guild?: { id?: string } };
-    if (!inviteResponse.ok || !invite.guild?.id) return "unknown";
-    const memberResponse = await fetch(
-      `https://discord.com/api/v10/guilds/${encodeURIComponent(invite.guild.id)}/members/${encodeURIComponent(discordUserId)}`,
+    const inv = (await invR.json()) as { guild?: { id?: string } };
+    if (!invR.ok || !inv.guild?.id) return "unknown";
+
+    const memR = await fetch(
+      `https://discord.com/api/v10/guilds/${encodeURIComponent(inv.guild.id)}/members/${encodeURIComponent(discordUserId)}`,
       { headers, signal: AbortSignal.timeout(10_000) },
     );
-    if (memberResponse.status === 200) return "member";
-    if (memberResponse.status === 404) return "left";
+    if (memR.status === 200) return "member";
+    if (memR.status === 404) return "left";
     return "unknown";
   } catch {
     return "unknown";
@@ -113,13 +113,17 @@ async function clawbackReward(opts: {
       .limit(1);
     if (existing && existing.length > 0) return false;
 
+    const amount = -Math.abs(opts.rewardUsd);
     const { error } = await supabaseAdmin.from("transactions").insert({
       user_id: opts.userId,
-      amount: -Math.abs(opts.rewardUsd),
+      amount,
       kind: "clawback",
       label: `Membership leave clawback · submission ${opts.submissionId}`,
     } as never);
-    if (error) return false;
+    if (error) {
+      console.warn("[clawback]", error.message);
+      return false;
+    }
     try {
       const { data: task } = await supabaseAdmin
         .from("tasks")
@@ -138,9 +142,39 @@ async function clawbackReward(opts: {
       /* soft */
     }
     return true;
-  } catch {
+  } catch (e) {
+    console.warn("[clawback]", e);
     return false;
   }
+}
+
+function isTelegramJoinTask(task: any): boolean {
+  const platform = String(task?.platform || "").toLowerCase();
+  if (platform !== "telegram") return false;
+  const proof = String(task?.proof || "").toLowerCase();
+  const type = String(task?.task_type || "").toLowerCase();
+  return (
+    proof === "auto" ||
+    proof === "automatic" ||
+    type.includes("join") ||
+    type.includes("subscribe") ||
+    type.includes("bot_start") ||
+    /t\.me\//i.test(String(task?.link || ""))
+  );
+}
+
+function isDiscordJoinTask(task: any): boolean {
+  const platform = String(task?.platform || "").toLowerCase();
+  if (platform !== "discord") return false;
+  const proof = String(task?.proof || "").toLowerCase();
+  const type = String(task?.task_type || "").toLowerCase();
+  return (
+    proof === "auto" ||
+    proof === "automatic" ||
+    type.includes("join") ||
+    type.includes("subscribe") ||
+    /discord(?:\.gg|app\.com\/invite|\.com\/invite)/i.test(String(task?.link || ""))
+  );
 }
 
 export async function runMembershipRecheckInternal(opts?: {
@@ -148,27 +182,26 @@ export async function runMembershipRecheckInternal(opts?: {
   maxAgeHours?: number;
   limit?: number;
   actorId?: string | null;
-  platform?: string;
+  platform?: "telegram" | "discord" | "all";
 }): Promise<{
   checked: number;
   left: number;
   still: number;
   skipped: number;
   clawed: number;
+  telegramChecked: number;
+  discordChecked: number;
   minH: number;
   maxH: number;
-  platforms: string[];
+  discordTokenPresent: boolean;
 }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const tgTok = await botTokenTg();
-  const dcTok = discordToken();
-  const want = String(opts?.platform || "all").toLowerCase();
-
-  if (want === "telegram" && !tgTok) throw new Error("BOT_TOKEN / TELEGRAM_BOT_TOKEN not configured");
-  if (want === "discord" && !dcTok) throw new Error("DISCORD_BOT_TOKEN not configured");
-  if (want === "all" && !tgTok && !dcTok) {
-    throw new Error("No membership bot tokens configured");
-  }
+  const token = await botToken();
+  const dcToken = await discordBotToken();
+  const platformFilter = (opts?.platform || "all").toLowerCase() as
+    | "telegram"
+    | "discord"
+    | "all";
 
   const minH = Math.max(1, Number(opts?.minAgeHours ?? 20));
   const maxH = Math.max(minH + 1, Number(opts?.maxAgeHours ?? 72));
@@ -193,49 +226,28 @@ export async function runMembershipRecheckInternal(opts?: {
   let still = 0;
   let skipped = 0;
   let clawed = 0;
-  const platformsUsed = new Set<string>();
+  let telegramChecked = 0;
+  let discordChecked = 0;
 
   for (const row of rows ?? []) {
     const task = (row as { tasks?: any }).tasks;
     const platform = String(task?.platform || "").toLowerCase();
-    const proof = String(task?.proof || "").toLowerCase();
-    const type = String(task?.task_type || "").toLowerCase();
-    const link = String(task?.link || "");
+    const wantTg =
+      (platformFilter === "all" || platformFilter === "telegram") && isTelegramJoinTask(task);
+    const wantDc =
+      (platformFilter === "all" || platformFilter === "discord") && isDiscordJoinTask(task);
 
-    const isTgJoin =
-      platform === "telegram" &&
-      (proof === "auto" ||
-        proof === "automatic" ||
-        type.includes("join") ||
-        type.includes("subscribe") ||
-        type.includes("bot_start") ||
-        /t\.me\//i.test(link));
-
-    const isDcJoin =
-      platform === "discord" &&
-      (proof === "auto" ||
-        proof === "automatic" ||
-        type.includes("join") ||
-        type.includes("subscribe") ||
-        /discord\.(gg|com)/i.test(link));
-
-    if (want === "telegram" && !isTgJoin) {
-      skipped += 1;
-      continue;
-    }
-    if (want === "discord" && !isDcJoin) {
-      skipped += 1;
-      continue;
-    }
-    if (want === "all" && !isTgJoin && !isDcJoin) {
+    if (!wantTg && !wantDc) {
       skipped += 1;
       continue;
     }
 
-    let status: "member" | "left" | "unknown" = "unknown";
-
-    if (isTgJoin && tgTok && (want === "all" || want === "telegram")) {
-      const chatRef = chatRefFromLink(link);
+    if (wantTg) {
+      if (!token) {
+        skipped += 1;
+        continue;
+      }
+      const chatRef = chatRefFromLink(String(task?.link || ""));
       if (!chatRef) {
         skipped += 1;
         continue;
@@ -250,73 +262,125 @@ export async function runMembershipRecheckInternal(opts?: {
         skipped += 1;
         continue;
       }
+
       checked += 1;
-      platformsUsed.add("telegram");
-      status = await tgGetChatMember(tgTok, chatRef, tgId);
-    } else if (isDcJoin && dcTok && (want === "all" || want === "discord")) {
-      const code = discordInviteCode(link);
+      telegramChecked += 1;
+      const status = await tgGetChatMember(token, chatRef, tgId);
+      if (status === "left") {
+        left += 1;
+        await supabaseAdmin
+          .from("submissions")
+          .update({
+            status: "rejected",
+            review_note: `Membership re-check (Telegram): left channel/group within ${minH}–${maxH}h window`,
+          } as never)
+          .eq("id", row.id);
+
+        const rewardUsd = Number(task?.reward ?? 0);
+        const didClaw = await clawbackReward({
+          userId: String(row.user_id),
+          taskId: String(row.task_id),
+          submissionId: String(row.id),
+          rewardUsd,
+        });
+        if (didClaw) clawed += 1;
+
+        try {
+          await supabaseAdmin.from("audit_log").insert({
+            actor_id: opts?.actorId ?? null,
+            action: "membership_recheck_reject",
+            target_id: row.id,
+            meta: {
+              platform: "telegram",
+              user_id: row.user_id,
+              task_id: row.task_id,
+              chat: chatRef,
+              clawback: didClaw,
+              reward: rewardUsd,
+            },
+          } as never);
+        } catch {
+          /* soft */
+        }
+      } else if (status === "member") {
+        still += 1;
+      } else {
+        skipped += 1;
+      }
+      continue;
+    }
+
+    if (wantDc) {
+      if (!dcToken) {
+        skipped += 1;
+        continue;
+      }
+      const code = discordInviteCode(String(task?.link || ""));
       if (!code) {
         skipped += 1;
         continue;
       }
+
       const { data: account } = await supabaseAdmin
         .from("connected_accounts")
-        .select("external_id")
+        .select("external_id,status")
         .eq("user_id", row.user_id)
         .ilike("platform", "discord")
         .maybeSingle();
-      const ext = String((account as { external_id?: string } | null)?.external_id || "");
-      if (!ext) {
+
+      const discordUserId = String(
+        (account as { external_id?: string } | null)?.external_id || "",
+      ).trim();
+      if (!discordUserId) {
         skipped += 1;
         continue;
       }
+
       checked += 1;
-      platformsUsed.add("discord");
-      status = await discordMemberStatus(dcTok, code, ext);
-    } else {
-      skipped += 1;
-      continue;
-    }
+      discordChecked += 1;
+      const status = await discordMemberStatus(dcToken, code, discordUserId);
+      if (status === "left") {
+        left += 1;
+        await supabaseAdmin
+          .from("submissions")
+          .update({
+            status: "rejected",
+            review_note: `Membership re-check (Discord): left server within ${minH}–${maxH}h window`,
+          } as never)
+          .eq("id", row.id);
 
-    if (status === "left") {
-      left += 1;
-      await supabaseAdmin
-        .from("submissions")
-        .update({
-          status: "rejected",
-          review_note: `Membership re-check: left within ${minH}–${maxH}h (${platform})`,
-        } as never)
-        .eq("id", row.id);
+        const rewardUsd = Number(task?.reward ?? 0);
+        const didClaw = await clawbackReward({
+          userId: String(row.user_id),
+          taskId: String(row.task_id),
+          submissionId: String(row.id),
+          rewardUsd,
+        });
+        if (didClaw) clawed += 1;
 
-      const rewardUsd = Number(task?.reward ?? 0);
-      const didClaw = await clawbackReward({
-        userId: String(row.user_id),
-        taskId: String(row.task_id),
-        submissionId: String(row.id),
-        rewardUsd,
-      });
-      if (didClaw) clawed += 1;
-
-      try {
-        await supabaseAdmin.from("audit_log").insert({
-          actor_id: opts?.actorId ?? null,
-          action: "membership_recheck_reject",
-          target_id: row.id,
-          meta: {
-            user_id: row.user_id,
-            task_id: row.task_id,
-            platform,
-            clawback: didClaw,
-            reward: rewardUsd,
-          },
-        } as never);
-      } catch {
-        /* soft */
+        try {
+          await supabaseAdmin.from("audit_log").insert({
+            actor_id: opts?.actorId ?? null,
+            action: "membership_recheck_reject",
+            target_id: row.id,
+            meta: {
+              platform: "discord",
+              user_id: row.user_id,
+              task_id: row.task_id,
+              invite: code,
+              discord_user: discordUserId,
+              clawback: didClaw,
+              reward: rewardUsd,
+            },
+          } as never);
+        } catch {
+          /* soft */
+        }
+      } else if (status === "member") {
+        still += 1;
+      } else {
+        skipped += 1;
       }
-    } else if (status === "member") {
-      still += 1;
-    } else {
-      skipped += 1;
     }
   }
 
@@ -326,9 +390,11 @@ export async function runMembershipRecheckInternal(opts?: {
     still,
     skipped,
     clawed,
+    telegramChecked,
+    discordChecked,
     minH,
     maxH,
-    platforms: [...platformsUsed],
+    discordTokenPresent: Boolean(dcToken),
   };
 }
 
@@ -339,7 +405,7 @@ export const ownerRunMembershipRecheck = createServerFn({ method: "POST" })
       minAgeHours?: number;
       maxAgeHours?: number;
       limit?: number;
-      platform?: string;
+      platform?: "telegram" | "discord" | "all";
     }) => d ?? {},
   )
   .handler(async ({ context, data }) => {
