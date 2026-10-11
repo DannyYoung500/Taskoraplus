@@ -1,22 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "tanstack-start",
-  "crons": [
-    {
-      "path": "/api/cron/strong-nightly",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/ops-digest",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/stuck-withdrawals",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/membership-recheck",
-      "schedule": "0 */4 * * *"
-    }
-  ]
+  "framework": "tanstack-start"
 }

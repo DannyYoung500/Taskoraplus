@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runMembershipRecheckInternal } from "@/lib/strong-membership-recheck.functions";
 
+/**
+ * Manual/cron endpoint for membership leave-check.
+ * NOT registered in vercel.json until development is finished.
+ * Call with Authorization: Bearer $CRON_SECRET or x-cron-secret header.
+ */
 export const Route = createFileRoute("/api/cron/membership-recheck")({
   server: {
     handlers: {
@@ -20,10 +25,19 @@ export const Route = createFileRoute("/api/cron/membership-recheck")({
               headers: { "content-type": "application/json" },
             });
           }
+          const url = new URL(request.url);
+          const minAgeHours = Number(url.searchParams.get("minAgeHours") || 20);
+          const maxAgeHours = Number(url.searchParams.get("maxAgeHours") || 72);
+          const limit = Number(url.searchParams.get("limit") || 80);
+          const platform = (url.searchParams.get("platform") || "all") as
+            | "all"
+            | "telegram"
+            | "discord";
           const result = await runMembershipRecheckInternal({
-            minAgeHours: 20,
-            maxAgeHours: 72,
-            limit: 100,
+            minAgeHours,
+            maxAgeHours,
+            limit,
+            platform,
           });
           return new Response(JSON.stringify({ ok: true, ...result }), {
             status: 200,
