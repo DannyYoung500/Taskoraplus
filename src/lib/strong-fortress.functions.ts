@@ -1,10 +1,6 @@
 /**
- * Strong Fortress — next-tier anti-fraud for TASKORA.
- * - Daily earn cap (per user)
- * - Impossible progression (burst verifies across many campaigns)
- * - Post-verify hooks (escrow touch, reject-spike auto-pause)
- * - Unified owner/cron nightly runner
- * Soft-fail friendly; never blocks owner tooling.
+ * Strong Fortress — daily earn cap, impossible progression, post-verify hooks,
+ * nightly suite (includes membership leave-check).
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -24,7 +20,6 @@ async function assertOwner(userId: string) {
   await ao(userId);
 }
 
-/** Rolling 24h reward earnings (tasks + watch + bonuses). */
 export async function assertDailyEarnCap(opts: {
   userId: string;
   addUsd: number;
@@ -54,10 +49,6 @@ export async function assertDailyEarnCap(opts: {
   }
 }
 
-/**
- * Block robotic progression: too many verified submissions in a short window
- * across distinct tasks.
- */
 export async function assertImpossibleProgression(opts: {
   userId: string;
 }): Promise<void> {
@@ -91,9 +82,6 @@ export async function assertImpossibleProgression(opts: {
   }
 }
 
-/**
- * After a submission is verified: touch escrow, check reject spike, soft pause.
- */
 export async function onSubmissionVerified(opts: {
   submissionId: string;
   userId: string;
@@ -121,11 +109,8 @@ export async function onSubmissionVerified(opts: {
   } catch {
     /* soft */
   }
-
   try {
-    if (opts.taskId) {
-      await maybeAutoPauseTaskOnRejectSpike(opts.taskId);
-    }
+    if (opts.taskId) await maybeAutoPauseTaskOnRejectSpike(opts.taskId);
   } catch {
     /* soft */
   }
@@ -165,26 +150,20 @@ export async function maybeAutoPauseTaskOnRejectSpike(taskId: string): Promise<{
   return { paused: false, ratio };
 }
 
-/**
- * Nightly strong suite: escrow release, membership recheck, stuck SLA, trust decay.
- */
 export async function runStrongNightlySuite(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
-
   try {
     const { releaseExpiredCampaignEscrow } = await import("@/lib/strong-escrow.functions");
     out.escrow = await releaseExpiredCampaignEscrow({ holdHours: 36, limit: 40 });
   } catch (e) {
     out.escrow = { error: e instanceof Error ? e.message : "fail" };
   }
-
   try {
     const { runStuckTaskSla } = await import("@/lib/strong-plus.functions");
     out.stuckTasks = await runStuckTaskSla({ hours: 48, autoPause: true });
   } catch (e) {
     out.stuckTasks = { error: e instanceof Error ? e.message : "fail" };
   }
-
   try {
     const { applyPassiveTrustDecay } = await import("@/lib/strong-escrow.functions");
     if (typeof applyPassiveTrustDecay === "function") {
@@ -193,14 +172,24 @@ export async function runStrongNightlySuite(): Promise<Record<string, unknown>> 
   } catch (e) {
     out.trustDecay = { error: e instanceof Error ? e.message : "fail" };
   }
-
   try {
     const { alertStuckWithdrawals } = await import("@/lib/strong-wave.functions");
     out.stuckWd = await alertStuckWithdrawals();
   } catch (e) {
     out.stuckWd = { error: e instanceof Error ? e.message : "fail" };
   }
-
+  try {
+    const { runMembershipRecheckInternal } = await import(
+      "@/lib/strong-membership-recheck.functions"
+    );
+    out.membership = await runMembershipRecheckInternal({
+      minAgeHours: 20,
+      maxAgeHours: 72,
+      limit: 80,
+    });
+  } catch (e) {
+    out.membership = { error: e instanceof Error ? e.message : "fail" };
+  }
   return out;
 }
 
@@ -222,9 +211,6 @@ export const ownerRunMembershipRecheckAlias = createServerFn({ method: "POST" })
     return ownerRunMembershipRecheck({ data: data as never });
   });
 
-/**
- * Pre-submit fortress checks (call from submitTaskGuarded).
- */
 export async function assertFortressBeforeSubmit(opts: {
   userId: string;
   rewardUsd?: number;
