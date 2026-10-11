@@ -19,7 +19,6 @@ async function getMaintenanceSwitches() {
   }
 }
 
-/** Coerce RPC / nested payloads to a plain uuid string */
 function asUuid(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value.trim();
@@ -41,16 +40,13 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
   .inputValidator((d: { taskId?: string; proofText?: string; proofUrl?: string; startedAtIso?: string; data?: unknown }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
-
     const nested = (data as { data?: { taskId?: string; proofText?: string; proofUrl?: string; startedAtIso?: string } })?.data;
     const taskId = asUuid(data.taskId ?? nested?.taskId);
     const proofText = String(data.proofText ?? nested?.proofText ?? "").trim();
     const proofUrl = String(data.proofUrl ?? nested?.proofUrl ?? "").trim();
     const startedAtIso = data.startedAtIso ?? nested?.startedAtIso;
 
-    if (!taskId || taskId.length < 8) {
-      throw new Error("Invalid task. Go back and open the task again.");
-    }
+    if (!taskId || taskId.length < 8) throw new Error("Invalid task. Go back and open the task again.");
 
     try {
       const { assertActionRateLimit } = await import("@/lib/strong-ops");
@@ -64,12 +60,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     } catch (e) {
       if (e instanceof Error && e.message.includes("Too many")) throw e;
     }
-    try {
-      const { assertNotImpossibleProgression } = await import("@/lib/strong-tier-b.functions");
-      await assertNotImpossibleProgression({ userId });
-    } catch (e) {
-      if (e instanceof Error && (e.message.includes("Too many") || e.message.includes("New accounts"))) throw e;
-    }
 
     const maint = await getMaintenanceSwitches();
     if (maint.read_only) throw new Error("Platform is in read-only mode. Try again later.");
@@ -77,45 +67,32 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const since = new Date(Date.now() - RULES.submissionWindowMs).toISOString();
-    const { count } = await supabaseAdmin
-      .from("submissions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", since);
+    const { count } = await supabaseAdmin.from("submissions").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
     if ((count ?? 0) >= RULES.maxSubmissionsPerHour) {
       throw new Error(`Rate limit: max ${RULES.maxSubmissionsPerHour} submissions per hour.`);
     }
 
-    const { data: task } = await supabaseAdmin
-      .from("tasks")
-      .select("*")
-      .eq("id", taskId)
-      .eq("is_active", true)
-      .maybeSingle();
+    const { data: task } = await supabaseAdmin.from("tasks").select("*").eq("id", taskId).eq("is_active", true).maybeSingle();
     if (!task) throw new Error("This task is no longer available.");
-    if (task.created_by && String(task.created_by) === String(userId)) {
-      throw new Error("You cannot complete your own task.");
-    }
+    if (task.created_by && String(task.created_by) === String(userId)) throw new Error("You cannot complete your own task.");
     if (Number(task.slots_left) <= 0) throw new Error("All slots for this task are taken.");
 
-    const { data: existing } = await supabaseAdmin
-      .from("submissions")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("task_id", taskId)
-      .maybeSingle();
+    const { data: existing } = await supabaseAdmin.from("submissions").select("id").eq("user_id", userId).eq("task_id", taskId).maybeSingle();
     if (existing) throw new Error("You already submitted this task.");
+
+    try {
+      const { assertFortressBeforeSubmit } = await import("@/lib/strong-fortress.functions");
+      await assertFortressBeforeSubmit({
+        userId,
+        rewardUsd: Number((task as { reward?: number }).reward ?? 0),
+      });
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("Daily earn") || e.message.includes("automated") || e.message.includes("Too many"))) throw e;
+    }
 
     const platform = String((task as { platform?: string }).platform ?? "").toLowerCase();
     try {
-      const {
-        assertConnectedAccountForPlatform,
-        assertPlatformDailyCompletionCap,
-        assertEarnerQuality,
-        assertPlatformSubmitCooldown,
-      } = await import("@/lib/strong-ops");
-      // Telegram Mini App already authenticates Telegram identity.
-      // Discord MUST connect Discord account before submit.
+      const { assertConnectedAccountForPlatform, assertPlatformDailyCompletionCap, assertEarnerQuality, assertPlatformSubmitCooldown } = await import("@/lib/strong-ops");
       if (platform !== "telegram") {
         await assertConnectedAccountForPlatform({ userId, platform });
       }
@@ -123,15 +100,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       await assertEarnerQuality({ userId });
       await assertPlatformSubmitCooldown({ userId, platform });
     } catch (e) {
-      if (
-        e instanceof Error &&
-        (e.message.includes("Connect your") ||
-          e.message.includes("Daily limit") ||
-          e.message.includes("Quality hold") ||
-          e.message.includes("Wait "))
-      ) {
-        throw e;
-      }
+      if (e instanceof Error && (e.message.includes("Connect your") || e.message.includes("Daily limit") || e.message.includes("Quality hold") || e.message.includes("Wait "))) throw e;
     }
 
     try {
@@ -141,10 +110,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("seconds on this task")) throw e;
     }
 
-    const metadata = ((task as { task_metadata?: unknown }).task_metadata ?? {}) as Record<string, unknown>;
     const proofMode = String((task as { proof?: string }).proof ?? "").toLowerCase();
-    // Source of truth = task.proof chosen at publish time.
-    // If advertiser picked "screenshot", never auto-verify — even for join tasks.
     const isAutoProof =
       proofMode === "auto" ||
       proofMode === "automatic" ||
@@ -152,52 +118,39 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
 
     let autoVerified = false;
     if (isAutoProof && ["telegram", "discord"].includes(platform)) {
-      try {
-        const { verifyAutomaticTask } = await import("@/lib/automatic-verification.functions");
-        const result = await verifyAutomaticTask(userId, task);
-        if (!result.ok) {
-          throw new Error(
-            result.reason ||
-              "Could not confirm membership yet. Open the link, join, then tap Verify again.",
-          );
-        }
-        autoVerified = true;
-      } catch (e) {
-        if (
-          e instanceof Error &&
-          (e.message.includes("membership") ||
-            e.message.includes("confirm") ||
-            e.message.includes("join") ||
-            e.message.includes("Could not"))
-        ) {
-          throw e;
-        }
-        autoVerified = false;
+      const { verifyAutomaticTask } = await import("@/lib/automatic-verification.functions");
+      const result = await verifyAutomaticTask(userId, task);
+      if (!result.ok) {
+        throw new Error(result.reason || "Could not confirm membership yet. Open the link, join, then tap Verify again.");
       }
+      autoVerified = true;
     } else if (!proofText && !proofUrl) {
       throw new Error("Add the proof required by this campaign.");
     }
 
     let proofHash: string | null = null;
     try {
-      const { assertProofNotRecycled } = await import("@/lib/strong-ops");
-      const r = await assertProofNotRecycled({ proofText, proofUrl, userId });
-      proofHash = r.proofHash;
+      if (proofUrl || (proofText && !proofText.startsWith("auto:"))) {
+        const { assertProofPerceptualV2 } = await import("@/lib/strong-premium.functions");
+        const r = await assertProofPerceptualV2({ userId, proofText, proofUrl });
+        proofHash = r.proofHash;
+      } else {
+        const { assertProofNotRecycled } = await import("@/lib/strong-ops");
+        const r = await assertProofNotRecycled({ proofText, proofUrl, userId });
+        proofHash = r.proofHash;
+      }
     } catch (e) {
-      if (e instanceof Error && e.message.toLowerCase().includes("proof")) throw e;
+      if (e instanceof Error && (e.message.toLowerCase().includes("proof") || e.message.includes("recycled") || e.message.includes("original"))) throw e;
     }
 
     let submissionId = "";
-    const { data: rpcId, error: claimError } = await supabaseAdmin.rpc(
-      "claim_task_submission",
-      {
-        p_user_id: userId,
-        p_task_id: taskId,
-        p_proof_text: proofText || (isAutoProof ? "auto:telegram_membership" : null),
-        p_proof_url: proofUrl || null,
-        p_proof_hash: proofHash || null,
-      } as never,
-    );
+    const { data: rpcId, error: claimError } = await supabaseAdmin.rpc("claim_task_submission", {
+      p_user_id: userId,
+      p_task_id: taskId,
+      p_proof_text: proofText || (isAutoProof ? "auto:telegram_membership" : null),
+      p_proof_url: proofUrl || null,
+      p_proof_hash: proofHash || null,
+    } as never);
 
     if (claimError) {
       if (/function|does not exist|claim_task/i.test(claimError.message)) {
@@ -209,22 +162,13 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
           proof_url: proofUrl || null,
         };
         if (proofHash) row.proof_hash = proofHash;
-        const { data: inserted, error: insErr } = await supabaseAdmin
-          .from("submissions")
-          .insert(row as never)
-          .select("id")
-          .single();
+        const { data: inserted, error: insErr } = await supabaseAdmin.from("submissions").insert(row as never).select("id").single();
         if (insErr) throw new Error(insErr.message);
         submissionId = asUuid((inserted as { id?: string } | null)?.id);
         if (autoVerified) {
           try {
-            await supabaseAdmin
-              .from("tasks")
-              .update({ slots_left: Math.max(0, Number(task.slots_left) - 1) } as never)
-              .eq("id", taskId);
-          } catch {
-            /* soft */
-          }
+            await supabaseAdmin.from("tasks").update({ slots_left: Math.max(0, Number(task.slots_left) - 1) } as never).eq("id", taskId);
+          } catch { /* soft */ }
         }
       } else {
         throw new Error(claimError.message);
@@ -233,9 +177,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       submissionId = asUuid(rpcId);
     }
 
-    if (!submissionId) {
-      throw new Error("Could not create submission. Try again.");
-    }
+    if (!submissionId) throw new Error("Could not create submission. Try again.");
 
     if (autoVerified) {
       try {
@@ -245,34 +187,19 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
           p_reason: "Automatic verification confirmed membership.",
         } as never);
         if (verificationError && !/function|does not exist/i.test(verificationError.message)) {
-          await supabaseAdmin
-            .from("submissions")
-            .update({ status: "verified", review_note: "auto membership" } as never)
-            .eq("id", submissionId);
+          await supabaseAdmin.from("submissions").update({ status: "verified", review_note: "auto membership" } as never).eq("id", submissionId);
         }
       } catch {
-        await supabaseAdmin
-          .from("submissions")
-          .update({ status: "verified", review_note: "auto membership" } as never)
-          .eq("id", submissionId);
+        await supabaseAdmin.from("submissions").update({ status: "verified", review_note: "auto membership" } as never).eq("id", submissionId);
       }
       try {
         const { applyTrustOutcome } = await import("@/lib/strong-escrow.functions");
         await applyTrustOutcome({ userId, outcome: "approved" });
-      } catch {
-        /* soft */
-      }
+      } catch { /* soft */ }
       try {
         const { onSubmissionVerified } = await import("@/lib/strong-fortress.functions");
-        await onSubmissionVerified({
-          submissionId,
-          userId,
-          taskId,
-          rewardUsd: Number((task as { reward?: number }).reward ?? 0),
-        });
-      } catch {
-        /* soft */
-      }
+        await onSubmissionVerified({ submissionId, userId, taskId, rewardUsd: Number((task as { reward?: number }).reward ?? 0) });
+      } catch { /* soft */ }
       return { status: "verified" as const, autoVerified: true, submissionId };
     }
 
