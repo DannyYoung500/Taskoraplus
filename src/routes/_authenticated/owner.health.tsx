@@ -11,6 +11,13 @@ import {
   ownerAlertStuckCampaigns,
 } from "@/lib/strong-wave.functions";
 import { ownerRunStuckWithdrawalSla } from "@/lib/strong-premium.functions";
+import {
+  ownerGetBotEnvStatus,
+  ownerProbeDiscordInvite,
+  ownerRunMembershipRecheckNow,
+  ownerRunStrongNightlyNow,
+  type BotEnvStatus,
+} from "@/lib/owner-fortress-ops.functions";
 
 export const Route = createFileRoute("/_authenticated/owner/health")({
   component: OwnerHealthPage,
@@ -33,8 +40,17 @@ function OwnerHealthPage() {
   } | null>(null);
   const [switches, setSwitches] = useState<Switches | null>(null);
   const [webhook, setWebhook] = useState<{ status: string; detail: string } | null>(null);
+  const [bots, setBots] = useState<BotEnvStatus | null>(null);
+  const [inviteInput, setInviteInput] = useState("");
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+
+  function loadBots() {
+    void ownerGetBotEnvStatus()
+      .then(setBots)
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
     void getSystemHealth()
@@ -46,6 +62,7 @@ function OwnerHealthPage() {
     void getWebhookHealthBadge()
       .then((w) => setWebhook({ status: w.status, detail: w.detail }))
       .catch(() => undefined);
+    loadBots();
   }, []);
 
   async function toggle(key: keyof Switches) {
@@ -71,7 +88,7 @@ function OwnerHealthPage() {
     }
   }
 
-  async function runCron(kind: "wd" | "campaigns" | "wd_sla") {
+  async function runCron(kind: "wd" | "campaigns" | "wd_sla" | "membership" | "nightly" | "bots") {
     setBusy(kind);
     setMsg(null);
     try {
@@ -80,13 +97,49 @@ function OwnerHealthPage() {
         setMsg(`Stuck withdrawals: ${r.count} · ~$${Number(r.totalUsd).toFixed(2)}`);
       } else if (kind === "wd_sla") {
         const r = await ownerRunStuckWithdrawalSla({ data: { hours: 12 } });
-        setMsg(`WD SLA: ${r.count} stuck · ~$${Number(r.totalUsd).toFixed(2)} · flagged ${r.flagged}`);
-      } else {
+        setMsg(
+          `WD SLA: ${r.count} stuck · ~$${Number(r.totalUsd).toFixed(2)} · flagged ${r.flagged}`,
+        );
+      } else if (kind === "campaigns") {
         const r = await ownerAlertStuckCampaigns();
         setMsg(`Stuck campaigns: ${r.count}`);
+      } else if (kind === "membership") {
+        const r = await ownerRunMembershipRecheckNow({
+          data: { minAgeHours: 20, maxAgeHours: 72, limit: 80, platform: "all" },
+        });
+        setMsg(
+          `Membership recheck: checked ${r.checked} (TG ${r.telegramChecked} · DC ${r.discordChecked}) · left ${r.left} · still ${r.still} · clawed ${r.clawed} · skipped ${r.skipped}${r.discordTokenPresent ? "" : " · DISCORD_BOT_TOKEN missing"}`,
+        );
+      } else if (kind === "nightly") {
+        const r = await ownerRunStrongNightlyNow();
+        const mem = r.membership as Record<string, unknown> | undefined;
+        setMsg(
+          `Strong nightly done. membership left=${mem?.left ?? "?"} clawed=${mem?.clawed ?? "?"} · keys: ${Object.keys(r).join(", ")}`,
+        );
+      } else if (kind === "bots") {
+        const s = await ownerGetBotEnvStatus();
+        setBots(s);
+        setMsg(
+          `Bots refreshed · TG ${s.telegram.reachable ? "OK" : s.telegram.configured ? "fail" : "unset"} · DC ${s.discord.reachable ? "OK" : s.discord.configured ? "fail" : "unset"}`,
+        );
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Cron failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function probeInvite() {
+    setBusy("invite");
+    setInviteResult(null);
+    setMsg(null);
+    try {
+      const r = await ownerProbeDiscordInvite({ data: { invite: inviteInput } });
+      setInviteResult(r.detail);
+      setMsg(r.ok ? "Invite OK" : "Invite probe failed");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Probe failed");
     } finally {
       setBusy(null);
     }
@@ -109,26 +162,57 @@ function OwnerHealthPage() {
         </AppLink>
         <div>
           <h1 className="text-xl font-bold">System Health</h1>
-          <p className="text-xs text-white/45">Probes · kill switches · cron</p>
+          <p className="text-xs text-white/45">Bots · probes · kill switches · fortress cron</p>
         </div>
       </div>
       {msg ? <p className="mb-3 text-xs text-cyan-300">{msg}</p> : null}
+
+      <section className="mb-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/80">Bot tokens</p>
+          <button type="button" disabled={busy === "bots"} onClick={() => void runCron("bots")} className="text-[10px] font-bold text-cyan-300/80 disabled:opacity-50">Refresh</button>
+        </div>
+        {bots ? (
+          <>
+            <div className="rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">Telegram bot</p>
+                <span className={bots.telegram.reachable ? "text-emerald-400" : bots.telegram.configured ? "text-red-400" : "text-amber-300"}>
+                  {bots.telegram.reachable ? "OK" : bots.telegram.configured ? "FAIL" : "UNSET"}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-white/45">{bots.telegram.detail}</p>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">Discord bot</p>
+                <span className={bots.discord.reachable ? "text-emerald-400" : bots.discord.configured ? "text-red-400" : "text-amber-300"}>
+                  {bots.discord.reachable ? "OK" : bots.discord.configured ? "FAIL" : "UNSET"}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-white/45">{bots.discord.detail}</p>
+              {!bots.discord.configured ? (
+                <p className="mt-1 text-[10px] text-amber-300/80">Set DISCORD_BOT_TOKEN in Vercel env or Owner → Settings → Platforms.</p>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <p className="text-[11px] text-white/40">Loading bot status…</p>
+        )}
+      </section>
+
+      <section className="mb-4 space-y-2">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/80">Discord invite probe</p>
+        <input value={inviteInput} onChange={(e) => setInviteInput(e.target.value)} placeholder="discord.gg/… or invite code" className="w-full rounded-xl border border-white/10 bg-[#0c0e14] px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none focus:border-cyan-400/40" />
+        <button type="button" disabled={busy === "invite" || !inviteInput.trim()} onClick={() => void probeInvite()} className="w-full rounded-xl border border-violet-400/25 bg-violet-400/10 py-2.5 text-xs font-bold text-violet-200 disabled:opacity-50">Probe invite + bot-in-guild</button>
+        {inviteResult ? <p className="text-[11px] text-white/55">{inviteResult}</p> : null}
+      </section>
 
       {webhook ? (
         <div className="mb-3 rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">Telegram webhook</p>
-            <span
-              className={
-                webhook.status === "ok"
-                  ? "text-emerald-400"
-                  : webhook.status === "warn"
-                    ? "text-amber-300"
-                    : "text-red-400"
-              }
-            >
-              {webhook.status}
-            </span>
+            <span className={webhook.status === "ok" ? "text-emerald-400" : webhook.status === "warn" ? "text-amber-300" : "text-red-400"}>{webhook.status}</span>
           </div>
           <p className="mt-1 text-[11px] text-white/45">{webhook.detail}</p>
         </div>
@@ -138,21 +222,9 @@ function OwnerHealthPage() {
         <section className="mb-4 space-y-2">
           <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/80">Kill switches</p>
           {switchRows.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              disabled={busy === key}
-              onClick={() => void toggle(key)}
-              className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3 text-left disabled:opacity-50"
-            >
+            <button key={key} type="button" disabled={busy === key} onClick={() => void toggle(key)} className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3 text-left disabled:opacity-50">
               <span className="text-sm font-semibold">{label}</span>
-              <span
-                className={
-                  switches[key]
-                    ? "rounded-full bg-red-500/15 px-2.5 py-0.5 text-[10px] font-black text-red-300"
-                    : "rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-black text-emerald-300"
-                }
-              >
+              <span className={switches[key] ? "rounded-full bg-red-500/15 px-2.5 py-0.5 text-[10px] font-black text-red-300" : "rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-black text-emerald-300"}>
                 {switches[key] ? "ON" : "OFF"}
               </span>
             </button>
@@ -161,70 +233,25 @@ function OwnerHealthPage() {
       ) : null}
 
       <section className="mb-4 space-y-2">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/80">Manual cron</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/80">Fortress · manual cron</p>
         <div className="grid grid-cols-1 gap-2">
-          <button
-            type="button"
-            disabled={busy === "wd"}
-            onClick={() => void runCron("wd")}
-            className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50"
-          >
-            Alert stuck WDs
-          </button>
-          <button
-            type="button"
-            disabled={busy === "wd_sla"}
-            onClick={() => void runCron("wd_sla")}
-            className="rounded-xl border border-amber-400/25 bg-amber-400/10 py-2.5 text-xs font-bold text-amber-200 disabled:opacity-50"
-          >
-            Run 12h WD SLA (flag + notify)
-          </button>
-          <button
-            type="button"
-            disabled={busy === "campaigns"}
-            onClick={() => void runCron("campaigns")}
-            className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50"
-          >
-            Alert stuck campaigns
-          </button>
+          <button type="button" disabled={busy === "membership"} onClick={() => void runCron("membership")} className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 py-2.5 text-xs font-bold text-emerald-200 disabled:opacity-50">Membership leave-check (TG + Discord · 20–72h)</button>
+          <button type="button" disabled={busy === "nightly"} onClick={() => void runCron("nightly")} className="rounded-xl border border-violet-400/25 bg-violet-400/10 py-2.5 text-xs font-bold text-violet-200 disabled:opacity-50">Run strong nightly suite</button>
+          <button type="button" disabled={busy === "wd"} onClick={() => void runCron("wd")} className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50">Alert stuck WDs</button>
+          <button type="button" disabled={busy === "wd_sla"} onClick={() => void runCron("wd_sla")} className="rounded-xl border border-amber-400/25 bg-amber-400/10 py-2.5 text-xs font-bold text-amber-200 disabled:opacity-50">Run 12h WD SLA (flag + notify)</button>
+          <button type="button" disabled={busy === "campaigns"} onClick={() => void runCron("campaigns")} className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50">Alert stuck campaigns</button>
         </div>
       </section>
 
       {data ? (
         <>
-          <p className="mb-3 text-sm">
-            Overall:{" "}
-            <span
-              className={
-                data.overall === "ok"
-                  ? "text-emerald-400"
-                  : data.overall === "warn"
-                    ? "text-amber-300"
-                    : "text-red-400"
-              }
-            >
-              {data.overall.toUpperCase()}
-            </span>
-          </p>
+          <p className="mb-3 text-sm">Overall: <span className={data.overall === "ok" ? "text-emerald-400" : data.overall === "warn" ? "text-amber-300" : "text-red-400"}>{data.overall.toUpperCase()}</span></p>
           <div className="space-y-2">
             {data.checks.map((c) => (
-              <div
-                key={c.name}
-                className="rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3"
-              >
+              <div key={c.name} className="rounded-2xl border border-white/8 bg-[#12141c] px-4 py-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold">{c.name}</p>
-                  <span
-                    className={
-                      c.status === "ok"
-                        ? "text-emerald-400"
-                        : c.status === "warn"
-                          ? "text-amber-300"
-                          : "text-red-400"
-                    }
-                  >
-                    {c.status}
-                  </span>
+                  <span className={c.status === "ok" ? "text-emerald-400" : c.status === "warn" ? "text-amber-300" : "text-red-400"}>{c.status}</span>
                 </div>
                 <p className="mt-1 text-[11px] text-white/45">{c.detail}</p>
               </div>
