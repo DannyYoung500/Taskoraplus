@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { ChevronLeft, ExternalLink, Image as ImageIcon, User } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ChevronLeft,
+  ExternalLink,
+  Image as ImageIcon,
+  ShieldAlert,
+  User,
+  Zap,
+} from "lucide-react";
 import { listPendingSubmissions, reviewSubmission } from "@/lib/taskora.functions";
 import { AppLink } from "@/components/AppLink";
 
@@ -37,6 +44,16 @@ type TaskJoin = {
   link?: string;
 } | null;
 
+type RiskSnap = {
+  trust: number;
+  flags: string[];
+  deviceCluster: number;
+  pendingSubs: number;
+  verified24h: number;
+  rejected24h: number;
+  accountAgeHours: number;
+};
+
 function displayUser(profile: ProfileJoin, userId: string): string {
   if (!profile) return `User ${String(userId).slice(0, 8)}…`;
   const un = profile.username?.trim();
@@ -57,6 +74,18 @@ function isImageUrl(url: string): boolean {
   );
 }
 
+function riskTone(flags: string[], trust: number): string {
+  if (flags.some((f) => f.startsWith("status:") && f !== "status:active")) {
+    return "border-red-400/40 bg-red-500/10 text-red-200";
+  }
+  if (flags.includes("device_cluster") || flags.includes("recent_rejects")) {
+    return "border-amber-400/35 bg-amber-500/10 text-amber-100";
+  }
+  if (trust >= 75) return "border-emerald-400/30 bg-emerald-500/10 text-emerald-100";
+  if (trust < 40) return "border-orange-400/30 bg-orange-500/10 text-orange-100";
+  return "border-white/10 bg-white/5 text-white/70";
+}
+
 function OwnerReviewsPage() {
   const initial = Route.useLoaderData();
   const [rows, setRows] = useState(initial.rows);
@@ -64,6 +93,40 @@ function OwnerReviewsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
   const [expandedProof, setExpandedProof] = useState<string | null>(null);
+  const [riskMap, setRiskMap] = useState<Record<string, RiskSnap>>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState("");
+
+  const loadRisks = useCallback(async (list: typeof rows) => {
+    const unique = [
+      ...new Set(list.map((r) => String(r.user_id)).filter(Boolean)),
+    ].slice(0, 40);
+    const next: Record<string, RiskSnap> = {};
+    await Promise.all(
+      unique.map(async (uid) => {
+        try {
+          const { ownerGetUserRiskSnapshot } = await import("@/lib/strong-p2.functions");
+          const snap = await ownerGetUserRiskSnapshot({ data: { userId: uid } });
+          next[uid] = {
+            trust: Number(snap.trust ?? 50),
+            flags: Array.isArray(snap.flags) ? snap.flags.map(String) : [],
+            deviceCluster: Number(snap.deviceCluster ?? 1),
+            pendingSubs: Number(snap.pendingSubs ?? 0),
+            verified24h: Number(snap.verified24h ?? 0),
+            rejected24h: Number(snap.rejected24h ?? 0),
+            accountAgeHours: Number(snap.accountAgeHours ?? 0),
+          };
+        } catch {
+          /* soft */
+        }
+      }),
+    );
+    setRiskMap((prev) => ({ ...prev, ...next }));
+  }, []);
+
+  useEffect(() => {
+    if (rows.length) void loadRisks(rows);
+  }, [rows, loadRisks]);
 
   async function act(id: string, decision: "verified" | "rejected") {
     setBusyId(id);
@@ -86,19 +149,64 @@ function OwnerReviewsPage() {
     }
   }
 
+  async function bulkApproveSafe() {
+    setBulkBusy(true);
+    setBulkMsg("");
+    setError(null);
+    try {
+      const { ownerBulkApproveSubmissions } = await import("@/lib/strong-p4.functions");
+      const r = await ownerBulkApproveSubmissions({
+        data: {
+          minTrust: 60,
+          maxReward: 0.5,
+          skipDeviceCluster: true,
+          submissionIds: rows.map((x) => String(x.id)),
+        },
+      });
+      setBulkMsg(
+        `Bulk: ${r.approved} approved · ${r.skipped} skipped` +
+          (r.errors?.length ? ` · ${r.errors[0]}` : ""),
+      );
+      const next = await listPendingSubmissions();
+      setRows(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bulk approve failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#05070c] px-4 pb-28 pt-5 text-white">
       <div className="mb-4 flex items-center gap-2">
         <AppLink to="/owner" className="rounded-full border border-white/10 p-2 text-white/60">
           <ChevronLeft className="size-4" />
         </AppLink>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold">Task review</h1>
-          <p className="text-xs text-white/45">
-            Username · proof image/URL · approve or reject
-          </p>
+          <p className="text-xs text-white/45">Username · risk · proof · approve or reject</p>
         </div>
       </div>
+
+      {rows.length > 0 ? (
+        <div className="mb-3 flex gap-2">
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => void bulkApproveSafe()}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-2.5 text-xs font-bold text-emerald-100 disabled:opacity-50"
+          >
+            <Zap className="size-3.5" />
+            {bulkBusy ? "Bulk…" : "Bulk safe approve"}
+          </button>
+        </div>
+      ) : null}
+
+      {bulkMsg ? (
+        <p className="mb-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+          {bulkMsg}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
@@ -125,6 +233,7 @@ function OwnerReviewsPage() {
               proofMode === "auto" ||
               proofMode === "automatic" ||
               proofText.startsWith("auto:");
+            const risk = riskMap[String(row.user_id)];
 
             return (
               <div
@@ -167,6 +276,42 @@ function OwnerReviewsPage() {
                   </div>
                 </div>
 
+                {risk ? (
+                  <div
+                    className={`flex flex-wrap items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-semibold ${riskTone(risk.flags, risk.trust)}`}
+                  >
+                    <ShieldAlert className="size-3 shrink-0 opacity-80" />
+                    <span>Trust {risk.trust}</span>
+                    {risk.deviceCluster >= 2 ? (
+                      <span className="rounded-full bg-black/25 px-1.5 py-0.5">
+                        device×{risk.deviceCluster}
+                      </span>
+                    ) : null}
+                    {risk.verified24h > 0 ? (
+                      <span className="rounded-full bg-black/25 px-1.5 py-0.5">
+                        ✓{risk.verified24h}/24h
+                      </span>
+                    ) : null}
+                    {risk.rejected24h > 0 ? (
+                      <span className="rounded-full bg-black/25 px-1.5 py-0.5">
+                        ✗{risk.rejected24h}/24h
+                      </span>
+                    ) : null}
+                    {risk.accountAgeHours < 48 ? (
+                      <span className="rounded-full bg-black/25 px-1.5 py-0.5">
+                        new {Math.round(risk.accountAgeHours)}h
+                      </span>
+                    ) : null}
+                    {risk.flags.slice(0, 3).map((f) => (
+                      <span key={f} className="rounded-full bg-black/25 px-1.5 py-0.5">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-white/30">Loading risk…</p>
+                )}
+
                 <div className="rounded-xl border border-white/6 bg-black/20 px-3 py-2">
                   <p className="text-sm font-semibold">{task?.title ?? "Task"}</p>
                   <p className="text-[11px] text-white/45">
@@ -202,28 +347,24 @@ function OwnerReviewsPage() {
                     </p>
                   ) : null}
                   {proofUrl ? (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {isImageUrl(proofUrl) ? (
                         <button
                           type="button"
-                          className="block w-full overflow-hidden rounded-xl border border-white/10"
                           onClick={() =>
-                            setExpandedProof(expandedProof === row.id ? null : row.id)
+                            setExpandedProof((p) => (p === row.id ? null : row.id))
                           }
+                          className="block w-full overflow-hidden rounded-xl border border-white/10"
                         >
                           <img
                             src={proofUrl}
                             alt="Proof"
-                            className={
-                              expandedProof === row.id
-                                ? "max-h-[480px] w-full object-contain bg-black"
-                                : "max-h-40 w-full object-cover"
-                            }
+                            className={`w-full object-cover ${expandedProof === row.id ? "max-h-none" : "max-h-40"}`}
                             referrerPolicy="no-referrer"
                           />
-                          <span className="flex items-center justify-center gap-1 bg-black/40 py-1 text-[10px] text-white/50">
+                          <span className="flex items-center gap-1 px-2 py-1 text-[10px] text-white/45">
                             <ImageIcon className="size-3" />
-                            {expandedProof === row.id ? "Tap to shrink" : "Tap to enlarge"}
+                            {expandedProof === row.id ? "Tap to shrink" : "Tap to expand"}
                           </span>
                         </button>
                       ) : (
@@ -231,46 +372,45 @@ function OwnerReviewsPage() {
                           href={proofUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-2 break-all rounded-lg border border-sky-400/20 bg-sky-400/5 px-3 py-2 text-xs text-sky-200"
+                          className="break-all text-xs text-sky-300 underline-offset-2 hover:underline"
                         >
-                          <ExternalLink className="size-3.5 shrink-0" />
                           {proofUrl}
                         </a>
                       )}
                     </div>
                   ) : null}
                   {!proofText && !proofUrl && !isAuto ? (
-                    <p className="text-xs text-amber-300/80">No proof text or URL attached.</p>
+                    <p className="text-xs text-white/40">No proof attached.</p>
                   ) : null}
                 </div>
 
-                <input
-                  type="text"
-                  placeholder="Reject reason (optional)"
-                  value={rejectNote[row.id] || ""}
-                  onChange={(e) =>
-                    setRejectNote((prev) => ({ ...prev, [row.id]: e.target.value }))
-                  }
-                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/30 outline-none focus:border-cyan-400/40"
-                />
-
-                <div className="flex gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    disabled={busyId === row.id}
-                    onClick={() => void act(row.id, "verified")}
-                    className="flex-1 rounded-xl bg-emerald-500/90 py-2.5 text-xs font-bold text-[#05070c] disabled:opacity-50"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId === row.id}
-                    onClick={() => void act(row.id, "rejected")}
-                    className="flex-1 rounded-xl border border-red-400/40 bg-red-500/15 py-2.5 text-xs font-bold text-red-300 disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
+                <div className="space-y-2">
+                  <input
+                    className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-sky-400/40"
+                    placeholder="Reject reason (optional)"
+                    value={rejectNote[row.id] ?? ""}
+                    onChange={(e) =>
+                      setRejectNote((m) => ({ ...m, [row.id]: e.target.value }))
+                    }
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busyId === row.id}
+                      onClick={() => void act(row.id, "verified")}
+                      className="flex-1 rounded-xl bg-emerald-400 py-2.5 text-xs font-extrabold text-[#05070c] disabled:opacity-50"
+                    >
+                      {busyId === row.id ? "…" : "Approve"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === row.id}
+                      onClick={() => void act(row.id, "rejected")}
+                      className="flex-1 rounded-xl border border-red-400/40 bg-red-500/15 py-2.5 text-xs font-extrabold text-red-200 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
               </div>
             );
