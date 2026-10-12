@@ -64,7 +64,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     }
 
     try {
-      const { assertDeviceChangeCooldown } = await import("@/lib/strong-more.functions");
+      const { assertDeviceChangeCooldown } = await import("@/lib/strong-more.server");
       await assertDeviceChangeCooldown({ userId });
     } catch (e) {
       if (e instanceof Error && e.message.includes("Device changed")) throw e;
