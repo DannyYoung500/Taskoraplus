@@ -109,7 +109,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     const platform = String((task as { platform?: string }).platform ?? "").toLowerCase();
     try {
       const { assertConnectedAccountForPlatform, assertPlatformDailyCompletionCap, assertEarnerQuality, assertPlatformSubmitCooldown } = await import("@/lib/strong-ops");
-      // Telegram exempt; Discord requires connected Discord account
       if (platform !== "telegram") {
         await assertConnectedAccountForPlatform({ userId, platform });
       }
@@ -143,6 +142,28 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       autoVerified = true;
     } else if (!proofText && !proofUrl) {
       throw new Error("Add the proof required by this campaign.");
+    }
+
+    // P4 proof sanity + campaign hard budget stop
+    try {
+      const { assertProofSanity, assertCampaignBudgetRemaining } = await import("@/lib/strong-p4.functions");
+      await assertProofSanity({ proofUrl, proofText });
+      await assertCampaignBudgetRemaining({
+        taskId,
+        rewardUsd: Number((task as { reward?: number }).reward ?? 0),
+      });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        (e.message.includes("Proof") ||
+          e.message.includes("proof") ||
+          e.message.includes("Screenshot") ||
+          e.message.includes("budget") ||
+          e.message.includes("slots") ||
+          e.message.includes("no longer active"))
+      ) {
+        throw e;
+      }
     }
 
     let proofHash: string | null = null;
