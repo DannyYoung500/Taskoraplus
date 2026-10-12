@@ -7,8 +7,7 @@
  * 10 Dual approval if payout address changed < 48h
  * 8 Sparkline helpers for public ledger
  */
-import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
 
 async function adminClient() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -156,11 +155,7 @@ export async function applyAddressChangeDual(opts: {
 }
 
 /** 5 · Owner risk heatmap: group by device_fp / IP / country. */
-export const getOwnerRiskHeatmap = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { assertOwner } = await import("@/lib/owner-guard.server");
-    await assertOwner(context.userId);
+export async function getOwnerRiskHeatmapInternal() {
     const s = await adminClient();
     const { data: rows } = await s
       .from("profiles")
@@ -235,7 +230,7 @@ export const getOwnerRiskHeatmap = createServerFn({ method: "GET" })
   });
 
 /** 8 · Last 7 days verified-task counts for sparkline. */
-export const getVerifiedSparkline = createServerFn({ method: "GET" }).handler(async () => {
+export async function getVerifiedSparklineInternal() {
   try {
     const s = await adminClient();
     const days: { day: string; count: number }[] = [];
@@ -257,4 +252,4 @@ export const getVerifiedSparkline = createServerFn({ method: "GET" }).handler(as
   } catch {
     return [] as { day: string; count: number }[];
   }
-});
+}
