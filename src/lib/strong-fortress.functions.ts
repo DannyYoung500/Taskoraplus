@@ -1,8 +1,8 @@
 /**
- * Strong Fortress — next-tier anti-fraud for TASKORA.
+ * Strong Fortress - next-tier anti-fraud for TASKORA.
  * - Daily earn cap (per user)
  * - Impossible progression (burst verifies across many campaigns)
- * - Post-verify hooks (escrow touch, reject-spike auto-pause)
+ * - Post-verify hooks (escrow touch, reject-spike auto-pause, P6 velocity circuit)
  * - Unified owner/cron nightly runner (includes membership leave-check)
  * Soft-fail friendly; never blocks owner tooling.
  */
@@ -118,6 +118,16 @@ export async function onSubmissionVerified(opts: {
   try {
     if (opts.taskId) {
       await maybeAutoPauseTaskOnRejectSpike(opts.taskId);
+    }
+  } catch {
+    /* soft */
+  }
+
+  // P6: campaign velocity circuit (auto-pause hot tasks)
+  try {
+    if (opts.taskId) {
+      const { checkCampaignVelocityCircuit } = await import("@/lib/strong-p6.functions");
+      await checkCampaignVelocityCircuit({ taskId: opts.taskId });
     }
   } catch {
     /* soft */
