@@ -144,7 +144,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       throw new Error("Add the proof required by this campaign.");
     }
 
-    // P4 proof sanity + campaign hard budget stop
     try {
       const { assertProofSanity, assertCampaignBudgetRemaining } = await import("@/lib/strong-p4.functions");
       await assertProofSanity({ proofUrl, proofText });
@@ -188,7 +187,16 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("already")) throw e;
     }
 
-    if (!autoVerified && !isAutoProof) {
+    // P5: first N verified tasks always manual (anti bot farm)
+    let forceManual = false;
+    try {
+      const { shouldForceManualReview } = await import("@/lib/strong-p5.functions");
+      forceManual = await shouldForceManualReview({ userId });
+    } catch {
+      /* soft */
+    }
+
+    if (!autoVerified && !isAutoProof && !forceManual) {
       try {
         const { shouldTrustFastTrack } = await import("@/lib/strong-p3.functions");
         const ok = await shouldTrustFastTrack({
@@ -201,6 +209,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
         /* soft */
       }
     }
+    if (forceManual) autoVerified = false;
 
     let submissionId = "";
     const { data: rpcId, error: claimError } = await supabaseAdmin.rpc("claim_task_submission", {
