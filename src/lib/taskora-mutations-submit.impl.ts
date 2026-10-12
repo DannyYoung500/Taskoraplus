@@ -90,9 +90,26 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && (e.message.includes("Daily earn") || e.message.includes("automated") || e.message.includes("Too many"))) throw e;
     }
 
+    try {
+      const { assertAdvertiserDailyCap } = await import("@/lib/strong-p2.functions");
+      await assertAdvertiserDailyCap({
+        advertiser: String((task as { advertiser?: string }).advertiser || ""),
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("completion cap")) throw e;
+    }
+
+    try {
+      const { assertVerifyRateLimit } = await import("@/lib/strong-p3.functions");
+      await assertVerifyRateLimit({ userId });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Too many submissions")) throw e;
+    }
+
     const platform = String((task as { platform?: string }).platform ?? "").toLowerCase();
     try {
       const { assertConnectedAccountForPlatform, assertPlatformDailyCompletionCap, assertEarnerQuality, assertPlatformSubmitCooldown } = await import("@/lib/strong-ops");
+      // Telegram exempt; Discord requires connected Discord account
       if (platform !== "telegram") {
         await assertConnectedAccountForPlatform({ userId, platform });
       }
@@ -143,6 +160,27 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && (e.message.toLowerCase().includes("proof") || e.message.includes("recycled") || e.message.includes("original"))) throw e;
     }
 
+    try {
+      const { assertProofNotReused } = await import("@/lib/strong-p3.functions");
+      await assertProofNotReused({ userId, proofUrl, proofHash });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("already")) throw e;
+    }
+
+    if (!autoVerified && !isAutoProof) {
+      try {
+        const { shouldTrustFastTrack } = await import("@/lib/strong-p3.functions");
+        const ok = await shouldTrustFastTrack({
+          userId,
+          rewardUsd: Number((task as { reward?: number }).reward ?? 0),
+          proofMode,
+        });
+        if (ok) autoVerified = true;
+      } catch {
+        /* soft */
+      }
+    }
+
     let submissionId = "";
     const { data: rpcId, error: claimError } = await supabaseAdmin.rpc("claim_task_submission", {
       p_user_id: userId,
@@ -184,13 +222,15 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
         const { error: verificationError } = await supabaseAdmin.rpc("review_task_submission", {
           p_submission_id: submissionId,
           p_decision: "verified",
-          p_reason: "Automatic verification confirmed membership.",
+          p_reason: isAutoProof
+            ? "Automatic verification confirmed membership."
+            : "Trust fast-track auto-approved.",
         } as never);
         if (verificationError && !/function|does not exist/i.test(verificationError.message)) {
-          await supabaseAdmin.from("submissions").update({ status: "verified", review_note: "auto membership" } as never).eq("id", submissionId);
+          await supabaseAdmin.from("submissions").update({ status: "verified", review_note: isAutoProof ? "auto membership" : "trust fast-track" } as never).eq("id", submissionId);
         }
       } catch {
-        await supabaseAdmin.from("submissions").update({ status: "verified", review_note: "auto membership" } as never).eq("id", submissionId);
+        await supabaseAdmin.from("submissions").update({ status: "verified", review_note: isAutoProof ? "auto membership" : "trust fast-track" } as never).eq("id", submissionId);
       }
       try {
         const { applyTrustOutcome } = await import("@/lib/strong-escrow.functions");
