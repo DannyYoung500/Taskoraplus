@@ -167,7 +167,7 @@ export async function runStrongNightlySuite(): Promise<Record<string, unknown>> 
     out.escrow = { error: e instanceof Error ? e.message : "fail" };
   }
   try {
-    const { runStuckTaskSla } = await import("@/lib/strong-plus.functions");
+    const { runStuckTaskSla } = await import("@/lib/strong-plus.server");
     out.stuckTasks = await runStuckTaskSla({ hours: 48, autoPause: true });
   } catch (e) {
     out.stuckTasks = { error: e instanceof Error ? e.message : "fail" };
