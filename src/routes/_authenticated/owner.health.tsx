@@ -97,9 +97,7 @@ function OwnerHealthPage() {
         setMsg(`Stuck withdrawals: ${r.count} · ~$${Number(r.totalUsd).toFixed(2)}`);
       } else if (kind === "wd_sla") {
         const r = await ownerRunStuckWithdrawalSla({ data: { hours: 12 } });
-        setMsg(
-          `WD SLA: ${r.count} stuck · ~$${Number(r.totalUsd).toFixed(2)} · flagged ${r.flagged}`,
-        );
+        setMsg(`WD SLA: ${r.count} stuck · ~$${Number(r.totalUsd).toFixed(2)} · flagged ${r.flagged}`);
       } else if (kind === "campaigns") {
         const r = await ownerAlertStuckCampaigns();
         setMsg(`Stuck campaigns: ${r.count}`);
@@ -283,6 +281,28 @@ function OwnerHealthPage() {
             className="rounded-xl border border-orange-400/25 bg-orange-400/10 py-2.5 text-xs font-bold text-orange-200 disabled:opacity-50"
           >
             Pause high-clawback advertisers
+          </button>
+          <button
+            type="button"
+            disabled={busy === "zero_slots"}
+            onClick={() => {
+              void (async () => {
+                setBusy("zero_slots");
+                setMsg(null);
+                try {
+                  const { ownerAutoCloseZeroSlotTasks } = await import("@/lib/strong-p5.functions");
+                  const r = await ownerAutoCloseZeroSlotTasks();
+                  setMsg(`Auto-closed ${r.closed} zero-slot task(s)`);
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "Auto-close failed");
+                } finally {
+                  setBusy(null);
+                }
+              })();
+            }}
+            className="rounded-xl border border-sky-400/25 bg-sky-400/10 py-2.5 text-xs font-bold text-sky-200 disabled:opacity-50"
+          >
+            Auto-close zero-slot tasks
           </button>
         </div>
       </section>
