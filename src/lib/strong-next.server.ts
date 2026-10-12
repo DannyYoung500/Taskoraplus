@@ -186,7 +186,7 @@ export const ownerUnfreezeWallet = createServerFn({ method: "POST" })
   });
 
 /** H · Public masked paid withdrawals. */
-export const getPublicPayoutLedger = createServerFn({ method: "GET" }).handler(async () => {
+export async function getPublicPayoutLedgerInternal() {
   try {
     const s = await adminClient();
     const { data } = await s
@@ -232,7 +232,7 @@ export const getPublicPayoutLedger = createServerFn({ method: "GET" }).handler(a
   } catch {
     return [];
   }
-});
+}
 
 /** J · Require connected account before first withdrawal. */
 export async function assertConnectedBeforeFirstWithdrawal(opts: {
