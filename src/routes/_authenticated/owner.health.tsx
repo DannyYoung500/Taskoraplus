@@ -192,7 +192,7 @@ function OwnerHealthPage() {
               </div>
               <p className="mt-1 text-[11px] text-white/45">{bots.discord.detail}</p>
               {!bots.discord.configured ? (
-                <p className="mt-1 text-[10px] text-amber-300/80">Set DISCORD_BOT_TOKEN in Vercel env or Owner → Settings → Platforms.</p>
+                <p className="mt-1 text-[10px] text-amber-300/80">Set DISCORD_BOT_TOKEN in Vercel env or Owner → Platforms.</p>
               ) : null}
             </div>
           </>
@@ -240,6 +240,50 @@ function OwnerHealthPage() {
           <button type="button" disabled={busy === "wd"} onClick={() => void runCron("wd")} className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50">Alert stuck WDs</button>
           <button type="button" disabled={busy === "wd_sla"} onClick={() => void runCron("wd_sla")} className="rounded-xl border border-amber-400/25 bg-amber-400/10 py-2.5 text-xs font-bold text-amber-200 disabled:opacity-50">Run 12h WD SLA (flag + notify)</button>
           <button type="button" disabled={busy === "campaigns"} onClick={() => void runCron("campaigns")} className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 py-2.5 text-xs font-bold text-cyan-200 disabled:opacity-50">Alert stuck campaigns</button>
+          <button
+            type="button"
+            disabled={busy === "referral_audit"}
+            onClick={() => {
+              void (async () => {
+                setBusy("referral_audit");
+                setMsg(null);
+                try {
+                  const { ownerRunReferralAudit } = await import("@/lib/strong-p4.functions");
+                  const r = await ownerRunReferralAudit({ data: { clawback: false, limit: 50 } });
+                  setMsg(`Referral audit: ${r.checked} checked · ${r.failed} inactive · ${r.clawed} clawed`);
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "Referral audit failed");
+                } finally {
+                  setBusy(null);
+                }
+              })();
+            }}
+            className="rounded-xl border border-rose-400/25 bg-rose-400/10 py-2.5 text-xs font-bold text-rose-200 disabled:opacity-50"
+          >
+            Referral unlock audit (inactive referees)
+          </button>
+          <button
+            type="button"
+            disabled={busy === "clawback_pause"}
+            onClick={() => {
+              void (async () => {
+                setBusy("clawback_pause");
+                setMsg(null);
+                try {
+                  const { ownerPauseClawbackSpikeAdvertisers } = await import("@/lib/strong-p2.functions");
+                  const r = await ownerPauseClawbackSpikeAdvertisers();
+                  setMsg(`Clawback spike: paused ${r.paused} · checked ${r.advertisersChecked} advertisers`);
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "Clawback pause failed");
+                } finally {
+                  setBusy(null);
+                }
+              })();
+            }}
+            className="rounded-xl border border-orange-400/25 bg-orange-400/10 py-2.5 text-xs font-bold text-orange-200 disabled:opacity-50"
+          >
+            Pause high-clawback advertisers
+          </button>
         </div>
       </section>
 
