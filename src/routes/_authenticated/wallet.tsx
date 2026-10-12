@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AppLink } from "@/components/AppLink";
 import { useState } from "react";
 import {
   ArrowDownLeft,
@@ -21,6 +20,7 @@ import {
 } from "@/lib/taskora-mutations.functions";
 import { CryptoLogo, resolveCryptoId } from "@/components/CryptoIcon";
 import { ACCENT_GRAD } from "@/lib/brand";
+import { AppLink } from "@/components/AppLink";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
   loader: async () => {
@@ -106,12 +106,37 @@ function WalletScreen() {
         typeof window !== "undefined"
           ? String((window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData ?? "")
           : "";
+      let moneySessionToken: string | undefined;
+      try {
+        const {
+          mintMoneySession,
+          storeMoneySessionClient,
+          readMoneySessionClient,
+        } = await import("@/lib/money-session.functions");
+        if (initData) {
+          const minted = await mintMoneySession({ data: { initData } });
+          if (minted?.token) {
+            storeMoneySessionClient(minted.token, minted.expiresAt);
+            moneySessionToken = minted.token;
+          }
+        }
+        if (!moneySessionToken) moneySessionToken = readMoneySessionClient() ?? undefined;
+      } catch {
+        try {
+          const { readMoneySessionClient } = await import("@/lib/money-session.functions");
+          moneySessionToken = readMoneySessionClient() ?? undefined;
+        } catch {
+          /* soft */
+        }
+      }
       await requestWithdrawalGuarded({
         data: {
           method: wMethod,
           address: wAddress.trim(),
           amount: Number(wAmount),
           initData: initData || undefined,
+          moneySessionToken,
+          sessionToken: moneySessionToken,
         },
       });
       hapticSuccess();
@@ -330,7 +355,7 @@ function WalletScreen() {
       {tab === "withdraw" ? (
         <section className="space-y-3">
           <p className="text-[12px] font-normal text-neutral-500">
-            Min {formatUsd(minWd)} · processed after review
+            Min {formatUsd(minWd)} · processed after review · secure session required
           </p>
           <AppLink
             to="/payout-proofs"
