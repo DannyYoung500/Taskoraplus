@@ -88,12 +88,12 @@ export const startWatchVideo = createServerFn({ method: "POST" })
 /** Heartbeat: only accumulate qualified time when tab is visible + optional attention ack. */
 export const heartbeatWatchVideo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { sessionId: string; attentionAck?: boolean; visible?: boolean }) => data)
+  .inputValidator((data: { sessionId: string; attentionAck?: boolean; visible?: boolean; playing?: boolean }) => data)
   .handler(async ({ data, context }) => {
     const s = await adminClient();
     const { data: session } = await (s as any)
       .from("watch_video_sessions")
-      .select("id,status,qualified_seconds,last_heartbeat_at")
+      .select("id,status,qualified_seconds,last_heartbeat_at,heartbeat_count")
       .eq("id", data.sessionId)
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -103,19 +103,27 @@ export const heartbeatWatchVideo = createServerFn({ method: "POST" })
     const now = Date.now();
     const last = session.last_heartbeat_at ? new Date(String(session.last_heartbeat_at)).getTime() : now;
     const delta = Math.min(15, Math.max(0, (now - last) / 1000));
-    // Visibility gate: if client reports tab hidden, do not credit watch time
     const isVisible = data.visible !== false;
-    const add = isVisible ? delta : 0;
+    const isPlaying = data.playing !== false;
+    const add = isVisible && isPlaying ? delta : 0;
     const qualified = Number(session.qualified_seconds ?? 0) + add;
+    const hbCount = Number(session.heartbeat_count ?? 0) + 1;
     const patch: Record<string, unknown> = {
       qualified_seconds: qualified,
       last_heartbeat_at: new Date(now).toISOString(),
+      heartbeat_count: hbCount,
     };
     if (data.attentionAck) {
       patch.attention_ack_at = new Date(now).toISOString();
       patch.attention_acked = true;
     }
-    await (s as any).from("watch_video_sessions").update(patch).eq("id", data.sessionId);
+    try {
+      await (s as any).from("watch_video_sessions").update(patch).eq("id", data.sessionId);
+    } catch {
+      // heartbeat_count column may not exist yet
+      delete patch.heartbeat_count;
+      await (s as any).from("watch_video_sessions").update(patch).eq("id", data.sessionId);
+    }
     return { ok: true as const, qualifiedSeconds: qualified, credited: add };
   });
 
@@ -123,6 +131,21 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { sessionId: string }) => data)
   .handler(async ({ data, context }) => {
+    // P5: require recent heartbeats / valid session binding
+    try {
+      const { assertWatchSessionBound } = await import("@/lib/strong-p5.functions");
+      await assertWatchSessionBound({ sessionId: data.sessionId, userId: context.userId });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        (e.message.includes("Watch") ||
+          e.message.includes("heartbeat") ||
+          e.message.includes("session"))
+      ) {
+        throw e;
+      }
+    }
+
     const s = await adminClient();
     const { data: session } = await (s as any)
       .from("watch_video_sessions")
@@ -184,8 +207,6 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
       }
     }
 
-    // Create the idempotent reward transaction before completing the session.
-    // A unique DB index on (user_id, label) for this session prevents replay credits.
     const rewardLabel = `Watch video — ${String(v.title)} [session:${String(session.id)}]`;
     if (rewardUsdt > 0) {
       const { error } = await s.from("transactions").insert({
@@ -198,7 +219,6 @@ export const completeWatchVideo = createServerFn({ method: "POST" })
         if (String((error as { code?: string }).code) !== "23505") {
           throw new Error(error.message);
         }
-        // A retry may encounter the reward created by an earlier attempt.
         const { data: existingReward, error: lookupError } = await s
           .from("transactions")
           .select("id,amount")
