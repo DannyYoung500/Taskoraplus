@@ -46,7 +46,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Money-session required (15m token) or fresh Telegram initData
     try {
       const { assertMoneySessionOrInitData } = await import("@/lib/strong-tier-a.functions");
       await assertMoneySessionOrInitData({
@@ -62,6 +61,13 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
         e.message.includes("Fresh session") || e.message.includes("Money session") ||
         e.message.includes("session")
       )) throw e;
+    }
+
+    try {
+      const { assertNotShadowbanned } = await import("@/lib/strong-p5.functions");
+      await assertNotShadowbanned({ userId });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Withdrawals are temporarily")) throw e;
     }
 
     try {
@@ -83,6 +89,13 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       await assertAddressAllowlisted({ userId, address });
     } catch (e) {
       if (e instanceof Error && (e.message.includes("24") || e.message.includes("cool") || e.message.includes("wait") || e.message.includes("Address saved"))) throw e;
+    }
+
+    try {
+      const { assertStrictAddressCoolOff } = await import("@/lib/strong-p5.functions");
+      await assertStrictAddressCoolOff({ userId, address });
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("Wait") || e.message.includes("cooling"))) throw e;
     }
 
     try {
@@ -153,13 +166,21 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
         const geo = assertGeoMethodMatch({ countryCode: cc, method: data.method, hardBlock: RULES.geoMismatchHardBlock });
         if (geo.blocked) throw new Error(geo.blocked);
         if (geo.dualRequired) requiresDual = true;
+        try {
+          const { assertGeoMethodMatrix } = await import("@/lib/strong-p5.functions");
+          assertGeoMethodMatrix({ countryCode: cc, method: data.method });
+        } catch (ge) {
+          if (ge instanceof Error && (ge.message.includes("Payout") || ge.message.includes("region"))) throw ge;
+        }
       }
     } catch (e) {
-      if (e instanceof Error && (e.message.includes("network") || e.message.includes("Too many accounts") || e.message.includes("payout method requires"))) throw e;
+      if (e instanceof Error && (e.message.includes("network") || e.message.includes("Too many accounts") || e.message.includes("payout method requires") || e.message.includes("Payout") || e.message.includes("region"))) throw e;
     }
 
     const { data: profile } = await supabaseAdmin.from("profiles").select("created_at, status, wallet_frozen, wallet_frozen_reason").eq("id", userId).maybeSingle();
-    if (profile && (profile as { status?: string }).status && (profile as { status?: string }).status !== "active") throw new Error("Account is not allowed to withdraw.");
+    if (profile && (profile as { status?: string }).status && (profile as { status?: string }).status !== "active" && (profile as { status?: string }).status !== "shadowban") {
+      throw new Error("Account is not allowed to withdraw.");
+    }
     if (Boolean((profile as { wallet_frozen?: boolean } | null)?.wallet_frozen)) {
       const reason = String((profile as { wallet_frozen_reason?: string | null } | null)?.wallet_frozen_reason ?? "").trim() || "Contact support.";
       throw new Error(`Wallet is frozen by the owner. ${reason}`);
@@ -201,7 +222,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     const { count: pendingCount } = await supabaseAdmin.from("withdrawals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "pending");
     if ((pendingCount ?? 0) >= RULES.maxPendingWithdrawals) throw new Error(`You already have ${RULES.maxPendingWithdrawals} pending withdrawals. Wait for review.`);
 
-    // P4 shared wallet cluster (soft hold / dual / first-WD cap)
     try {
       const { count: priorWd } = await supabaseAdmin
         .from("withdrawals")
@@ -218,14 +238,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       });
       if (cluster.dualRequired) requiresDual = true;
     } catch (e) {
-      if (
-        e instanceof Error &&
-        (e.message.includes("wallet") ||
-          e.message.includes("Shared") ||
-          e.message.includes("too many accounts"))
-      ) {
-        throw e;
-      }
+      if (e instanceof Error && (e.message.includes("wallet") || e.message.includes("Shared") || e.message.includes("too many accounts"))) throw e;
     }
 
     const { data: txs } = await supabaseAdmin.from("transactions").select("amount").eq("user_id", userId);
