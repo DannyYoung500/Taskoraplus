@@ -18,7 +18,7 @@ export const RULES = {
   maxWithdrawalsPerDay: 3,
   riskForceDual: 40,
   riskAutoFreeze: 70,
-  txHashRequiredUsd: 20,
+  txHashRequiredUsd: 5,
   maxAccountsPerDevice: 3,
   multiDeviceWdCapUsd: 10,
   referralUnlockApprovedTasks: 3,
