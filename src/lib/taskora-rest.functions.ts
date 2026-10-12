@@ -52,13 +52,19 @@ export const listTasks = createServerFn({ method: "GET" }).handler(async () => {
     .eq("is_active", true)
     .order("reward", { ascending: false });
   if (error) throw new Error(error.message);
-  return (data ?? []).filter((t) => {
+  const filtered = (data ?? []).filter((t) => {
     const type = String((t as { task_type?: string }).task_type || "").toLowerCase();
     const platform = String((t as { platform?: string }).platform || "").toLowerCase();
     if (type.includes("video_watch") || type === "video_watch") return false;
     if (platform === "youtube" && type.includes("watch")) return false;
     return true;
   });
+  try {
+    const { rankTasksByAdvertiserReputation } = await import("@/lib/strong-p5.functions");
+    return await rankTasksByAdvertiserReputation(filtered);
+  } catch {
+    return filtered;
+  }
 });
 
 export const getTask = createServerFn({ method: "GET" })
