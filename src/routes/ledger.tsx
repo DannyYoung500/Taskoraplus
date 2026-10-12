@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getPublicPlatformStats } from "@/lib/strong-wave.functions";
+import { getPublicPlatformStats } from "@/lib/strong-wave-public.functions";
 import { getPublicPayoutLedger } from "@/lib/strong-next.functions";
 import { getVerifiedSparkline } from "@/lib/strong-more.functions";
 import { TASKORA_LOGO } from "@/lib/brand";
