@@ -18,7 +18,7 @@ const KYC_WD_THRESHOLD_USD = 15;
 const PUBLIC_PAYOUT_LIMIT = 50;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/strong-p7.server");
   return supabaseAdmin;
 }
 
