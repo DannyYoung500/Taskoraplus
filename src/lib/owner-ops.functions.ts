@@ -13,7 +13,7 @@ export const getSystemHealth = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertOwner(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
     const checks: HealthCheck[] = [];
     const now = new Date().toISOString();
 
@@ -110,7 +110,7 @@ export const listAuditLogs = createServerFn({ method: "GET" })
   .inputValidator((d: { search?: string; limit?: number } | undefined) => d ?? {})
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
     const limit = Math.min(200, Math.max(20, Number(data?.limit ?? 80)));
     let q = supabaseAdmin
       .from("audit_logs")
@@ -146,7 +146,7 @@ export const listFraudFlags = createServerFn({ method: "GET" })
   .inputValidator((d: { status?: string } | undefined) => d ?? {})
   .handler(async ({ data, context }): Promise<FraudFlagRow[]> => {
     await assertOwner(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
     const status = (data?.status ?? "open").trim() || "open";
     let q = supabaseAdmin
       .from("fraud_flags")
@@ -188,7 +188,7 @@ export const resolveFraudFlag = createServerFn({ method: "POST" })
   .inputValidator((d: { flagId: string; status: "resolved" | "dismissed"; note?: string }) => d)
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
     const { data: row } = await supabaseAdmin.from("fraud_flags").select("*").eq("id", data.flagId).maybeSingle();
     if (!row) throw new Error("Flag not found.");
     const { error } = await supabaseAdmin
@@ -212,7 +212,7 @@ export const resolveFraudFlag = createServerFn({ method: "POST" })
   });
 
 export async function computeUserRiskScore(userId: string): Promise<{ score: number; signals: string[] }> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/owner-ops.server");
   const signals: string[] = [];
   let score = 0;
 
@@ -329,7 +329,7 @@ export const scanFraudSignals = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertOwner(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
     let created = 0;
 
     const { data: recentWd } = await supabaseAdmin
@@ -494,7 +494,7 @@ export const listFeatureFlags = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertOwner(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
 
     const [{ data: flagsRow }, { data: maintRow }] = await Promise.all([
       supabaseAdmin.from("app_settings").select("value").eq("key", "feature_flags").maybeSingle(),
@@ -534,7 +534,7 @@ export const setFeatureFlag = createServerFn({ method: "POST" })
     const key = (data.key || "").trim();
     if (!key) throw new Error("Flag key required.");
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
     const { data: row } = await supabaseAdmin
       .from("app_settings")
       .select("value")
@@ -574,7 +574,7 @@ export const setMaintenanceMode = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/owner-ops.server");
 
     const { data: row } = await supabaseAdmin
       .from("app_settings")
