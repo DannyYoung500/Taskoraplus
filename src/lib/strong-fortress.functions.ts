@@ -11,8 +11,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const DEFAULT_DAILY_EARN_CAP_USD = 25;
 const IMPOSSIBLE_VERIFIES_PER_HOUR = 12;
-const REJECT_SPIKE_RATIO = 0.55;
-const REJECT_SPIKE_MIN = 8;
+const REJECT_SPIKE_RATIO = 0.75;
+const REJECT_SPIKE_MIN = 20;
 
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
