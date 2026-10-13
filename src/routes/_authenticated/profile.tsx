@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
     ]);
     return { dash, accounts };
   },
-  head: () => ({ meta: [{ title: "Profile — TASKORA" }] }),
+  head: () => ({ meta: [{ title: "Profile - TASKORA" }] }),
   component: ProfileScreen,
 });
 
@@ -172,6 +172,12 @@ function ProfileScreen() {
             label="Connected accounts"
             sub={connectedCount > 0 ? `${connectedCount} linked` : "Link social accounts"}
             badge={connectedCount > 0 ? String(connectedCount) : undefined}
+          />
+          <MenuRow
+            to="/verification"
+            icon={Shield}
+            label="Identity check"
+            sub="Selfie unlock for larger withdrawals"
           />
           <MenuRow to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
           <MenuRow to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
