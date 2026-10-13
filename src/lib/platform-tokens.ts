@@ -29,7 +29,7 @@ function mask(s: string, keep = 4): string {
 
 async function readDbTokens(): Promise<TokenBag> {
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/platform-tokens.server");
     const { data } = await supabaseAdmin
       .from("app_settings")
       .select("value")
@@ -137,7 +137,7 @@ export const ownerSetPlatformToken = createServerFn({ method: "POST" })
       throw new Error("Telegram bot token format looks invalid (expect digits:alphanum from @BotFather).");
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/platform-tokens.server");
     const existing = await readDbTokens();
     const next: TokenBag = { ...existing };
     if (!value) {
