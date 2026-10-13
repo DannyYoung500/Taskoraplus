@@ -191,6 +191,27 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
     }
 
     try {
+      const { assertProofWatermark, assertProofUrlNotShared } = await import("@/lib/strong-p8.functions");
+      await assertProofWatermark({
+        userId,
+        taskId,
+        proofText,
+        proofUrl,
+        proofMode,
+        rewardUsd: Number((task as { reward?: number }).reward ?? 0),
+      });
+      await assertProofUrlNotShared({ userId, proofUrl });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        (e.message.includes("watermark") ||
+          e.message.includes("Watermark") ||
+          e.message.includes("already used"))
+      )
+        throw e;
+    }
+
+    try {
       const { enforceProofUploadToken } = await import("@/lib/strong-p6.functions");
       await enforceProofUploadToken({ userId, proofMode, token: proofUploadToken });
     } catch (e) {
