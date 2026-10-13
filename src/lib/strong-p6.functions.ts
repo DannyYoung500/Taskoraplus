@@ -152,26 +152,72 @@ export async function assertDestinationFingerprint(opts: { userId: string; addre
   return { clusterSize, dualRequired: clusterSize >= 2 };
 }
 
-export async function checkCampaignVelocityCircuit(opts: { taskId: string; platform?: string }) {
+/** Velocity: only hard-pause at extreme rates (default 40+/h). Soft flag at 15+/h. */
+export async function checkCampaignVelocityCircuit(opts: {
+  taskId: string;
+  platform?: string;
+  hardPauseThreshold?: number;
+}) {
   const s = await admin();
   const since = new Date(Date.now() - 60 * 60_000).toISOString();
   let rate = 0;
   let median = 0;
   let paused = false;
+  const hard = Math.max(40, Number(opts.hardPauseThreshold ?? 40));
   try {
     const { count } = await s.from("submissions").select("id", { count: "exact", head: true })
       .eq("task_id", opts.taskId).in("status", ["verified", "approved", "auto_approved"] as never).gte("created_at", since);
     rate = count ?? 0;
-    if (rate >= 8) {
-      const threshold = Math.max(8, median * 3 || 12);
-      if (rate > threshold) {
-        await s.from("tasks").update({ is_active: false, status: "paused", review_note: `Velocity circuit: ${rate}/h` } as never).eq("id", opts.taskId);
-        paused = true;
-      }
+    if (rate >= hard) {
+      await s.from("tasks").update({
+        is_active: false,
+        status: "paused",
+        review_note: `Velocity circuit: ${rate}/h (threshold ${hard})`,
+      } as never).eq("id", opts.taskId);
+      paused = true;
+    } else if (rate >= 15) {
+      try {
+        await s.from("tasks").update({ review_note: `Velocity watch: ${rate}/h` } as never).eq("id", opts.taskId);
+      } catch { /* soft */ }
     }
   } catch { /* soft */ }
-  return { paused, rate, median };
+  return { paused, rate, median, hard };
 }
+
+/** Owner: re-enable tasks paused by velocity / reject-spike / status paused. */
+export async function reactivatePausedTasks(opts?: { limit?: number; onlyVelocity?: boolean }) {
+  const s = await admin();
+  const limit = Math.min(200, Math.max(1, Number(opts?.limit ?? 100)));
+  const { data: rows } = await s.from("tasks").select("id, review_note, status, is_active").eq("is_active", false).limit(limit);
+  let reactivated = 0;
+  for (const row of rows ?? []) {
+    const r = row as { id: string; review_note?: string | null; status?: string };
+    const note = String(r.review_note || "");
+    if (opts?.onlyVelocity && !note.toLowerCase().includes("velocity") && String(r.status) !== "paused") {
+      continue;
+    }
+    try {
+      await s.from("tasks").update({
+        is_active: true,
+        status: "active",
+        review_note: note ? `${note} · reactivated` : "reactivated",
+      } as never).eq("id", r.id);
+      reactivated += 1;
+    } catch { /* soft */ }
+  }
+  return { scanned: (rows ?? []).length, reactivated };
+}
+
+export const ownerReactivatePausedTasks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d?: { onlyVelocity?: boolean }) => d ?? {})
+  .handler(async ({ context, data }) => {
+    await assertOwner(context.userId);
+    return reactivatePausedTasks({
+      onlyVelocity: Boolean((data as { onlyVelocity?: boolean })?.onlyVelocity),
+      limit: 150,
+    });
+  });
 
 export const ownerRunVelocityCircuits = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
