@@ -3,7 +3,7 @@
  * - Daily earn cap (per user)
  * - Impossible progression (burst verifies across many campaigns)
  * - Post-verify hooks (escrow touch, reject-spike auto-pause, P6 velocity circuit)
- * - Unified owner/cron nightly runner (includes membership leave-check)
+ * - Unified owner/cron nightly runner (membership leave-check + P7 bond)
  * Soft-fail friendly; never blocks owner tooling.
  */
 import { createServerFn } from "@tanstack/react-start";
@@ -24,7 +24,6 @@ async function assertOwner(userId: string) {
   await ao(userId);
 }
 
-/** Rolling 24h reward earnings (tasks + watch + bonuses). */
 export async function assertDailyEarnCap(opts: {
   userId: string;
   addUsd: number;
@@ -123,7 +122,6 @@ export async function onSubmissionVerified(opts: {
     /* soft */
   }
 
-  // P6: campaign velocity circuit (auto-pause hot tasks)
   try {
     if (opts.taskId) {
       const { checkCampaignVelocityCircuit } = await import("@/lib/strong-p6.functions");
@@ -208,6 +206,12 @@ export async function runStrongNightlySuite(): Promise<Record<string, unknown>> 
   } catch (e) {
     out.membership = { error: e instanceof Error ? e.message : "fail" };
   }
+  try {
+    const { runP7NightlySuite } = await import("@/lib/strong-p7.functions");
+    out.p7 = await runP7NightlySuite();
+  } catch (e) {
+    out.p7 = { error: e instanceof Error ? e.message : "fail" };
+  }
   return out;
 }
 
@@ -232,9 +236,22 @@ export const ownerRunMembershipRecheckAlias = createServerFn({ method: "POST" })
 export async function assertFortressBeforeSubmit(opts: {
   userId: string;
   rewardUsd?: number;
+  taskId?: string | null;
 }): Promise<void> {
   await assertImpossibleProgression({ userId: opts.userId });
   if (opts.rewardUsd && opts.rewardUsd > 0) {
     await assertDailyEarnCap({ userId: opts.userId, addUsd: opts.rewardUsd });
+  }
+  if (opts.taskId) {
+    try {
+      const { assertTaskCooldownGraph } = await import("@/lib/strong-p7.functions");
+      await assertTaskCooldownGraph({ userId: opts.userId, taskId: opts.taskId });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        (e.message.includes("Cooldown") || e.message.includes("device has completed"))
+      )
+        throw e;
+    }
   }
 }
