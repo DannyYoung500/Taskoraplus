@@ -53,7 +53,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && (e.message.includes("Wait") || e.message.includes("cooling"))) throw e;
     }
 
-    // P6: destination fingerprint
     try {
       const { assertDestinationFingerprint } = await import("@/lib/strong-p6.functions");
       await assertDestinationFingerprint({ userId, address });
@@ -61,7 +60,6 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("linked to too many")) throw e;
     }
 
-    // P6: device attestation
     let requiresDual = false;
     try {
       const { assertDeviceScoreForWithdraw } = await import("@/lib/strong-p6.functions");
@@ -69,6 +67,14 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
       if (ds.dualRequired) requiresDual = true;
     } catch (e) {
       if (e instanceof Error && (e.message.includes("device needs") || e.message.includes("security review"))) throw e;
+    }
+
+    // P7: soft KYC for larger withdrawals
+    try {
+      const { assertKycForWithdraw } = await import("@/lib/strong-p7.functions");
+      await assertKycForWithdraw({ userId, amountUsd: Number(data.amount) });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Identity check")) throw e;
     }
 
     let minWd = RULES.minWithdrawalUsd;
@@ -83,7 +89,7 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
     if (data.amount >= dualThreshold) requiresDual = true;
 
     const { data: profile } = await supabaseAdmin.from("profiles").select("created_at, status, wallet_frozen, wallet_frozen_reason").eq("id", userId).maybeSingle();
-    if (profile && (profile as { status?: string }).status && ! ["active", "shadowban"].includes(String((profile as { status?: string }).status))) {
+    if (profile && (profile as { status?: string }).status && !["active", "shadowban"].includes(String((profile as { status?: string }).status))) {
       throw new Error("Account is not allowed to withdraw.");
     }
     if (Boolean((profile as { wallet_frozen?: boolean } | null)?.wallet_frozen)) {
