@@ -37,14 +37,15 @@ function asUuid(value: unknown): string {
 
 export const submitTaskGuarded = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId?: string; proofText?: string; proofUrl?: string; startedAtIso?: string; data?: unknown }) => d)
+  .inputValidator((d: { taskId?: string; proofText?: string; proofUrl?: string; startedAtIso?: string; data?: unknown; proofUploadToken?: string }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const nested = (data as { data?: { taskId?: string; proofText?: string; proofUrl?: string; startedAtIso?: string } })?.data;
+    const nested = (data as { data?: { taskId?: string; proofText?: string; proofUrl?: string; startedAtIso?: string; proofUploadToken?: string } })?.data;
     const taskId = asUuid(data.taskId ?? nested?.taskId);
     const proofText = String(data.proofText ?? nested?.proofText ?? "").trim();
     const proofUrl = String(data.proofUrl ?? nested?.proofUrl ?? "").trim();
     const startedAtIso = data.startedAtIso ?? nested?.startedAtIso;
+    const proofUploadToken = String((data as { proofUploadToken?: string }).proofUploadToken ?? nested?.proofUploadToken ?? "").trim();
 
     if (!taskId || taskId.length < 8) throw new Error("Invalid task. Go back and open the task again.");
 
@@ -85,9 +86,18 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       await assertFortressBeforeSubmit({
         userId,
         rewardUsd: Number((task as { reward?: number }).reward ?? 0),
+        taskId,
       });
     } catch (e) {
-      if (e instanceof Error && (e.message.includes("Daily earn") || e.message.includes("automated") || e.message.includes("Too many"))) throw e;
+      if (
+        e instanceof Error &&
+        (e.message.includes("Daily earn") ||
+          e.message.includes("automated") ||
+          e.message.includes("Too many") ||
+          e.message.includes("Cooldown") ||
+          e.message.includes("device has completed"))
+      )
+        throw e;
     }
 
     try {
@@ -146,7 +156,7 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
 
     try {
       const { assertProofSanity, assertCampaignBudgetRemaining } = await import("@/lib/strong-p4.functions");
-      await assertProofSanity({ proofUrl, proofText });
+      await assertProofSanity({ proofUrl, proofText, userId, taskId });
       await assertCampaignBudgetRemaining({
         taskId,
         rewardUsd: Number((task as { reward?: number }).reward ?? 0),
@@ -159,10 +169,32 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
           e.message.includes("Screenshot") ||
           e.message.includes("budget") ||
           e.message.includes("slots") ||
-          e.message.includes("no longer active"))
+          e.message.includes("no longer active") ||
+          e.message.includes("Liveness") ||
+          e.message.includes("live code"))
       ) {
         throw e;
       }
+    }
+
+    try {
+      const { assertLivenessChallenge } = await import("@/lib/strong-p6.functions");
+      await assertLivenessChallenge({
+        userId,
+        taskId,
+        proofText,
+        rewardUsd: Number((task as { reward?: number }).reward ?? 0),
+        proofMode,
+      });
+    } catch (e) {
+      if (e instanceof Error && (e.message.includes("Liveness") || e.message.includes("live code") || e.message.includes("Include"))) throw e;
+    }
+
+    try {
+      const { enforceProofUploadToken } = await import("@/lib/strong-p6.functions");
+      await enforceProofUploadToken({ userId, proofMode, token: proofUploadToken });
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Proof upload")) throw e;
     }
 
     let proofHash: string | null = null;
@@ -187,7 +219,6 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       if (e instanceof Error && e.message.includes("already")) throw e;
     }
 
-    // P5: first N verified tasks always manual (anti bot farm)
     let forceManual = false;
     try {
       const { shouldForceManualReview } = await import("@/lib/strong-p5.functions");
@@ -269,6 +300,10 @@ export const submitTaskGuarded = createServerFn({ method: "POST" })
       try {
         const { onSubmissionVerified } = await import("@/lib/strong-fortress.functions");
         await onSubmissionVerified({ submissionId, userId, taskId, rewardUsd: Number((task as { reward?: number }).reward ?? 0) });
+      } catch { /* soft */ }
+      try {
+        const { checkCampaignVelocityCircuit } = await import("@/lib/strong-p6.functions");
+        await checkCampaignVelocityCircuit({ taskId, platform });
       } catch { /* soft */ }
       return { status: "verified" as const, autoVerified: true, submissionId };
     }
