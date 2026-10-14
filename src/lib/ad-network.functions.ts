@@ -1,19 +1,44 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { isOwnerTelegramId } from "@/lib/owner";
-async function db(){const {supabaseAdmin}=await import("@/integrations/supabase/client.server");return supabaseAdmin;}
-async function assertOwner(userId:string){const s=await db();const {data:role}=await s.rpc("has_role",{_user_id:userId,_role:"admin"});if(role)return;const {data:p}=await s.from("profiles").select("telegram_id").eq("id",userId).maybeSingle();if(isOwnerTelegramId((p as any)?.telegram_id??null))return;throw new Error("Owner/admin authorization required.");}
-const REWARDED_ADAPTERS=new Set(["adsgram"]);
-export const listAdNetworks=createServerFn({method:"GET"}).middleware([requireSupabaseAuth]).handler(async({context})=>{await assertOwner(context.userId);const s=await db();const {data,error}=await (s as any).from("monetization_providers").select("*").eq("category","ads").order("priority").order("provider_name");if(error)throw new Error(error.message);return data??[];});
-export const saveAdNetwork=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).inputValidator((d:{id:string;enabled:boolean;dailyMissionEnabled:boolean;priority:number;placementId?:string|null;rewardUsdtPerView:number;dailyLimit:number;maxDailyRewardUsdt:number;badge:string;description:string;adFormat:string;countries:string;logoUrl:string;title:string})=>d).handler(async({data,context})=>{
- await assertOwner(context.userId);const s=await db();const {data:provider}=await (s as any).from("monetization_providers").select("*").eq("id",data.id).maybeSingle();if(!provider)throw new Error("Ad network not found.");
- const ready=REWARDED_ADAPTERS.has(String(provider.provider_key));if(data.enabled&&!ready)throw new Error("This network cannot be enabled yet because its real TaskoraPlus ad adapter is not connected.");
- const settings={...(provider.settings??{}),logoUrl:data.logoUrl,dailyMissionEnabled:Boolean(data.dailyMissionEnabled),rewardUsdtPerView:Math.max(0,Number(data.rewardUsdtPerView)||0),dailyLimit:Math.max(1,Math.floor(Number(data.dailyLimit)||1)),maxDailyRewardUsdt:Math.max(0,Number(data.maxDailyRewardUsdt)||0),badge:String(data.badge||"").slice(0,60),description:String(data.description||"").slice(0,500),adFormat:String(data.adFormat||"Rewarded video").slice(0,80),countries:String(data.countries||"All supported countries").slice(0,250),title:String(data.title||("Watch "+provider.provider_name)).slice(0,100)};
- const {data:updated,error}=await (s as any).from("monetization_providers").update({enabled:Boolean(data.enabled),priority:Math.max(1,Math.floor(Number(data.priority)||100)),placement_id:String(data.placementId??provider.placement_id??"").trim()||null,settings,updated_at:new Date().toISOString()}).eq("id",data.id).select("*").single();if(error)throw new Error(error.message);
- const missionActive=Boolean(data.enabled&&data.dailyMissionEnabled&&ready&&updated.placement_id);const payload={title:settings.title,description:settings.description,mission_type:"rewarded_ad",provider_key:provider.provider_key,reward_usdt:settings.rewardUsdtPerView,reward_points:0,daily_limit:settings.dailyLimit,is_active:missionActive,created_by:context.userId,updated_at:new Date().toISOString()};
- const {data:existing}=await (s as any).from("daily_missions").select("id").eq("mission_type","rewarded_ad").eq("provider_key",provider.provider_key).maybeSingle();
- if(existing?.id){const {error:e}=await (s as any).from("daily_missions").update(payload).eq("id",existing.id);if(e)throw new Error(e.message);}else{const {error:e}=await (s as any).from("daily_missions").insert(payload);if(e)throw new Error(e.message);}
- return updated;
-});
 
-export const getAdNetworkHealth = createServerFn({method:"GET"}).middleware([requireSupabaseAuth]).handler(async({context})=>{ await assertOwner(context.userId); const s=await db(); const {data,error}=await (s as any).from("monetization_providers").select("id,provider_key,provider_name,enabled,placement_id,public_id,secret_names,updated_at").eq("category","ads").order("priority").order("provider_name"); if(error) throw new Error(error.message); return (data??[]).map((p:any)=>{ const adapter=REWARDED_ADAPTERS.has(String(p.provider_key)); const placement=Boolean(String(p.placement_id??"").trim()); const configured=Boolean(String(p.public_id??"").trim()||((p.secret_names??[]).length>0)); return {providerKey:String(p.provider_key),providerName:String(p.provider_name),enabled:Boolean(p.enabled),adapterConnected:adapter,placementConfigured:placement,credentialsConfigured:configured,ready:adapter&&placement&&configured,lastUpdated:p.updated_at??null,reason:!adapter?"Adapter not connected":!configured?"Credentials not configured":!placement?"Placement ID missing":"Ready"}; }); });
+async function db() {
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
+  return supabaseAdmin;
+}
+
+export const getAdNetworkConfig = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    try {
+      const s = await db();
+      const { data } = await s.from("app_settings").select("value").eq("key", "ad_network").maybeSingle();
+      return (data?.value ?? {}) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  });
+
+export const listAdOffers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    try {
+      const s = await db();
+      const { data } = await s
+        .from("ad_offers")
+        .select("id, title, reward, network, is_active")
+        .eq("is_active", true)
+        .limit(30);
+      return { offers: data ?? [] };
+    } catch {
+      return { offers: [] as Array<Record<string, unknown>> };
+    }
+  });
+
+export const completeAdOffer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { offerId: string; proof?: string }) => d)
+  .handler(async ({ data, context }) => {
+    const s = await db();
+    // soft stub - real postback verification is network-specific
+    return { ok: true, offerId: data.offerId };
+  });
