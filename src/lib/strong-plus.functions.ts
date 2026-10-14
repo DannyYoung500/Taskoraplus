@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/** Owner-only RPC wrappers. Database and crypto helpers live in strong-plus-impl.ts. */
+/** Owner-only RPC wrappers. Database helpers live in strong-plus-impl.ts. */
 export const ownerRunStuckTaskSla = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d?: { hours?: number; autoPause?: boolean }) => d ?? {})
@@ -55,6 +55,17 @@ export const ownerRunAdvertiserReputation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { assertOwner } = await import("@/lib/owner-guard-impl");
     await assertOwner(context.userId);
-    const { ownerRunAdvertiserReputationInternal } = await import("@/lib/strong-plus-impl");
-    return ownerRunAdvertiserReputationInternal(data as { advertiserId?: string; autoPause?: boolean });
+    const { scoreAdvertiserReputation } = await import("@/lib/strong-plus-impl");
+    const advertiserId = (data as { advertiserId?: string })?.advertiserId;
+    if (!advertiserId) {
+      const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
+      const { data: rows } = await supabaseAdmin.from("tasks").select("advertiser_id").not("advertiser_id", "is", null).limit(40);
+      const ids = [...new Set((rows ?? []).map((r) => String((r as { advertiser_id?: string }).advertiser_id ?? "")).filter(Boolean))];
+      const results = [];
+      for (const id of ids.slice(0, 15)) {
+        results.push(await scoreAdvertiserReputation(id));
+      }
+      return { scanned: results.length, results };
+    }
+    return scoreAdvertiserReputation(advertiserId);
   });
