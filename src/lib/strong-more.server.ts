@@ -227,7 +227,7 @@ export async function getOwnerRiskHeatmapInternal() {
       topCc,
       multiDeviceClusters: topFp.filter((x) => x.count >= 3).length,
     };
-  });
+}
 
 /** 8 · Last 7 days verified-task counts for sparkline. */
 export async function getVerifiedSparklineInternal() {
