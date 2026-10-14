@@ -46,7 +46,7 @@ const LEVEL_REQUIREMENTS = [
 const getMyLevelStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
     const [tasks, videos, games, ads] = await Promise.all([
       supabaseAdmin.from("submissions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "verified"),
       supabaseAdmin.from("watch_video_sessions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "completed"),
