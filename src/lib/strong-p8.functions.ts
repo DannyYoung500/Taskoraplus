@@ -3,13 +3,17 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwner } from "@/lib/owner-guard.server";
+
+async function assertOwner(userId: string) {
+  const { assertOwner: ao } = await import("@/lib/owner-guard-impl");
+  await ao(userId);
+}
 
 const WATERMARK_REWARD_USD = 0.15;
 const REFERRAL_QUALITY_MIN_VERIFIED = 3;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/lib/strong-p8.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 

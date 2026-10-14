@@ -10,12 +10,12 @@ const REJECT_SPIKE_RATIO = 0.75;
 const REJECT_SPIKE_MIN = 20;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/lib/strong-fortress.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 
 async function assertOwner(userId: string) {
-  const { assertOwner: ao } = await import("@/lib/owner-guard.server");
+  const { assertOwner: ao } = await import("@/lib/owner-guard-impl");
   await ao(userId);
 }
 
@@ -170,7 +170,7 @@ export async function runStrongNightlySuite(): Promise<Record<string, unknown>> 
     out.escrow = { error: e instanceof Error ? e.message : "fail" };
   }
   try {
-    const { runStuckTaskSla } = await import("@/lib/strong-plus.server");
+    const { runStuckTaskSla } = await import("@/lib/strong-plus-impl");
     out.stuckTasks = await runStuckTaskSla({ hours: 48, autoPause: true });
   } catch (e) {
     out.stuckTasks = { error: e instanceof Error ? e.message : "fail" };
