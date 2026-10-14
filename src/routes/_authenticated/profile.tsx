@@ -173,12 +173,6 @@ function ProfileScreen() {
             sub={connectedCount > 0 ? `${connectedCount} linked` : "Link social accounts"}
             badge={connectedCount > 0 ? String(connectedCount) : undefined}
           />
-          <MenuRow
-            to="/verification"
-            icon={Shield}
-            label="Identity check"
-            sub="Selfie unlock for larger withdrawals"
-          />
           <MenuRow to="/proof-rules" icon={Shield} label="Proof standards" sub="How verification works" />
           <MenuRow to="/support" icon={LifeBuoy} label="Support" sub="Tickets & help" />
           <MenuRow to="/notifications" icon={Bell} label="Notifications" sub="Alerts & updates" />
