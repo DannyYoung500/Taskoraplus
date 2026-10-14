@@ -7,7 +7,10 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwner } from "@/lib/owner-guard.server";
+async function assertOwner(userId: string) {
+  const { assertOwner: ao } = await import("@/lib/owner-guard-impl");
+  await ao(userId);
+}
 
 const TX_HASH_REQUIRED_USD = 5;
 const FIRST_TASKS_MANUAL_COUNT = 3;
@@ -28,7 +31,7 @@ const GEO_METHOD_MATRIX: Record<string, string[]> = {
 };
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 

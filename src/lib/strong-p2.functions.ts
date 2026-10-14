@@ -10,7 +10,10 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwner } from "@/lib/owner-guard.server";
+async function assertOwner(userId: string) {
+  const { assertOwner: ao } = await import("@/lib/owner-guard-impl");
+  await ao(userId);
+}
 
 const NEW_ACCOUNT_WD_HOLD_HOURS = 12;
 const MAX_TASKS_PER_ADVERTISER_PER_DAY = 8;
@@ -18,7 +21,7 @@ const CLAWBACK_SPIKE_MIN = 5;
 const CLAWBACK_SPIKE_RATIO = 0.4;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 

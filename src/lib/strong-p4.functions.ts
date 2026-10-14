@@ -10,7 +10,10 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwner } from "@/lib/owner-guard.server";
+async function assertOwner(userId: string) {
+  const { assertOwner: ao } = await import("@/lib/owner-guard-impl");
+  await ao(userId);
+}
 
 const WALLET_CLUSTER_SOFT = 2;
 const WALLET_CLUSTER_HARD = 3;
@@ -22,7 +25,7 @@ const REFERRAL_MIN_TASKS_FOR_UNLOCK = 3;
 const REFERRAL_LOOKBACK_DAYS = 30;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 

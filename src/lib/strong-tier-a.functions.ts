@@ -21,7 +21,7 @@ export async function assertMoneySessionOrInitData(opts: {
   }
 
   const { assertHardInitDataForMoney } = await import("@/lib/telegram-initdata");
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   let expectedTg: number | string | null = null;
   try {
     const { data } = await supabaseAdmin

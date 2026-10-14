@@ -7,7 +7,10 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwner } from "@/lib/owner-guard.server";
+async function assertOwner(userId: string) {
+  const { assertOwner: ao } = await import("@/lib/owner-guard-impl");
+  await ao(userId);
+}
 
 const TRUST_FAST_TRACK_MIN = 75;
 const TRUST_FAST_TRACK_MAX_REWARD = 0.15;
@@ -15,7 +18,7 @@ const VERIFY_ATTEMPTS_PER_HOUR = 30;
 const DUP_PROOF_LOOKBACK_DAYS = 14;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 
