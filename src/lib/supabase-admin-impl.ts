@@ -18,9 +18,9 @@ function build(): SupabaseClient {
 
 /** Eager export for: const { supabaseAdmin } = await import("@/lib/supabase-admin-impl"); */
 export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
-  get(_target, prop, receiver) {
+  get(_t, prop, receiver) {
     const c = build();
-    const val = Reflect.get(c, prop, c);
-    return typeof val === "function" ? val.bind(c) : val;
+    const v = Reflect.get(c, prop, receiver);
+    return typeof v === "function" ? v.bind(c) : v;
   },
 });
