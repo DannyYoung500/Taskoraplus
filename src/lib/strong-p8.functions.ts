@@ -9,7 +9,7 @@ const WATERMARK_REWARD_USD = 0.15;
 const REFERRAL_QUALITY_MIN_VERIFIED = 3;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/strong-p8.server");
   return supabaseAdmin;
 }
 
@@ -232,13 +232,11 @@ export async function notifyTaskWaitlist(opts: { taskId: string; limit?: number 
     for (const row of rows ?? []) {
       const r = row as { id: string; user_id: string };
       try {
-        const { notifyUserHtml } = await import("@/lib/notify-user");
-        if (typeof notifyUserHtml === "function") {
-          await notifyUserHtml(
-            r.user_id,
-            `Slots reopened on a task you waitlisted. Open Tasks and claim before they fill.`,
-          );
-        }
+        const { sendUserHtml } = await import("@/lib/notify-user");
+        await sendUserHtml({
+          userId: r.user_id,
+          text: "Slots reopened on a task you waitlisted. Open Tasks and claim before they fill.",
+        });
       } catch {
         /* soft */
       }
