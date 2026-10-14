@@ -1,10 +1,5 @@
 /**
  * Strong Fortress - next-tier anti-fraud for TASKORA.
- * - Daily earn cap (per user)
- * - Impossible progression (burst verifies across many campaigns)
- * - Post-verify hooks (escrow touch, reject-spike auto-pause, P6 velocity circuit)
- * - Unified owner/cron nightly runner (membership leave-check + P7 bond)
- * Soft-fail friendly; never blocks owner tooling.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -15,7 +10,7 @@ const REJECT_SPIKE_RATIO = 0.75;
 const REJECT_SPIKE_MIN = 20;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/strong-fortress.server");
   return supabaseAdmin;
 }
 
@@ -156,7 +151,7 @@ export async function maybeAutoPauseTaskOnRejectSpike(taskId: string): Promise<{
     try {
       const { sendOwnerHtml } = await import("@/lib/notify-owner");
       await sendOwnerHtml(
-        `⏸ <b>Auto-paused task</b>\nReject spike ${(ratio * 100).toFixed(0)}% (${rejected}/${list.length})\nTask: <code>${taskId}</code>`,
+        `Auto-paused task\nReject spike ${(ratio * 100).toFixed(0)}% (${rejected}/${list.length})\nTask: ${taskId}`,
       );
     } catch {
       /* soft */
