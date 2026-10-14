@@ -3,7 +3,6 @@
  * - Task cooldown graph (same device/IP × advertiser)
  * - Advertiser bond slash on high leave/clawback rate
  * - Public payout feed (trust signal)
- * - Soft KYC gate before larger withdrawals
  * Soft-fail friendly where schema columns may be missing.
  */
 import { createServerFn } from "@tanstack/react-start";
@@ -18,7 +17,6 @@ const ADVERTISER_COOLDOWN_HOURS = 4;
 const DEVICE_SAME_ADV_MAX = 3;
 const BOND_SLASH_LEAVE_RATE = 0.35;
 const BOND_SLASH_MIN_SAMPLES = 12;
-const KYC_WD_THRESHOLD_USD = 15;
 const PUBLIC_PAYOUT_LIMIT = 50;
 
 async function admin() {
@@ -289,40 +287,9 @@ export async function assertKycForWithdraw(opts: {
   amountUsd: number;
   thresholdUsd?: number;
 }): Promise<{ required: boolean; status: string }> {
-  const thr = Number(opts.thresholdUsd ?? KYC_WD_THRESHOLD_USD);
-  if (opts.amountUsd < thr) return { required: false, status: "not_needed" };
-
-  try {
-    const s = await admin();
-    const { data: profile } = await s
-      .from("profiles")
-      .select("kyc_status, selfie_passed, trust_score")
-      .eq("id", opts.userId)
-      .maybeSingle();
-    const p = profile as {
-      kyc_status?: string;
-      selfie_passed?: boolean;
-      trust_score?: number;
-    } | null;
-
-    if (!p) return { required: true, status: "unknown" };
-
-    const status = String(p.kyc_status || "").toLowerCase();
-    if (status === "verified" || status === "approved" || p.selfie_passed === true) {
-      return { required: true, status: "ok" };
-    }
-
-    if (Number(p.trust_score ?? 0) >= 85) {
-      return { required: true, status: "trust_bypass" };
-    }
-
-    throw new Error(
-      `Identity check required for withdrawals ≥ $${thr}. Complete the quick selfie verification in Settings.`,
-    );
-  } catch (e) {
-    if (e instanceof Error && e.message.includes("Identity check")) throw e;
-    return { required: false, status: "soft_skip" };
-  }
+  // Face/selfie verification removed from product UX — never block withdrawals.
+  void opts;
+  return { required: false, status: "not_needed" };
 }
 
 export const markSelfiePassed = createServerFn({ method: "POST" })
