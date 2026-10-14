@@ -8,7 +8,11 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwner } from "@/lib/owner-guard.server";
+
+async function assertOwner(userId: string) {
+  const { assertOwner: ao } = await import("@/lib/owner-guard-impl");
+  await ao(userId);
+}
 
 const ADVERTISER_COOLDOWN_HOURS = 4;
 const DEVICE_SAME_ADV_MAX = 3;
@@ -18,7 +22,7 @@ const KYC_WD_THRESHOLD_USD = 15;
 const PUBLIC_PAYOUT_LIMIT = 50;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/lib/strong-p7.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 
