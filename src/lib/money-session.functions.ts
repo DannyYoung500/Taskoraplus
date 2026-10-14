@@ -21,7 +21,7 @@ async function sha256Hex(s: string): Promise<string> {
 }
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
   return supabaseAdmin;
 }
 
@@ -33,7 +33,7 @@ export const mintMoneySession = createServerFn({ method: "POST" })
     if (!initData) throw new Error("Re-open TASKORA from Telegram to continue.");
 
     const { assertHardInitDataForMoney } = await import("@/lib/telegram-initdata");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabaseAdmin } = await import("@/lib/supabase-admin-impl");
 
     let expectedTg: number | null = null;
     try {
