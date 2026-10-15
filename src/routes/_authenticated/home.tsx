@@ -20,7 +20,6 @@ import { AppLink } from "@/components/AppLink";
 import { listDailyMissions } from "@/lib/daily-missions.functions";
 import { recordSecuritySignal } from "@/lib/security-engine.functions";
 import { PlatformLogo, platformLabel, type Platform } from "@/components/PlatformIcon";
-import { TaskCard } from "@/components/TaskCard";
 import { TASKORA_LOGO, ACCENT_GRAD } from "@/lib/brand";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { formatUsd, isDemoTaskTitle, isDemoTransactionLabel } from "@/lib/taskora-display";
@@ -111,126 +110,263 @@ function HomePage() {
 
   const name = profile?.display_name ?? "Tasker";
   const photo = profile?.photo_url ?? null;
-  const streak = Number(profile?.streak ?? 0);
-  const level = Number(levelStats?.level ?? profile?.level_num ?? 1);
-  const levelProgress = Number(levelStats?.progress ?? 0);
+  const streak = profile?.streak ?? 0;
+  const levelNum = Number(levelStats?.level ?? profile?.level_num ?? 1);
+  const progressPct = Number(levelStats?.progress ?? 0);
+  const isOwner = Boolean(dash?.isOwner);
 
   useEffect(() => {
-    syncMyTimezone().catch(() => {});
-    recordSecuritySignal({ signal: "home_view" }).catch(() => {});
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timezone) void syncMyTimezone({ data: { timezone } }).catch(() => {});
+    let cancelled = false;
+    void (async () => {
+      try {
+        const nav = navigator;
+        const stable = [
+          nav.userAgent,
+          nav.platform,
+          nav.language,
+          timezone,
+          String(nav.hardwareConcurrency ?? ""),
+          String((nav as Navigator & { deviceMemory?: number }).deviceMemory ?? ""),
+          String(window.screen?.width ?? ""),
+          String(window.screen?.height ?? ""),
+          String(window.screen?.colorDepth ?? ""),
+          String(window.devicePixelRatio ?? ""),
+        ].join("|");
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stable));
+        const deviceFp = Array.from(new Uint8Array(digest))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        if (!cancelled) {
+          await recordSecuritySignal({
+            data: {
+              deviceFp,
+              timezone,
+              language: nav.language,
+              screen: `${window.screen?.width ?? 0}x${window.screen?.height ?? 0}`,
+            },
+          });
+        }
+      } catch {
+        /* soft */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const [checking, setChecking] = useState(false);
-  const onCheckin = async () => {
-    if (checking) return;
-    setChecking(true);
+  const [checkMsg, setCheckMsg] = useState<string | null>(null);
+  const [checkBusy, setCheckBusy] = useState(false);
+
+  async function onCheckin() {
+    setCheckBusy(true);
+    setCheckMsg(null);
     try {
-      await dailyCheckin();
-    } catch {
-      /* ignore */
+      const r = await dailyCheckin();
+      setCheckMsg(r.already ? `Already checked in · streak ${r.streak}` : `Day ${r.streak} · Check-in complete`);
+    } catch (e) {
+      setCheckMsg(e instanceof Error ? e.message : "Check-in failed");
     } finally {
-      setChecking(false);
+      setCheckBusy(false);
     }
-  };
+  }
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-x-hidden bg-[#080808] px-4 pb-28 pt-3 text-neutral-100">
-      <header className="mb-4 flex items-center gap-3">
-        <img src={TASKORA_LOGO} alt="" className="size-10 rounded-full object-cover" draggable={false} />
+      <header className="mb-4 flex items-center gap-2.5">
+        <img src={TASKORA_LOGO} alt="TASKORA" className="size-9 rounded-lg object-cover" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold text-neutral-50">Hi, {name}</p>
-          <p className="text-[11px] text-neutral-500">Level {level} · Streak {streak}d</p>
+          <p className="text-[17px] font-semibold tracking-wide text-neutral-50">TASKORA</p>
+          <p className="text-[10px] font-normal text-neutral-500">Earn · Watch · Grow</p>
         </div>
-        <AppLink to="/notifications" className="flex size-9 items-center justify-center rounded-full bg-[#121212]">
-          <Bell className="size-4 text-neutral-400" />
+        <AppLink to="/notifications" aria-label="Notifications" className="p-2 text-neutral-400">
+          <Bell className="size-5" strokeWidth={1.75} />
+        </AppLink>
+        <AppLink to="/profile" className="flex items-center gap-1.5 rounded-full bg-[#141414] py-1 pl-1 pr-2.5">
+          {photo ? (
+            <img src={photo} alt="" className="size-7 rounded-full object-cover" />
+          ) : (
+            <span className="flex size-7 items-center justify-center rounded-full bg-neutral-800 text-xs font-medium text-neutral-300">
+              {name.charAt(0)}
+            </span>
+          )}
+          <div className="min-w-0 leading-tight">
+            <p className="max-w-[64px] truncate text-[11px] font-medium text-neutral-200">{name}</p>
+            <p className="text-[9px] font-normal text-neutral-500">Level {levelNum}</p>
+          </div>
         </AppLink>
       </header>
 
-      <section className="mb-4 rounded-2xl bg-[#121212] p-4">
-        <p className="text-[11px] text-neutral-500">Available balance</p>
-        <p className="mt-1 text-[28px] font-bold tracking-tight text-emerald-400">{formatUsd(balance)}</p>
-        <p className="mt-0.5 text-[11px] text-neutral-500">Pending {formatUsd(pending)}</p>
-        <div className="mt-3 flex gap-2">
-          <AppLink
-            to="/wallet"
-            className="flex-1 rounded-full py-2.5 text-center text-[12px] font-bold text-white"
-            style={{ background: ACCENT_GRAD }}
-          >
-            Wallet
-          </AppLink>
-          <button
-            type="button"
-            onClick={onCheckin}
-            disabled={checking}
-            className="flex-1 rounded-full bg-white/10 py-2.5 text-[12px] font-bold text-neutral-100 active:opacity-80 disabled:opacity-50"
-          >
-            {checking ? "..." : "Daily check-in"}
-          </button>
-        </div>
+      {isOwner ? (
+        <AppLink
+          to="/owner"
+          className="mb-3 flex items-center justify-between rounded-2xl bg-orange-500/10 px-3.5 py-2.5 text-[12px] font-medium text-orange-200"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Crown className="size-4" strokeWidth={1.75} /> Owner Control Center
+          </span>
+          <ChevronRight className="size-4" strokeWidth={1.75} />
+        </AppLink>
+      ) : null}
+
+      <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#121212] p-4">
+        <p className="text-[11px] font-normal text-neutral-500">Total balance</p>
+        <p className="mt-1.5 text-[36px] font-semibold leading-none tracking-tight text-neutral-50">
+          {formatUsd(balance)}
+        </p>
+        <p className="mt-2 text-[12px] font-normal text-neutral-500">
+          Available {formatUsd(balance)}
+          {pending > 0 ? <span> · Pending {formatUsd(pending)}</span> : null}
+        </p>
+        <AppLink
+          to="/wallet"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-medium text-white"
+          style={{ background: ACCENT_GRAD }}
+        >
+          <WalletCards className="size-3.5" strokeWidth={1.75} />
+          Withdraw
+        </AppLink>
       </section>
 
       <section className="mb-4">
-        <div className="mb-2 flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-orange-500" />
-          <p className="text-[12px] font-medium text-neutral-400">Quick actions</p>
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          <Quick to="/tasks" label="Tasks" Icon={ClipboardList} />
+        <div className="grid grid-cols-3 gap-2">
+          <Quick to="/tasks" label="Tasks" Icon={ClipboardCheck} />
           <Quick to="/watch-earn" label="Watch" Icon={PlayCircle} />
-          <Quick to="/my-tasks" label="My tasks" Icon={ClipboardCheck} />
-          <Quick to="/leaderboard" label="Ranks" Icon={Trophy} />
+          <Quick to="/advertise" label="Advertise" Icon={Megaphone} />
+          <Quick to="/leaderboard" label="Rank" Icon={Trophy} />
+          <Quick to="/ambassador" label="Invite" Icon={Users} />
+          <Quick to="/my-tasks" label="My orders" Icon={ClipboardList} />
         </div>
       </section>
 
+      <section className="mb-4 rounded-2xl bg-[#121212] p-3.5">
+        <div className="flex items-center gap-3">
+          <Trophy className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-medium text-neutral-100">Level {levelNum}</p>
+            <p className="text-[11px] font-normal text-neutral-500">Keep going for the next level</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[12px] font-medium text-orange-400">{progressPct}%</p>
+            <div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-orange-400" style={{ width: progressPct + "%" }} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <button
+        type="button"
+        disabled={checkBusy}
+        onClick={() => void onCheckin()}
+        className="mb-4 flex w-full items-center gap-3 rounded-2xl bg-[#121212] px-3.5 py-3 text-left active:opacity-90"
+      >
+        <CalendarCheck className="size-5 shrink-0 text-orange-400" strokeWidth={1.75} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-neutral-100">Daily check-in</p>
+          <p className="truncate text-[11px] font-normal text-neutral-500">
+            {checkMsg ?? `Streak ${streak}d · claim today's reward`}
+          </p>
+        </div>
+        <span className="text-[11px] font-medium text-orange-400">{checkBusy ? "…" : "Claim"}</span>
+      </button>
+
       <section className="mb-4">
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="text-[13px] font-medium text-neutral-200">Daily missions</p>
+          <AppLink to="/daily-missions" className="text-[11px] font-normal text-orange-400">
+            View all
+          </AppLink>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {missions.slice(0, 3).map((m: any) => (
+            <AppLink key={m.id} to="/daily-missions" className="rounded-2xl bg-[#121212] p-2.5 active:opacity-90">
+              {m.mission_type === "rewarded_ad" ? (
+                <PlayCircle className="size-4 text-orange-400" strokeWidth={1.75} />
+              ) : (
+                <ClipboardCheck className="size-4 text-emerald-400" strokeWidth={1.75} />
+              )}
+              <p className="mt-2 line-clamp-2 text-[11px] font-medium leading-tight text-neutral-200">{m.title}</p>
+              <p className="mt-1 text-[10px] font-normal text-orange-400">
+                {Number(m.reward_usdt) > 0 ? formatUsd(m.reward_usdt) : "Bonus"}
+              </p>
+            </AppLink>
+          ))}
+          {missions.length === 0 ? (
+            <p className="col-span-3 rounded-2xl bg-[#121212] p-4 text-center text-[12px] font-normal text-neutral-600">
+              No missions today
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      <section>
         <div className="mb-2.5 flex items-center justify-between">
           <p className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-200">
             <Flame className="size-3.5 text-orange-400" strokeWidth={1.75} /> Top tasks
           </p>
           <AppLink to="/tasks" className="text-[11px] font-normal text-orange-400">
-            View all
+            Browse all
           </AppLink>
         </div>
         <div className="space-y-2">
           {tasks.length === 0 ? (
             <p className="rounded-2xl bg-[#121212] p-4 text-[13px] font-normal text-neutral-500">
-              No tasks yet - check back soon
+              No tasks yet — check back soon
             </p>
           ) : (
-            tasks.map((t: any) => (
-              <TaskCard
-                key={t.id}
-                task={{
-                  id: String(t.id),
-                  platform: String(t.platform || ""),
-                  title: String(t.title || ""),
-                  advertiser: t.advertiser,
-                  reward: Number(t.reward ?? 0),
-                  points: t.points,
-                  seconds: Number(t.seconds ?? 0),
-                  slots_left: t.slots_left,
-                  slots_total: t.slots_total,
-                  featured: Boolean(t.featured),
-                }}
-              />
+            tasks.map((t: { id: string; title: string; reward: number; platform: string; advertiser?: string; seconds?: number; featured?: boolean }) => (
+              <article key={t.id} className="rounded-2xl bg-[#121212] p-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#1a1a1a]">
+                    <PlatformLogo platform={t.platform as Platform} size={26} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-medium text-neutral-50">{t.title}</p>
+                        <p className="mt-0.5 text-[11px] text-neutral-500">
+                          {platformLabel(t.platform as Platform)}
+                        </p>
+                      </div>
+                      {t.featured ? (
+                        <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase text-amber-400">
+                          Featured
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[16px] font-semibold text-emerald-400">
+                        {formatUsd(Number(t.reward))}
+                      </span>
+                      <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-400">
+                        EASY
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <AppLink
+                  to="/tasks/$taskId"
+                  params={{ taskId: String(t.id) }}
+                  className="mt-3 flex w-full items-center justify-center rounded-xl bg-orange-500 py-2.5 text-[13px] font-medium text-[#0a0a0a]"
+                >
+                  Start Task
+                </AppLink>
+              </article>
             ))
           )}
         </div>
+        {tasks.length > 0 ? (
+          <AppLink
+            to="/tasks"
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-orange-500/30 bg-orange-500/10 py-3 text-[13px] font-medium text-orange-400"
+          >
+            Browse all tasks
+          </AppLink>
+        ) : null}
       </section>
-
-      {missions && missions.length > 0 ? (
-        <section className="mb-4">
-          <p className="mb-2 text-[13px] font-medium text-neutral-200">Daily missions</p>
-          <div className="space-y-2">
-            {missions.slice(0, 3).map((m: any) => (
-              <div key={m.id || m.title} className="rounded-2xl bg-[#121212] px-3 py-2.5">
-                <p className="text-[13px] font-medium text-neutral-100">{m.title || m.name}</p>
-                <p className="mt-0.5 text-[11px] text-neutral-500">{m.description || m.reward_label || ""}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </main>
   );
 }
@@ -245,11 +381,12 @@ function Quick({
   Icon: ComponentType<{ className?: string; strokeWidth?: number }>;
 }) {
   return (
-    <AppLink to={to} className="flex flex-col items-center gap-1.5 rounded-2xl bg-[#121212] px-1 py-3">
-      <span className="flex size-9 items-center justify-center rounded-xl bg-orange-500/15">
-        <Icon className="size-4 text-orange-400" strokeWidth={1.75} />
-      </span>
-      <p className="truncate text-[10px] font-normal text-neutral-400">{label}</p>
+    <AppLink
+      to={to}
+      className="flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[#121212] px-1 py-2.5 text-center active:opacity-90"
+    >
+      <Icon className="size-5 text-orange-400" strokeWidth={1.75} />
+      <p className="mt-1.5 w-full truncate text-[10px] font-normal text-neutral-400">{label}</p>
     </AppLink>
   );
 }
