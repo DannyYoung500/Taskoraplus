@@ -47,15 +47,45 @@ export const Route = createFileRoute("/_authenticated/wallet")({
 });
 
 const WITHDRAW_METHODS = [
-  { id: "USDT · BEP20", label: "USDT", network: "BEP20 (BSC)" },
-  { id: "USDT · TRC20", label: "USDT", network: "TRC20 (TRX / Tron)" },
+  { id: "USDT · TRC20", label: "USDT", network: "TRC20 · Tron" },
+  { id: "USDT · BEP20", label: "USDT", network: "BEP20 · BNB Smart Chain" },
+  { id: "USDT · ERC20", label: "USDT", network: "ERC20 · Ethereum" },
+  { id: "TON", label: "TON", network: "TON · The Open Network" },
+  { id: "BTC", label: "Bitcoin", network: "Bitcoin network" },
+  { id: "ETH", label: "Ethereum", network: "ERC20 · Ethereum" },
+  { id: "BNB · BEP20", label: "BNB", network: "BEP20 · BNB Smart Chain" },
 ] as const;
 
 const SUPPORTED_DEPOSIT_ASSETS = [
-  { id: "TON", label: "TON", network: "TON" },
-  { id: "USDT · BEP20", label: "USDT", network: "BEP20 (BSC)" },
-  { id: "USDT · TRC20", label: "USDT", network: "TRC20 (TRX / Tron)" },
+  { id: "USDT · TRC20", label: "USDT", network: "TRC20 · Tron" },
+  { id: "USDT · BEP20", label: "USDT", network: "BEP20 · BNB Smart Chain" },
+  { id: "USDT · ERC20", label: "USDT", network: "ERC20 · Ethereum" },
+  { id: "TON", label: "TON", network: "TON · The Open Network" },
+  { id: "BTC", label: "Bitcoin", network: "Bitcoin network" },
+  { id: "ETH", label: "Ethereum", network: "ERC20 · Ethereum" },
+  { id: "BNB · BEP20", label: "BNB", network: "BEP20 · BNB Smart Chain" },
 ] as const;
+
+function validCryptoAddress(method: string, address: string): boolean {
+  const value = address.trim().replace(/\\s+/g, "");
+  if (method.includes("TRC20")) return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value);
+  if (method.includes("BEP20") || method.includes("ERC20") || method === "ETH" || method === "BNB · BEP20") {
+    return /^0x[a-fA-F0-9]{40}$/.test(value);
+  }
+  if (method === "BTC") {
+    return /^(bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i.test(value);
+  }
+  if (method === "TON") {
+    return /^(?:-?0:[a-fA-F0-9]{64}|(?:EQ|UQ)[A-Za-z0-9_-]{46})$/.test(value);
+  }
+  return false;
+}
+
+function validTransactionHash(method: string, hash: string): boolean {
+  const value = hash.trim();
+  if (method === "TON") return /^[A-Za-z0-9_-]{32,128}$/.test(value);
+  return /^(?:0x)?[a-fA-F0-9]{64}$/.test(value);
+}
 
 function WalletScreen() {
   const { dash, features, error: loadError } = Route.useLoaderData();
@@ -88,7 +118,10 @@ function WalletScreen() {
     address: a.address,
   }));
   const depositMethods = SUPPORTED_DEPOSIT_ASSETS.map((asset) => {
-    const configured = configuredDeposits.find((a) => a.id === asset.id || a.label === asset.label);
+    // Match the exact asset/network first; label-only matching can accidentally
+    // show a TRC20 address for an ERC20 deposit.
+    const configured = configuredDeposits.find((a) => a.id === asset.id) ??
+      configuredDeposits.find((a) => a.label === asset.label && a.network === asset.network);
     return { ...asset, address: configured?.address ?? "" };
   });
 
@@ -99,6 +132,15 @@ function WalletScreen() {
   const txs = dash?.transactions ?? [];
 
   async function onWithdraw() {
+    if (!validCryptoAddress(wMethod, wAddress)) {
+      setWMsg("Enter a valid address for the selected coin and network.");
+      return;
+    }
+    const amount = Number(wAmount);
+    if (!Number.isFinite(amount) || amount < minWd) {
+      setWMsg(`Minimum withdrawal is ${formatUsd(minWd)}.`);
+      return;
+    }
     setWBusy(true);
     setWMsg(null);
     try {
@@ -152,8 +194,21 @@ function WalletScreen() {
   }
 
   async function onDeposit() {
-    if (!dMethod) {
-      setDMsg("No deposit address configured. Contact support.");
+    if (!dMethod?.address) {
+      setDMsg("This network is not configured yet. Do not send funds; contact support.");
+      return;
+    }
+    const amount = Number(dAmount);
+    if (!Number.isFinite(amount) || amount < minDep) {
+      setDMsg(`Minimum deposit is ${formatUsd(minDep)}.`);
+      return;
+    }
+    if (!dTxHash.trim()) {
+      setDMsg("Enter the on-chain transaction hash after sending your crypto.");
+      return;
+    }
+    if (!validTransactionHash(dMethod.id, dTxHash)) {
+      setDMsg("The transaction hash format does not match the selected network.");
       return;
     }
     setDBusy(true);
@@ -327,11 +382,11 @@ function WalletScreen() {
               inputMode="decimal"
               className="w-full rounded-xl bg-[#0a0a0a] px-4 py-3.5 text-sm font-normal text-neutral-100 outline-none focus:ring-1 focus:ring-orange-400/30"
             />
-            <label className="block text-[10px] font-normal text-neutral-500">TX hash (recommended)</label>
+            <label className="block text-[10px] font-normal text-neutral-500">On-chain transaction hash (required)</label>
             <input
               value={dTxHash}
               onChange={(e) => setDTxHash(e.target.value)}
-              placeholder="Paste TX hash"
+              placeholder="Paste transaction hash"
               className="w-full rounded-xl bg-[#0a0a0a] px-4 py-3.5 text-sm font-normal text-neutral-100 outline-none focus:ring-1 focus:ring-orange-400/30"
             />
             <button
