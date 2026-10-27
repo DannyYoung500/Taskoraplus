@@ -2,6 +2,17 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { RULES, hoursSince, normalizeWalletAddress } from "@/lib/platform-rules";
 
+const CRYPTO_METHODS = ["USDT · TRC20", "USDT · BEP20", "USDT · ERC20", "TON", "BTC", "ETH", "BNB · BEP20"] as const;
+
+function validCryptoAddress(method: string, address: string): boolean {
+  const value = address.trim().replace(/\\s+/g, "");
+  if (method === "USDT · TRC20") return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value);
+  if (["USDT · BEP20", "USDT · ERC20", "ETH", "BNB · BEP20"].includes(method)) return /^0x[a-fA-F0-9]{40}$/.test(value);
+  if (method === "BTC") return /^(bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i.test(value);
+  if (method === "TON") return /^(?:-?0:[a-fA-F0-9]{64}|(?:EQ|UQ)[A-Za-z0-9_-]{46})$/.test(value);
+  return false;
+}
+
 async function getMaintenanceSwitches() {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -24,8 +35,11 @@ export const requestWithdrawalGuarded = createServerFn({ method: "POST" })
   .inputValidator((d: { method: string; address: string; amount: number; initData?: string | undefined; sessionToken?: string | undefined }) => d)
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const address = normalizeWalletAddress(data.address);
-    if (!address || address.length < 10) throw new Error("Enter a valid wallet address.");
+    const method = String(data.method ?? "").trim();
+    const rawAddress = String(data.address ?? "").trim().replace(/\\s+/g, "");
+    if (!(CRYPTO_METHODS as readonly string[]).includes(method)) throw new Error("Choose a supported cryptocurrency network.");
+    if (!validCryptoAddress(method, rawAddress)) throw new Error("The wallet address format does not match the selected coin and network.");
+    const address = normalizeWalletAddress(rawAddress);
 
     try {
       const { assertActionRateLimit } = await import("@/lib/strong-ops");
