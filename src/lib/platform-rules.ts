@@ -121,5 +121,10 @@ export function hoursSince(iso: string | null | undefined): number {
 }
 
 export function normalizeWalletAddress(addr: string): string {
-  return addr.trim().toLowerCase().replace(/\s+/g, "");
+  const value = addr.trim().replace(/\s+/g, "");
+  // EVM addresses are case-insensitive for duplicate detection; preserve case
+  // for Base58 and TON formats, where lowercasing changes the address.
+  if (/^0x[a-fA-F0-9]{40}$/.test(value)) return value.toLowerCase();
+  if (/^bc1/i.test(value)) return value.toLowerCase();
+  return value;
 }

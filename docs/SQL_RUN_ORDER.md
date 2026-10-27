@@ -24,3 +24,16 @@ Creates:
 1. Redeploy Vercel
 2. Owner → Settings → Telegram Gate (optional)
 3. Bot must be **admin** of the channel for membership checks
+
+
+### 3. Crypto wallet foundation (after core tables exist)
+
+Apply `supabase/migrations/20261027220000_crypto_wallet_foundation.sql` in Supabase SQL Editor, or deploy it through the Supabase migration workflow.
+
+This migration is additive and preserves existing balances and transactions. It adds:
+- Network-specific crypto configuration for USDT TRC20/BEP20/ERC20, TON, BTC, ETH, and BNB BEP20.
+- Deposit/withdrawal transaction metadata and query indexes.
+- A service-role-only webhook event inbox with provider/event idempotency.
+- Row-level security for network settings.
+
+**All seeded networks start disabled and without addresses.** Configure and verify a real receive address or payment provider before enabling deposits. This schema alone does not verify blockchain payments or automatically send withdrawals; signed provider webhooks and a server-side payment integration are still required.
