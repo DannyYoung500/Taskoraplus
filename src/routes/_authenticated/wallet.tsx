@@ -67,7 +67,7 @@ const SUPPORTED_DEPOSIT_ASSETS = [
 ] as const;
 
 function validCryptoAddress(method: string, address: string): boolean {
-  const value = address.trim().replace(/\\s+/g, "");
+  const value = address.trim().replace(/\s+/g, "");
   if (method.includes("TRC20")) return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value);
   if (method.includes("BEP20") || method.includes("ERC20") || method === "ETH" || method === "BNB · BEP20") {
     return /^0x[a-fA-F0-9]{40}$/.test(value);
