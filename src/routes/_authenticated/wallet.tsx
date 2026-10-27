@@ -298,7 +298,7 @@ function WalletScreen() {
             <ol className="space-y-1.5 text-[11px] font-normal leading-snug text-neutral-400">
               <li>1. Choose network & copy the address</li>
               <li>2. Send crypto (min {formatUsd(minDep)})</li>
-              <li>3. Submit amount + TX hash for faster review</li>
+              <li>3. Submit amount + transaction hash for review</li>
             </ol>
           </div>
 
